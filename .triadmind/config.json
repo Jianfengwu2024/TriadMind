@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.1",
+  "architecture": {
+    "language": "typescript",
+    "parserEngine": "native",
+    "adapter": "@triadmind/plugin-ts"
+  },
+  "categories": {
+    "frontend": [
+      "src/frontend",
+      "frontend"
+    ],
+    "backend": [
+      "src/backend",
+      "backend"
+    ],
+    "core": [
+      "src/core",
+      "core"
+    ]
+  },
+  "parser": {
+    "excludePatterns": [
+      "node_modules",
+      ".triadmind"
+    ],
+    "includeUntaggedExports": true,
+    "jsDocTags": {
+      "triadNode": "TriadNode",
+      "leftBranch": "LeftBranch",
+      "rightBranch": "RightBranch"
+    }
+  },
+  "protocol": {
+    "minConfidence": 0.6,
+    "requireConfidence": false
+  },
+  "runtimeHealing": {
+    "enabled": true,
+    "maxAutoRetries": 3,
+    "requireHumanApprovalForContractChanges": true,
+    "snapshotStrategy": "manual"
+  }
+}

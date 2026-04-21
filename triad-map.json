@@ -1,0 +1,42 @@
+[
+  {
+    "nodeId": "ComputeEngine.step",
+    "category": "backend",
+    "fission": {
+      "problem": "执行 step 流程",
+      "demand": [
+        "SimState (currentState)",
+        "SimConfig (config)"
+      ],
+      "answer": [
+        "SimState"
+      ]
+    }
+  },
+  {
+    "nodeId": "DataStream.pushState",
+    "category": "backend",
+    "fission": {
+      "problem": "执行 pushState 流程",
+      "demand": [
+        "SimState (state)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "DataStream.getLatestState",
+    "category": "backend",
+    "fission": {
+      "problem": "执行 getLatestState 流程",
+      "demand": [
+        "None (无外部数据依赖)"
+      ],
+      "answer": [
+        "SimState | null"
+      ]
+    }
+  }
+]

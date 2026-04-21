@@ -1,0 +1,742 @@
+[
+  {
+    "nodeId": "Adapter.getAvailableAdapters",
+    "category": "core",
+    "sourcePath": "adapter.ts",
+    "fission": {
+      "problem": "执行 getAvailableAdapters 流程",
+      "demand": [
+        "None"
+      ],
+      "answer": [
+        "TriadLanguageAdapter[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Adapter.resolveAdapter",
+    "category": "core",
+    "sourcePath": "adapter.ts",
+    "fission": {
+      "problem": "执行 resolveAdapter 流程",
+      "demand": [
+        "WorkspacePaths | string (pathsOrProjectRoot)"
+      ],
+      "answer": [
+        "TriadLanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "Bootstrap.buildSelfBootstrapArchitecture",
+    "category": "core",
+    "sourcePath": "bootstrap.ts",
+    "fission": {
+      "problem": "执行 buildSelfBootstrapArchitecture 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "SelfBootstrapArchitecture"
+      ]
+    }
+  },
+  {
+    "nodeId": "Bootstrap.buildSelfBootstrapProtocol",
+    "category": "core",
+    "sourcePath": "bootstrap.ts",
+    "fission": {
+      "problem": "执行 buildSelfBootstrapProtocol 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "UpgradeProtocol"
+      ]
+    }
+  },
+  {
+    "nodeId": "Bootstrap.writeSelfBootstrapProtocol",
+    "category": "core",
+    "sourcePath": "bootstrap.ts",
+    "fission": {
+      "problem": "执行 writeSelfBootstrapProtocol 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "UpgradeProtocol"
+      ]
+    }
+  },
+  {
+    "nodeId": "Bootstrap.writeSelfBootstrapReport",
+    "category": "core",
+    "sourcePath": "bootstrap.ts",
+    "fission": {
+      "problem": "执行 writeSelfBootstrapReport 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Config.ensureTriadConfig",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "执行 ensureTriadConfig 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "unknown (force)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Config.loadTriadConfig",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "执行 loadTriadConfig 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "TriadConfig"
+      ]
+    }
+  },
+  {
+    "nodeId": "Config.resolveCategoryFromConfig",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "执行 resolveCategoryFromConfig 流程",
+      "demand": [
+        "string (sourcePath)",
+        "TriadConfig (config)"
+      ],
+      "answer": [
+        "TriadCategory"
+      ]
+    }
+  },
+  {
+    "nodeId": "Config.shouldExcludeSourcePath",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "执行 shouldExcludeSourcePath 流程",
+      "demand": [
+        "string (sourcePath)",
+        "TriadConfig (config)"
+      ],
+      "answer": [
+        "boolean"
+      ]
+    }
+  },
+  {
+    "nodeId": "Generator.applyProtocol",
+    "category": "core",
+    "sourcePath": "generator.ts",
+    "fission": {
+      "problem": "执行 applyProtocol 流程",
+      "demand": [
+        "string (projectRoot)",
+        "string (protocolPath)"
+      ],
+      "answer": [
+        "{ changedFiles: string[]; }"
+      ]
+    }
+  },
+  {
+    "nodeId": "Healing.buildHealingPrompt",
+    "category": "core",
+    "sourcePath": "healing.ts",
+    "fission": {
+      "problem": "执行 buildHealingPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (errorText)",
+        "HealingDiagnosis (diagnosis)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Healing.diagnoseRuntimeFailure",
+    "category": "core",
+    "sourcePath": "healing.ts",
+    "fission": {
+      "problem": "执行 diagnoseRuntimeFailure 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (errorText)",
+        "number (retryCount)",
+        "TriadNodeDefinition[] (nodes)"
+      ],
+      "answer": [
+        "HealingDiagnosis"
+      ]
+    }
+  },
+  {
+    "nodeId": "Healing.prepareHealingArtifacts",
+    "category": "core",
+    "sourcePath": "healing.ts",
+    "fission": {
+      "problem": "执行 prepareHealingArtifacts 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (errorText)",
+        "unknown (retryCount)"
+      ],
+      "answer": [
+        "{ diagnosis: HealingDiagnosis; prompt: string; }"
+      ]
+    }
+  },
+  {
+    "nodeId": "Ir.buildTopologyIR",
+    "category": "core",
+    "sourcePath": "ir.ts",
+    "fission": {
+      "problem": "执行 buildTopologyIR 流程",
+      "demand": [
+        "TriadNodeDefinition[] (nodes)",
+        "TriadLanguage (language)"
+      ],
+      "answer": [
+        "TriadTopologyIR"
+      ]
+    }
+  },
+  {
+    "nodeId": "Parser.runParser",
+    "category": "core",
+    "sourcePath": "parser.ts",
+    "fission": {
+      "problem": "执行 runParser 流程",
+      "demand": [
+        "string (targetDir)",
+        "string (outputPath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Protocol.assertProtocolShape",
+    "category": "core",
+    "sourcePath": "protocol.ts",
+    "fission": {
+      "problem": "执行 assertProtocolShape 流程",
+      "demand": [
+        "UpgradeProtocol (protocol)",
+        "ProtocolValidationContext (context)"
+      ],
+      "answer": [
+        "{ actions: ({ op: \"reuse\"; nodeId: string; reason?: string | undefined; confidence?: number | undefined; } | { op: \"modify\"; nodeId: string; fission: { problem: string; demand: string[]; answer: string[]; }; category?: \"frontend\" | \"backend\" | \"core\" | undefined; sourcePath?: string | undefined; reason?: string | undefined; reuse?: string[] | undefined; confidence?: number | undefined; } | { op: \"create_child\"; parentNodeId: string; node: { nodeId: string; fission: { problem: string; demand: string[]; answer: string[]; }; category?: \"frontend\" | \"backend\" | \"core\" | undefined; sourcePath?: string | undefined; }; reason?: string | undefined; reuse?: string[] | undefined; confidence?: number | undefined; })[]; protocolVersion?: string | undefined; project?: string | undefined; mapSource?: string | undefined; userDemand?: string | undefined; upgradePolicy?: { allowedOps?: (\"reuse\" | \"modify\" | \"create_child\")[] | undefined; principle?: string | undefined; } | undefined; macroSplit?: { anchorNodeId: string; vertexGoal: string; leftBranch: string[]; rightBranch: string[]; } | undefined; mesoSplit?: { classes: { className: string; category: string; responsibility: string; upstreams: string[]; downstreams: string[]; }[]; pipelines: { pipelineId: string; purpose: string; steps: string[]; }[]; } | undefined; microSplit?: { classes: { className: string; staticRightBranch: { name: string; type: string; role: string; }[]; dynamicLeftBranch: { name: string; demand: string[]; answer: string[]; responsibility: string; }[]; }[]; } | undefined; resultTopology?: { nodeId: string; fission: { problem: string; demand: string[]; answer: string[]; }; category?: \"frontend\" | \"backend\" | \"core\" | undefined; sourcePath?: string | undefined; }[] | undefined; }"
+      ]
+    }
+  },
+  {
+    "nodeId": "Protocol.normalizeCategory",
+    "category": "core",
+    "sourcePath": "protocol.ts",
+    "fission": {
+      "problem": "执行 normalizeCategory 流程",
+      "demand": [
+        "string (category)",
+        "TriadCategory (fallback)"
+      ],
+      "answer": [
+        "TriadCategory"
+      ]
+    }
+  },
+  {
+    "nodeId": "Protocol.parseDemandEntry",
+    "category": "core",
+    "sourcePath": "protocol.ts",
+    "fission": {
+      "problem": "执行 parseDemandEntry 流程",
+      "demand": [
+        "string (entry)",
+        "number (index)"
+      ],
+      "answer": [
+        "ParsedDemand | null"
+      ]
+    }
+  },
+  {
+    "nodeId": "Protocol.parseNodeRef",
+    "category": "core",
+    "sourcePath": "protocol.ts",
+    "fission": {
+      "problem": "执行 parseNodeRef 流程",
+      "demand": [
+        "string (nodeId)",
+        "string (category)"
+      ],
+      "answer": [
+        "ParsedNodeRef"
+      ]
+    }
+  },
+  {
+    "nodeId": "Protocol.parseReturnType",
+    "category": "core",
+    "sourcePath": "protocol.ts",
+    "fission": {
+      "problem": "执行 parseReturnType 流程",
+      "demand": [
+        "string (answer)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Protocol.readJsonFile",
+    "category": "core",
+    "sourcePath": "protocol.ts",
+    "fission": {
+      "problem": "执行 readJsonFile 流程",
+      "demand": [
+        "string (filePath)"
+      ],
+      "answer": [
+        "T"
+      ]
+    }
+  },
+  {
+    "nodeId": "Protocol.readTriadMap",
+    "category": "core",
+    "sourcePath": "protocol.ts",
+    "fission": {
+      "problem": "执行 readTriadMap 流程",
+      "demand": [
+        "string (mapPath)"
+      ],
+      "answer": [
+        "TriadNodeDefinition[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Rules.installAlwaysOnRules",
+    "category": "core",
+    "sourcePath": "rules.ts",
+    "fission": {
+      "problem": "执行 installAlwaysOnRules 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Snapshot.collectProtocolSnapshotFiles",
+    "category": "core",
+    "sourcePath": "snapshot.ts",
+    "fission": {
+      "problem": "执行 collectProtocolSnapshotFiles 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "UpgradeProtocol (protocol)"
+      ],
+      "answer": [
+        "string[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Snapshot.createSnapshot",
+    "category": "core",
+    "sourcePath": "snapshot.ts",
+    "fission": {
+      "problem": "执行 createSnapshot 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (label)",
+        "string[] (filePaths)"
+      ],
+      "answer": [
+        "TriadSnapshot"
+      ]
+    }
+  },
+  {
+    "nodeId": "Snapshot.listSnapshots",
+    "category": "core",
+    "sourcePath": "snapshot.ts",
+    "fission": {
+      "problem": "执行 listSnapshots 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "Pick<TriadSnapshot, \"id\" | \"label\" | \"createdAt\">[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Snapshot.restoreSnapshot",
+    "category": "core",
+    "sourcePath": "snapshot.ts",
+    "fission": {
+      "problem": "执行 restoreSnapshot 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (snapshotId)"
+      ],
+      "answer": [
+        "TriadSnapshot"
+      ]
+    }
+  },
+  {
+    "nodeId": "Stage.analyzeWorkspaceStage",
+    "category": "core",
+    "sourcePath": "stage.ts",
+    "fission": {
+      "problem": "执行 analyzeWorkspaceStage 流程",
+      "demand": [
+        "StageAnalysisInput (input)"
+      ],
+      "answer": [
+        "StageAnalysisResult"
+      ]
+    }
+  },
+  {
+    "nodeId": "Sync.syncTriadMap",
+    "category": "core",
+    "sourcePath": "sync.ts",
+    "fission": {
+      "problem": "执行 syncTriadMap 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "unknown (force)"
+      ],
+      "answer": [
+        "{ changed: boolean; fileCount: number; }"
+      ]
+    }
+  },
+  {
+    "nodeId": "Sync.watchTriadMap",
+    "category": "core",
+    "sourcePath": "sync.ts",
+    "fission": {
+      "problem": "执行 watchTriadMap 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "TreeSitterParser.runTreeSitterTypeScriptParser",
+    "category": "core",
+    "sourcePath": "treeSitterParser.ts",
+    "fission": {
+      "problem": "执行 runTreeSitterTypeScriptParser 流程",
+      "demand": [
+        "string (targetDir)",
+        "string (outputPath)",
+        "TriadConfig (config)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Visualizer.generateDashboard",
+    "category": "core",
+    "sourcePath": "visualizer.ts",
+    "fission": {
+      "problem": "执行 generateDashboard 流程",
+      "demand": [
+        "string (mapPath)",
+        "string (protocolPath)",
+        "string (outputPath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildImplementationHandoffPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildImplementationHandoffPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (triadSpec)",
+        "ImplementationHandoffInput (input)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildImplementationPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildImplementationPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildMacroPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildMacroPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildMasterPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildMasterPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildMesoPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildMesoPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildMicroPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildMicroPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildPipelinePrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildPipelinePrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.buildProtocolPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 buildProtocolPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.createDraftTemplate",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 createDraftTemplate 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "unknown (userDemand)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.ensureMultiPassTemplates",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 ensureMultiPassTemplates 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.ensureTriadSpec",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 ensureTriadSpec 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "unknown (force)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.resetPipelineArtifacts",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 resetPipelineArtifacts 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.writeImplementationHandoff",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 writeImplementationHandoff 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "ImplementationHandoffInput (input)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.writeMasterPrompt",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 writeMasterPrompt 流程",
+      "demand": [
+        "WorkspacePaths (paths)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.writePromptPacket",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 writePromptPacket 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workspace.getWorkspacePaths",
+    "category": "core",
+    "sourcePath": "workspace.ts",
+    "fission": {
+      "problem": "执行 getWorkspacePaths 流程",
+      "demand": [
+        "string (projectRoot)"
+      ],
+      "answer": [
+        "WorkspacePaths"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workspace.normalizePath",
+    "category": "core",
+    "sourcePath": "workspace.ts",
+    "fission": {
+      "problem": "执行 normalizePath 流程",
+      "demand": [
+        "string (input)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  }
+]

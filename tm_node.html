@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>TriadMind 架构落点视图</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', monospace; overflow: hidden; }
+        #header { padding: 20px; background: #2d2d2d; border-bottom: 2px solid #007acc; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 10; position: relative;}
+        h1 { margin: 0; font-size: 24px; color: #569cd6; }
+        .subtitle { font-size: 14px; color: #9cdcfe; margin-top: 5px; }
+        #canvas-container { width: 100vw; height: calc(100vh - 80px); position: relative; }
+        .node-existing { fill: #3a3d41; stroke: #569cd6; stroke-width: 2px; }
+        .node-new { fill: #007acc; stroke: #4fc1ff; stroke-width: 3px; filter: drop-shadow(0 0 8px #007acc); }
+        .link-reuse { stroke: #ce9178; stroke-dasharray: 5,5; stroke-width: 2px; }
+        .link-standard { stroke: #555; stroke-width: 1px; }
+        .node-text { fill: #d4d4d4; font-size: 12px; pointer-events: none; text-anchor: middle; }
+        .tooltip { position: absolute; background: rgba(30,30,30,0.9); border: 1px solid #007acc; padding: 10px; border-radius: 4px; pointer-events: none; opacity: 0; color: #d4d4d4; font-size: 12px; max-width: 300px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); z-index: 100; }
+        .legend { position: absolute; bottom: 20px; left: 20px; background: rgba(45,45,45,0.8); padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>TriadMind 架构协同驾驶舱</h1>
+        <div class="subtitle">需求：在前端新增一个导出按钮，能把当前流体粒子状态保存为CSV。</div>
+    </div>
+    
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background: #3a3d41; border: 2px solid #569cd6;"></div> 原有稳定节点</div>
+        <div class="legend-item"><div class="legend-color" style="background: #007acc; border: 2px solid #4fc1ff; box-shadow: 0 0 5px #007acc;"></div> 增量裂变节点</div>
+        <div class="legend-item"><div style="width: 15px; border-top: 2px dashed #ce9178; margin-right: 5px;"></div> 复用/读取数据流</div>
+    </div>
+
+    <div id="canvas-container"></div>
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        // 已经为你融合好的图谱数据
+        const graphData = {
+            nodes: [
+                { id: "ComputeEngine.step", group: 2, status: "existing", problem: "执行 step 流程" },
+                { id: "DataStream.pushState", group: 2, status: "existing", problem: "执行 pushState 流程" },
+                { id: "DataStream.getLatestState", group: 2, status: "existing", problem: "执行 getLatestState 流程" },
+                { id: "Frontend.ExportCurrentStateCsv", group: 1, status: "new", problem: "将当前流体粒子状态转换为可下载的 CSV 内容。" },
+                { id: "Frontend.ExportCsvButton", group: 1, status: "new", problem: "在前端提供导出按钮，点击后触发当前粒子状态的 CSV 保存。" }
+            ],
+            links: [
+                { source: "Frontend.ExportCurrentStateCsv", target: "DataStream.getLatestState", type: "reuse", label: "复用 / 依赖" },
+                { source: "Frontend.ExportCsvButton", target: "Frontend.ExportCurrentStateCsv", type: "standard", label: "触发" }
+            ]
+        };
+
+        const width = window.innerWidth;
+        const height = window.innerHeight - 80;
+
+        const svg = d3.select("#canvas-container").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        const simulation = d3.forceSimulation(graphData.nodes)
+            .force("link", d3.forceLink(graphData.links).id(d => d.id).distance(150))
+            .force("charge", d3.forceManyBody().strength(-1000))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("x", d3.forceX(d => d.group === 1 ? width * 0.3 : width * 0.7).strength(0.5))
+            .force("y", d3.forceY(height / 2).strength(0.1));
+
+        const link = svg.append("g")
+            .selectAll("line")
+            .data(graphData.links)
+            .enter().append("line")
+            .attr("class", d => d.type === 'reuse' ? 'link-reuse' : 'link-standard');
+
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(graphData.nodes)
+            .enter().append("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        node.append("circle")
+            .attr("r", 25)
+            .attr("class", d => d.status === 'new' ? 'node-new' : 'node-existing')
+            .on("mouseover", function(event, d) {
+                d3.select("#tooltip")
+                  .style("opacity", 1)
+                  .html("<strong>" + d.id + "</strong><br/><br/><strong>架构职责:</strong> " + d.problem)
+                  .style("left", (event.pageX + 15) + "px")
+                  .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", function() {
+                d3.select("#tooltip").style("opacity", 0);
+            });
+
+        node.append("text")
+            .attr("class", "node-text")
+            .attr("dy", 40)
+            .text(d => d.id.split('.').pop());
+
+        simulation.on("tick", () => {
+            link.attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+            node.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+        });
+
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x; d.fy = d.y;
+        }
+        function dragged(event, d) {
+            d.fx = event.x; d.fy = event.y;
+        }
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null; d.fy = null;
+        }
+    </script>
+</body>
+</html>

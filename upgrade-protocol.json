@@ -1,0 +1,131 @@
+{
+"protocolVersion": "1.0",
+"project": "D:/TraidMind/microflow-ts",
+"mapSource": "D:/TraidMind/triadmind-core/triad-map.json",
+"userDemand": "在前端新增一个导出按钮，能把当前流体粒子状态保存为CSV。",
+"upgradePolicy": {
+"allowedOps": ["reuse", "modify", "create_child"],
+"principle": "reuse_first_minimal_change"
+},
+"actions": [
+{
+"op": "reuse",
+"nodeId": "DataStream.getLatestState",
+"reason": "复用现有最新状态读取能力，避免重复构造当前粒子状态来源。",
+"binding": {
+"provided": ["SimState | null"],
+"usedAs": "currentStateSource"
+}
+},
+{
+"op": "create_child",
+"parentNodeId": "DataStream.getLatestState",
+"node": {
+"nodeId": "Frontend.ExportCurrentStateCsv",
+"category": "frontend",
+"fission": {
+"problem": "将当前流体粒子状态转换为可下载的 CSV 内容。",
+"demand": [
+"SimState (currentState)"
+],
+"answer": [
+"string (csvText)"
+]
+}
+},
+"reuse": [
+"DataStream.getLatestState"
+]
+},
+{
+"op": "create_child",
+"parentNodeId": "Frontend.ExportCurrentStateCsv",
+"node": {
+"nodeId": "Frontend.ExportCsvButton",
+"category": "frontend",
+"fission": {
+"problem": "在前端提供导出按钮，点击后触发当前粒子状态的 CSV 保存。",
+"demand": [
+"None (userClickEvent)"
+],
+"answer": [
+"void"
+]
+}
+},
+"reuse": [
+"Frontend.ExportCurrentStateCsv"
+]
+}
+],
+"resultTopology": [
+{
+"nodeId": "ComputeEngine.step",
+"category": "backend",
+"fission": {
+"problem": "执行 step 流程",
+"demand": [
+"SimState (currentState)",
+"SimConfig (config)"
+],
+"answer": [
+"SimState"
+]
+}
+},
+{
+"nodeId": "DataStream.pushState",
+"category": "backend",
+"fission": {
+"problem": "执行 pushState 流程",
+"demand": [
+"SimState (state)"
+],
+"answer": [
+"void"
+]
+}
+},
+{
+"nodeId": "DataStream.getLatestState",
+"category": "backend",
+"fission": {
+"problem": "执行 getLatestState 流程",
+"demand": [
+"None"
+],
+"answer": [
+"SimState | null"
+]
+}
+},
+{
+"nodeId": "Frontend.ExportCurrentStateCsv",
+"category": "frontend",
+"fission": {
+"problem": "将当前流体粒子状态转换为可下载的 CSV 内容。",
+"demand": [
+"SimState (currentState)"
+],
+"answer": [
+"string (csvText)"
+]
+}
+},
+{
+"nodeId": "Frontend.ExportCsvButton",
+"category": "frontend",
+"fission": {
+"problem": "在前端提供导出按钮，点击后触发当前粒子状态的 CSV 保存。",
+"demand": [
+"None (userClickEvent)"
+],
+"answer": [
+"void"
+]
+}
+}
+]
+}
+
+

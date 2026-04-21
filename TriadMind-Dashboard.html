@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>TriadMind 系统：新功能落点视图</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #18191c; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; overflow: hidden; }
+        #app-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        #header h1 { font-size: 20px; font-weight: 600; margin: 0 0 20px 0; display: flex; align-items: center; }
+        
+        #workspace { flex: 1; border-radius: 12px; background: #22252a; position: relative; overflow: hidden; border: 1px solid #30363d; display: flex; }
+        
+        /* 左右分区背景 */
+        .zone { flex: 1; position: relative; }
+        .zone-left { border-right: 1px solid rgba(255,255,255,0.05); }
+        .zone-title { position: absolute; top: 20px; width: 100%; text-align: center; font-size: 14px; font-weight: bold; color: #8b949e; pointer-events: none; }
+        
+        #canvas-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        /* 节点与连线样式 */
+        .node-circle { fill: #1e2227; stroke-width: 2.5px; }
+        .node-existing { stroke: #8b949e; }
+        .node-new { stroke: #58a6ff; }
+        .anchor-halo { fill: none; stroke: #e3b341; stroke-width: 4px; opacity: 0.8; }
+        
+        .link-standard { stroke: #8b949e; stroke-width: 2px; fill: none; }
+        .link-reuse { stroke: #e3b341; stroke-dasharray: 6,4; stroke-width: 2.5px; fill: none; }
+        
+        .text-icon { fill: #c9d1d9; font-size: 12px; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+        .text-id { fill: #ffffff; font-size: 12px; font-weight: 600; text-anchor: middle; pointer-events: none; }
+        .text-link { fill: #c9d1d9; font-size: 11px; text-anchor: middle; pointer-events: none; font-weight: bold; }
+        .text-anchor-label { fill: #e3b341; font-size: 12px; font-weight: bold; text-anchor: middle; pointer-events: none; }
+
+        /* 底部控制台与图例 */
+        .panel-bottom { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; background: #22252a; padding: 15px 20px; border-radius: 12px; border: 1px solid #30363d; }
+        .legend { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #c9d1d9; position: absolute; bottom: 40px; left: 40px; z-index: 10;}
+        .legend-item { display: flex; align-items: center; gap: 10px; }
+        .box { width: 14px; height: 14px; border-radius: 4px; }
+        .box-existing { background: #8b949e; }
+        .box-new { background: #58a6ff; }
+        .line-dash { width: 14px; border-top: 3px dashed #e3b341; }
+
+        .controls { display: flex; align-items: center; gap: 20px; width: 100%; justify-content: flex-end;}
+        .toggle-btn { background: #30363d; border: none; color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .reset-btn { background: #3b434d; border: none; color: white; padding: 10px 40px; border-radius: 8px; cursor: pointer; font-weight: bold; flex: 1; max-width: 300px;}
+        .reset-btn:hover { background: #4b5563; }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="header">
+            <h1>TriadMind 系统：新功能落点视图</h1>
+        </div>
+        
+        <div id="workspace">
+            <div class="zone zone-left"><div class="zone-title">前端 (Frontend)</div></div>
+            <div class="zone zone-right"><div class="zone-title">后端 (Backend)</div></div>
+            
+            <div class="legend">
+                <div class="legend-item"><div class="box box-existing"></div>现有节点 (后端核心)</div>
+                <div class="legend-item"><div class="box box-new"></div>新增节点 (前端功能)</div>
+                <div class="legend-item"><div class="line-dash"></div>复用/流动连接</div>
+            </div>
+
+            <svg id="canvas-layer"></svg>
+        </div>
+
+        <div class="panel-bottom">
+            <div style="color:white; font-weight:bold; margin-right: 15px;">物理引擎</div>
+            <label class="switch" style="margin-right:auto;">
+                <input type="checkbox" id="physics-toggle" checked style="accent-color: #58a6ff; transform: scale(1.5);">
+            </label>
+            <button class="reset-btn" onclick="location.reload()">重置视图</button>
+        </div>
+    </div>
+
+    <script>
+        const graph = {"nodes":[{"id":"ComputeEngine.step","icon":"memory","group":2,"status":"existing","isAnchor":false},{"id":"DataStream.pushState","icon":"database","group":2,"status":"existing","isAnchor":false},{"id":"DataStream.getLatestState","icon":"database","group":2,"status":"existing","isAnchor":true},{"id":"Frontend.ExportCurrentStateCsv","icon":"transform","group":1,"status":"new"},{"id":"Frontend.ExportCsvButton","icon":"smart_button","group":1,"status":"new"}],"links":[{"source":"Frontend.ExportCurrentStateCsv","target":"DataStream.getLatestState","type":"reuse","label":"复用/读取 (SimState)"},{"source":"Frontend.ExportCsvButton","target":"Frontend.ExportCurrentStateCsv","type":"reuse","label":"复用/读取 (SimState)"},{"source":"Frontend.ExportCsvButton","target":"Frontend.ExportCurrentStateCsv","type":"trigger","label":"触发 (无参)"}]};
+        const svg = d3.select("#canvas-layer");
+        const workspace = document.getElementById('workspace');
+        let width = workspace.clientWidth;
+        let height = workspace.clientHeight;
+
+        svg.attr("width", width).attr("height", height);
+
+        // 【修复点】：使用标准的字符串拼接，彻底避开底层编译器对反引号的误杀
+        svg.append("defs").selectAll("marker")
+            .data(["reuse", "trigger"])
+            .enter().append("marker")
+            .attr("id", d => "arrow-" + d) 
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 38)
+            .attr("refY", 0)
+            .attr("markerWidth", 8)
+            .attr("markerHeight", 8)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("fill", d => d === 'reuse' ? '#e3b341' : '#8b949e')
+            .attr("d", "M0,-5L10,0L0,5");
+
+        const simulation = d3.forceSimulation(graph.nodes)
+            .force("link", d3.forceLink(graph.links).id(d => d.id).distance(200))
+            .force("charge", d3.forceManyBody().strength(-1500))
+            .force("x", d3.forceX(d => d.group === 1 ? width * 0.25 : width * 0.75).strength(0.8))
+            .force("y", d3.forceY(height / 2).strength(0.1));
+
+        const link = svg.append("g")
+            .selectAll("path")
+            .data(graph.links)
+            .enter().append("path")
+            .attr("class", d => d.type === 'reuse' ? 'link-reuse' : 'link-standard')
+            .attr("marker-end", d => "url(#arrow-" + d.type + ")"); // 【修复点】
+
+        const linkText = svg.append("g")
+            .selectAll("text")
+            .data(graph.links)
+            .enter().append("text")
+            .attr("class", "text-link")
+            .attr("dy", -8)
+            .text(d => d.label);
+
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(graph.nodes)
+            .enter().append("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        node.filter(d => d.isAnchor).append("circle")
+            .attr("r", 48)
+            .attr("class", "anchor-halo");
+
+        node.filter(d => d.isAnchor).append("text")
+            .attr("class", "text-anchor-label")
+            .attr("dy", -60)
+            .text("【融合点/复用点】");
+
+        node.append("circle")
+            .attr("r", 35)
+            .attr("class", d => "node-circle " + (d.status === 'new' ? 'node-new' : 'node-existing'));
+
+        node.append("text")
+            .attr("class", "text-icon")
+            .text(d => d.icon);
+
+        node.append("text")
+            .attr("class", "text-id")
+            .attr("dy", 55)
+            .text(d => d.id);
+
+        simulation.on("tick", () => {
+            node.attr("transform", d => {
+                const radius = 40;
+                if(d.group === 1) {
+                    d.x = Math.max(radius, Math.min(width/2 - radius, d.x));
+                } else {
+                    d.x = Math.max(width/2 + radius, Math.min(width - radius, d.x));
+                }
+                d.y = Math.max(radius, Math.min(height - radius, d.y));
+                return "translate(" + d.x + "," + d.y + ")";
+            });
+
+            link.attr("d", d => {
+                const dx = d.target.x - d.source.x,
+                      dy = d.target.y - d.source.y,
+                      dr = Math.sqrt(dx * dx + dy * dy) * 1.5;
+                return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+            });
+
+            linkText
+                .attr("x", d => (d.source.x + d.target.x) / 2)
+                .attr("y", d => (d.source.y + d.target.y) / 2);
+        });
+
+        function dragstarted(event, d) {
+            if (!event.active && document.getElementById('physics-toggle').checked) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x; d.fy = d.y;
+        }
+        function dragged(event, d) {
+            d.fx = event.x; d.fy = event.y;
+        }
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            if(document.getElementById('physics-toggle').checked) {
+                d.fx = null; d.fy = null;
+            }
+        }
+
+        document.getElementById('physics-toggle').addEventListener('change', function(e) {
+            if(e.target.checked) {
+                simulation.alphaTarget(0.3).restart();
+                graph.nodes.forEach(d => { d.fx = null; d.fy = null; });
+            } else {
+                simulation.stop();
+                graph.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
+            }
+        });
+    </script>
+</body>
+</html>

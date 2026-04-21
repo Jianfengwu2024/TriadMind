@@ -1,0 +1,22 @@
+{
+  "projectRoot": "D:/TraidMind/triadmind-core",
+  "adapterLanguage": "typescript",
+  "retryCount": 0,
+  "matchedNodeId": null,
+  "matchedSourcePath": null,
+  "diagnosis": "contract",
+  "suggestedAction": "modify",
+  "summary": "unknown node is classified as contract; suggested action is modify; blast radius is medium.",
+  "blastRadius": {
+    "impactedNodeIds": [],
+    "risk": "medium"
+  },
+  "traceFrames": [],
+  "evidence": [
+    "diagnosis=contract",
+    "traceFrames=0",
+    "blastRadius=medium",
+    "error=TypeError: Cannot read properties of undefined (reading 'foo')"
+  ],
+  "requiresHumanApproval": false
+}

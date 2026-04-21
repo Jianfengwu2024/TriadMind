@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TriadMind Knowledge Graph Visualizer</title>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f0f1a;
+    color: #e0e0e0;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #graph { flex: 1; min-width: 0; }
+  #sidebar {
+    width: 340px;
+    background: #1a1a2e;
+    border-left: 1px solid #2a2a4e;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #hero { padding: 16px; border-bottom: 1px solid #2a2a4e; }
+  .eyebrow { color: #38bdf8; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  h1 { font-size: 18px; margin-bottom: 8px; color: #f8fafc; }
+  #hero p { color: #cbd5e1; font-size: 12px; line-height: 1.5; max-height: 58px; overflow: auto; }
+  .stats { color: #94a3b8; font-size: 11px; margin-top: 10px; }
+  #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
+  #search {
+    width: 100%;
+    background: #0f0f1a;
+    border: 1px solid #3a3a5e;
+    color: #e0e0e0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+  }
+  #search:focus { border-color: #38bdf8; }
+  #search-results {
+    max-height: 150px;
+    overflow-y: auto;
+    display: none;
+    padding-top: 8px;
+  }
+  .search-item {
+    padding: 5px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .search-item:hover { background: #2a2a4e; }
+  #status-legend, #info-panel, #legend-wrap {
+    padding: 14px;
+    border-bottom: 1px solid #2a2a4e;
+  }
+  #legend-wrap { flex: 1; overflow-y: auto; }
+  h3 {
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #cbd5e1;
+    font-size: 12px;
+    padding: 3px 0;
+  }
+  .status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    display: inline-block;
+    border: 2px solid currentColor;
+  }
+  .status-new { color: #38bdf8; background: #082f49; box-shadow: 0 0 14px rgba(56,189,248,.8); }
+  .status-modified { color: #fb923c; background: #431407; }
+  .status-reused { color: #fbbf24; background: #312e12; }
+  .status-line {
+    width: 22px;
+    height: 3px;
+    background: #38bdf8;
+    box-shadow: 0 0 10px rgba(56,189,248,.9);
+    display: inline-block;
+  }
+  #info-content {
+    font-size: 12px;
+    color: #ccc;
+    line-height: 1.55;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  #info-content .field { margin-bottom: 6px; word-break: break-word; }
+  #info-content .field b { color: #f8fafc; }
+  #info-content .empty { color: #64748b; font-style: italic; }
+  .pill {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    margin: 2px 4px 2px 0;
+    color: #cbd5e1;
+  }
+  .neighbor-link {
+    display: block;
+    padding: 3px 6px;
+    margin: 3px 0;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-left: 3px solid #333;
+  }
+  .neighbor-link:hover { background: #2a2a4e; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
+  .legend-item.dimmed { opacity: .35; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-count { color: #777; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="graph"></div>
+<aside id="sidebar">
+  <section id="hero">
+    <div class="eyebrow">TriadMind Knowledge Graph</div>
+    <h1>拓扑升级知识图谱</h1>
+    <p>完成 TriadMind 自举：用 TriadMind 自身的拓扑图证明其核心模块已经遵从顶点三元法。</p>
+    <div class="stats">51 nodes · 15 edges · new: 0 · modified: 0 · reused: 15</div>
+  </section>
+  <section id="search-wrap">
+    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
+    <div id="search-results"></div>
+  </section>
+  <section id="status-legend">
+    <h3>Status</h3>
+    <div class="status-row"><span class="status-dot status-new"></span>new leaf node</div>
+    <div class="status-row"><span class="status-dot status-modified"></span>modified node</div>
+    <div class="status-row"><span class="status-dot status-reused"></span>reused node</div>
+    <div class="status-row"><span class="status-line"></span>highlighted create_child edge</div>
+  </section>
+  <section id="info-panel">
+    <h3>Node Info</h3>
+    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
+  </section>
+  <section id="legend-wrap">
+    <h3>Communities</h3>
+    <div id="legend"></div>
+  </section>
+</aside>
+<script>
+const RAW_NODES = [{"id":"__protocol__","label":"Upgrade Protocol","shape":"diamond","size":32,"borderWidth":1.5,"color":{"background":"#312e81","border":"#a78bfa","highlight":{"background":"#ddd6fe","border":"#a78bfa"}},"font":{"color":"#f8fafc","size":16,"face":"Inter, Segoe UI, sans-serif"},"title":"完成 TriadMind 自举：用 TriadMind 自身的拓扑图证明其核心模块已经遵从顶点三元法。","_status":"protocol","_category":"protocol","_community":"protocol","_community_name":"Protocol","_sourcePath":"D:/TraidMind/TriadMind/.triadmind/triad-map.json","_problem":"完成 TriadMind 自举：用 TriadMind 自身的拓扑图证明其核心模块已经遵从顶点三元法。","_demand":[],"_answer":[],"_degree":15},{"id":"Adapter.getAvailableAdapters","label":"Adapter.getAvailableAdapters","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 getAvailableAdapters 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"adapter.ts","_problem":"执行 getAvailableAdapters 流程","_demand":["None"],"_answer":["TriadLanguageAdapter[]"],"_degree":0},{"id":"Adapter.resolveAdapter","label":"Adapter.resolveAdapter","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 resolveAdapter 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"adapter.ts","_problem":"执行 resolveAdapter 流程","_demand":["WorkspacePaths | string (pathsOrProjectRoot)"],"_answer":["TriadLanguageAdapter"],"_degree":1},{"id":"Bootstrap.buildSelfBootstrapArchitecture","label":"Bootstrap.buildSelfBootstrapArchitecture","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildSelfBootstrapArchitecture 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"bootstrap.ts","_problem":"执行 buildSelfBootstrapArchitecture 流程","_demand":["WorkspacePaths (paths)"],"_answer":["SelfBootstrapArchitecture"],"_degree":0},{"id":"Bootstrap.buildSelfBootstrapProtocol","label":"Bootstrap.buildSelfBootstrapProtocol","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildSelfBootstrapProtocol 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"bootstrap.ts","_problem":"执行 buildSelfBootstrapProtocol 流程","_demand":["WorkspacePaths (paths)"],"_answer":["UpgradeProtocol"],"_degree":0},{"id":"Bootstrap.writeSelfBootstrapProtocol","label":"Bootstrap.writeSelfBootstrapProtocol","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 writeSelfBootstrapProtocol 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"bootstrap.ts","_problem":"执行 writeSelfBootstrapProtocol 流程","_demand":["WorkspacePaths (paths)"],"_answer":["UpgradeProtocol"],"_degree":0},{"id":"Bootstrap.writeSelfBootstrapReport","label":"Bootstrap.writeSelfBootstrapReport","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 writeSelfBootstrapReport 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"bootstrap.ts","_problem":"执行 writeSelfBootstrapReport 流程","_demand":["WorkspacePaths (paths)"],"_answer":["string"],"_degree":0},{"id":"Config.ensureTriadConfig","label":"Config.ensureTriadConfig","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 ensureTriadConfig 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"config.ts","_problem":"执行 ensureTriadConfig 流程","_demand":["WorkspacePaths (paths)","unknown (force)"],"_answer":["void"],"_degree":0},{"id":"Config.loadTriadConfig","label":"Config.loadTriadConfig","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 loadTriadConfig 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"config.ts","_problem":"执行 loadTriadConfig 流程","_demand":["WorkspacePaths (paths)"],"_answer":["TriadConfig"],"_degree":1},{"id":"Config.resolveCategoryFromConfig","label":"Config.resolveCategoryFromConfig","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 resolveCategoryFromConfig 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"config.ts","_problem":"执行 resolveCategoryFromConfig 流程","_demand":["string (sourcePath)","TriadConfig (config)"],"_answer":["TriadCategory"],"_degree":0},{"id":"Config.shouldExcludeSourcePath","label":"Config.shouldExcludeSourcePath","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 shouldExcludeSourcePath 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"config.ts","_problem":"执行 shouldExcludeSourcePath 流程","_demand":["string (sourcePath)","TriadConfig (config)"],"_answer":["boolean"],"_degree":0},{"id":"Generator.applyProtocol","label":"Generator.applyProtocol","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 applyProtocol 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"generator.ts","_problem":"执行 applyProtocol 流程","_demand":["string (projectRoot)","string (protocolPath)"],"_answer":["{ changedFiles: string[]; }"],"_degree":1},{"id":"Healing.buildHealingPrompt","label":"Healing.buildHealingPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildHealingPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"healing.ts","_problem":"执行 buildHealingPrompt 流程","_demand":["WorkspacePaths (paths)","string (errorText)","HealingDiagnosis (diagnosis)"],"_answer":["string"],"_degree":0},{"id":"Healing.diagnoseRuntimeFailure","label":"Healing.diagnoseRuntimeFailure","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 diagnoseRuntimeFailure 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"healing.ts","_problem":"执行 diagnoseRuntimeFailure 流程","_demand":["WorkspacePaths (paths)","string (errorText)","number (retryCount)","TriadNodeDefinition[] (nodes)"],"_answer":["HealingDiagnosis"],"_degree":0},{"id":"Healing.prepareHealingArtifacts","label":"Healing.prepareHealingArtifacts","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 prepareHealingArtifacts 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"healing.ts","_problem":"执行 prepareHealingArtifacts 流程","_demand":["WorkspacePaths (paths)","string (errorText)","unknown (retryCount)"],"_answer":["{ diagnosis: HealingDiagnosis; prompt: string; }"],"_degree":1},{"id":"Ir.buildTopologyIR","label":"Ir.buildTopologyIR","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildTopologyIR 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"ir.ts","_problem":"执行 buildTopologyIR 流程","_demand":["TriadNodeDefinition[] (nodes)","TriadLanguage (language)"],"_answer":["TriadTopologyIR"],"_degree":1},{"id":"Parser.runParser","label":"Parser.runParser","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 runParser 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"parser.ts","_problem":"执行 runParser 流程","_demand":["string (targetDir)","string (outputPath)"],"_answer":["void"],"_degree":1},{"id":"Protocol.assertProtocolShape","label":"Protocol.assertProtocolShape","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 assertProtocolShape 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"protocol.ts","_problem":"执行 assertProtocolShape 流程","_demand":["UpgradeProtocol (protocol)","ProtocolValidationContext (context)"],"_answer":["{ actions: ({ op: \"reuse\"; nodeId: string; reason?: string | undefined; confidence?: number | undefined; } | { op: \"modify\"; nodeId: string; fission: { problem: string; demand: string[]; answer: string[]; }; category?: \"frontend\" | \"backend\" | \"core\" | undefined; sourcePath?: string | undefined; reason?: string | undefined; reuse?: string[] | undefined; confidence?: number | undefined; } | { op: \"create_child\"; parentNodeId: string; node: { nodeId: string; fission: { problem: string; demand: string[]; answer: string[]; }; category?: \"frontend\" | \"backend\" | \"core\" | undefined; sourcePath?: string | undefined; }; reason?: string | undefined; reuse?: string[] | undefined; confidence?: number | undefined; })[]; protocolVersion?: string | undefined; project?: string | undefined; mapSource?: string | undefined; userDemand?: string | undefined; upgradePolicy?: { allowedOps?: (\"reuse\" | \"modify\" | \"create_child\")[] | undefined; principle?: string | undefined; } | undefined; macroSplit?: { anchorNodeId: string; vertexGoal: string; leftBranch: string[]; rightBranch: string[]; } | undefined; mesoSplit?: { classes: { className: string; category: string; responsibility: string; upstreams: string[]; downstreams: string[]; }[]; pipelines: { pipelineId: string; purpose: string; steps: string[]; }[]; } | undefined; microSplit?: { classes: { className: string; staticRightBranch: { name: string; type: string; role: string; }[]; dynamicLeftBranch: { name: string; demand: string[]; answer: string[]; responsibility: string; }[]; }[]; } | undefined; resultTopology?: { nodeId: string; fission: { problem: string; demand: string[]; answer: string[]; }; category?: \"frontend\" | \"backend\" | \"core\" | undefined; sourcePath?: string | undefined; }[] | undefined; }"],"_degree":1},{"id":"Protocol.normalizeCategory","label":"Protocol.normalizeCategory","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 normalizeCategory 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"protocol.ts","_problem":"执行 normalizeCategory 流程","_demand":["string (category)","TriadCategory (fallback)"],"_answer":["TriadCategory"],"_degree":0},{"id":"Protocol.parseDemandEntry","label":"Protocol.parseDemandEntry","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 parseDemandEntry 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"protocol.ts","_problem":"执行 parseDemandEntry 流程","_demand":["string (entry)","number (index)"],"_answer":["ParsedDemand | null"],"_degree":0},{"id":"Protocol.parseNodeRef","label":"Protocol.parseNodeRef","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 parseNodeRef 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"protocol.ts","_problem":"执行 parseNodeRef 流程","_demand":["string (nodeId)","string (category)"],"_answer":["ParsedNodeRef"],"_degree":0},{"id":"Protocol.parseReturnType","label":"Protocol.parseReturnType","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 parseReturnType 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"protocol.ts","_problem":"执行 parseReturnType 流程","_demand":["string (answer)"],"_answer":["string"],"_degree":0},{"id":"Protocol.readJsonFile","label":"Protocol.readJsonFile","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 readJsonFile 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"protocol.ts","_problem":"执行 readJsonFile 流程","_demand":["string (filePath)"],"_answer":["T"],"_degree":0},{"id":"Protocol.readTriadMap","label":"Protocol.readTriadMap","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 readTriadMap 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"protocol.ts","_problem":"执行 readTriadMap 流程","_demand":["string (mapPath)"],"_answer":["TriadNodeDefinition[]"],"_degree":0},{"id":"Rules.installAlwaysOnRules","label":"Rules.installAlwaysOnRules","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 installAlwaysOnRules 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"rules.ts","_problem":"执行 installAlwaysOnRules 流程","_demand":["WorkspacePaths (paths)"],"_answer":["void"],"_degree":1},{"id":"Snapshot.collectProtocolSnapshotFiles","label":"Snapshot.collectProtocolSnapshotFiles","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 collectProtocolSnapshotFiles 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"snapshot.ts","_problem":"执行 collectProtocolSnapshotFiles 流程","_demand":["WorkspacePaths (paths)","UpgradeProtocol (protocol)"],"_answer":["string[]"],"_degree":0},{"id":"Snapshot.createSnapshot","label":"Snapshot.createSnapshot","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 createSnapshot 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"snapshot.ts","_problem":"执行 createSnapshot 流程","_demand":["WorkspacePaths (paths)","string (label)","string[] (filePaths)"],"_answer":["TriadSnapshot"],"_degree":1},{"id":"Snapshot.listSnapshots","label":"Snapshot.listSnapshots","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 listSnapshots 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"snapshot.ts","_problem":"执行 listSnapshots 流程","_demand":["WorkspacePaths (paths)"],"_answer":["Pick\u003cTriadSnapshot, \"id\" | \"label\" | \"createdAt\"\u003e[]"],"_degree":0},{"id":"Snapshot.restoreSnapshot","label":"Snapshot.restoreSnapshot","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 restoreSnapshot 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"snapshot.ts","_problem":"执行 restoreSnapshot 流程","_demand":["WorkspacePaths (paths)","string (snapshotId)"],"_answer":["TriadSnapshot"],"_degree":0},{"id":"Stage.analyzeWorkspaceStage","label":"Stage.analyzeWorkspaceStage","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 analyzeWorkspaceStage 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"stage.ts","_problem":"执行 analyzeWorkspaceStage 流程","_demand":["StageAnalysisInput (input)"],"_answer":["StageAnalysisResult"],"_degree":1},{"id":"Sync.syncTriadMap","label":"Sync.syncTriadMap","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 syncTriadMap 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"sync.ts","_problem":"执行 syncTriadMap 流程","_demand":["WorkspacePaths (paths)","unknown (force)"],"_answer":["{ changed: boolean; fileCount: number; }"],"_degree":1},{"id":"Sync.watchTriadMap","label":"Sync.watchTriadMap","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 watchTriadMap 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"sync.ts","_problem":"执行 watchTriadMap 流程","_demand":["WorkspacePaths (paths)"],"_answer":["void"],"_degree":0},{"id":"TreeSitterParser.runTreeSitterTypeScriptParser","label":"TreeSitterParser.runTreeSitterTypeScriptParser","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 runTreeSitterTypeScriptParser 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"treeSitterParser.ts","_problem":"执行 runTreeSitterTypeScriptParser 流程","_demand":["string (targetDir)","string (outputPath)","TriadConfig (config)"],"_answer":["void"],"_degree":1},{"id":"Visualizer.generateDashboard","label":"Visualizer.generateDashboard","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 generateDashboard 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"visualizer.ts","_problem":"执行 generateDashboard 流程","_demand":["string (mapPath)","string (protocolPath)","string (outputPath)"],"_answer":["void"],"_degree":1},{"id":"Workflow.buildImplementationHandoffPrompt","label":"Workflow.buildImplementationHandoffPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildImplementationHandoffPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildImplementationHandoffPrompt 流程","_demand":["WorkspacePaths (paths)","string (triadSpec)","ImplementationHandoffInput (input)"],"_answer":["string"],"_degree":0},{"id":"Workflow.buildImplementationPrompt","label":"Workflow.buildImplementationPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildImplementationPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildImplementationPrompt 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["string"],"_degree":0},{"id":"Workflow.buildMacroPrompt","label":"Workflow.buildMacroPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildMacroPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildMacroPrompt 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["string"],"_degree":0},{"id":"Workflow.buildMasterPrompt","label":"Workflow.buildMasterPrompt","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildMasterPrompt 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildMasterPrompt 流程","_demand":["WorkspacePaths (paths)"],"_answer":["string"],"_degree":1},{"id":"Workflow.buildMesoPrompt","label":"Workflow.buildMesoPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildMesoPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildMesoPrompt 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["string"],"_degree":0},{"id":"Workflow.buildMicroPrompt","label":"Workflow.buildMicroPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildMicroPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildMicroPrompt 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["string"],"_degree":0},{"id":"Workflow.buildPipelinePrompt","label":"Workflow.buildPipelinePrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildPipelinePrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildPipelinePrompt 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["string"],"_degree":0},{"id":"Workflow.buildProtocolPrompt","label":"Workflow.buildProtocolPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 buildProtocolPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 buildProtocolPrompt 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["string"],"_degree":0},{"id":"Workflow.createDraftTemplate","label":"Workflow.createDraftTemplate","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 createDraftTemplate 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 createDraftTemplate 流程","_demand":["WorkspacePaths (paths)","unknown (userDemand)"],"_answer":["void"],"_degree":0},{"id":"Workflow.ensureMultiPassTemplates","label":"Workflow.ensureMultiPassTemplates","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 ensureMultiPassTemplates 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 ensureMultiPassTemplates 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["void"],"_degree":0},{"id":"Workflow.ensureTriadSpec","label":"Workflow.ensureTriadSpec","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 ensureTriadSpec 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 ensureTriadSpec 流程","_demand":["WorkspacePaths (paths)","unknown (force)"],"_answer":["void"],"_degree":0},{"id":"Workflow.resetPipelineArtifacts","label":"Workflow.resetPipelineArtifacts","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 resetPipelineArtifacts 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 resetPipelineArtifacts 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["void"],"_degree":0},{"id":"Workflow.writeImplementationHandoff","label":"Workflow.writeImplementationHandoff","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 writeImplementationHandoff 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 writeImplementationHandoff 流程","_demand":["WorkspacePaths (paths)","ImplementationHandoffInput (input)"],"_answer":["void"],"_degree":0},{"id":"Workflow.writeMasterPrompt","label":"Workflow.writeMasterPrompt","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 writeMasterPrompt 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 writeMasterPrompt 流程","_demand":["WorkspacePaths (paths)"],"_answer":["void"],"_degree":0},{"id":"Workflow.writePromptPacket","label":"Workflow.writePromptPacket","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 writePromptPacket 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workflow.ts","_problem":"执行 writePromptPacket 流程","_demand":["WorkspacePaths (paths)","string (userDemand)"],"_answer":["void"],"_degree":0},{"id":"Workspace.getWorkspacePaths","label":"Workspace.getWorkspacePaths","shape":"dot","size":22,"borderWidth":1.5,"color":{"background":"#312e12","border":"#fbbf24","highlight":{"background":"#fde68a","border":"#fbbf24"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 getWorkspacePaths 流程","_status":"reused","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workspace.ts","_problem":"执行 getWorkspacePaths 流程","_demand":["string (projectRoot)"],"_answer":["WorkspacePaths"],"_degree":1},{"id":"Workspace.normalizePath","label":"Workspace.normalizePath","shape":"dot","size":18,"borderWidth":1.5,"color":{"background":"#1f2937","border":"#64748b","highlight":{"background":"#94a3b8","border":"#64748b"}},"font":{"color":"#f8fafc","size":0,"face":"Inter, Segoe UI, sans-serif"},"title":"执行 normalizePath 流程","_status":"existing","_category":"core","_community":"core","_community_name":"Core","_sourcePath":"workspace.ts","_problem":"执行 normalizePath 流程","_demand":["string (input)"],"_answer":["string"],"_degree":0}];
+const RAW_EDGES = [{"id":0,"from":"__protocol__","to":"Workflow.buildMasterPrompt","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":1,"from":"__protocol__","to":"Parser.runParser","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":2,"from":"__protocol__","to":"Protocol.assertProtocolShape","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":3,"from":"__protocol__","to":"Generator.applyProtocol","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":4,"from":"__protocol__","to":"Visualizer.generateDashboard","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":5,"from":"__protocol__","to":"Sync.syncTriadMap","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":6,"from":"__protocol__","to":"Rules.installAlwaysOnRules","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":7,"from":"__protocol__","to":"Healing.prepareHealingArtifacts","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":8,"from":"__protocol__","to":"Snapshot.createSnapshot","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":9,"from":"__protocol__","to":"Adapter.resolveAdapter","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":10,"from":"__protocol__","to":"TreeSitterParser.runTreeSitterTypeScriptParser","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":11,"from":"__protocol__","to":"Workspace.getWorkspacePaths","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":12,"from":"__protocol__","to":"Config.loadTriadConfig","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":13,"from":"__protocol__","to":"Stage.analyzeWorkspaceStage","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false},{"id":14,"from":"__protocol__","to":"Ir.buildTopologyIR","label":"","title":"自举协议复用该节点作为 TriadMind 自身架构的既有顶点。","dashes":[6,4],"width":2,"color":{"color":"#fbbf24","highlight":"#fde68a","opacity":0.55},"arrows":{"to":{"enabled":true,"scaleFactor":0.6}},"font":{"align":"middle","color":"#94a3b8","strokeWidth":3,"strokeColor":"#0f0f1a"},"smooth":{"enabled":true,"type":"continuous","roundness":0.12},"_type":"reuse","_highlighted":false}];
+const LEGEND = [{"cid":"core","label":"Core","color":"#59A14F","count":50},{"cid":"protocol","label":"Protocol","color":"#B07AA1","count":1}];
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+const nodesDS = new vis.DataSet(RAW_NODES);
+const edgesDS = new vis.DataSet(RAW_EDGES);
+const container = document.getElementById('graph');
+const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
+  physics: {
+    enabled: true,
+    solver: 'forceAtlas2Based',
+    forceAtlas2Based: {
+      gravitationalConstant: -75,
+      centralGravity: 0.006,
+      springLength: 150,
+      springConstant: 0.08,
+      damping: 0.42,
+      avoidOverlap: 0.9
+    },
+    stabilization: { iterations: 260, fit: true }
+  },
+  interaction: {
+    hover: true,
+    tooltipDelay: 120,
+    hideEdgesOnDrag: true,
+    navigationButtons: true,
+    keyboard: false
+  },
+  nodes: {
+    shadow: { enabled: true, color: 'rgba(0,0,0,.35)', size: 12, x: 0, y: 2 }
+  },
+  edges: {
+    selectionWidth: 4
+  }
+});
+
+network.once('stabilizationIterationsDone', () => {
+  network.setOptions({ physics: { enabled: false } });
+});
+
+network.on('afterDrawing', function(ctx) {
+  RAW_NODES.filter(n => n._status === 'new').forEach(n => {
+    const pos = network.getPositions([n.id])[n.id];
+    if (!pos) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 48, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56,189,248,.65)';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur = 24;
+    ctx.stroke();
+    ctx.restore();
+  });
+});
+
+function showInfo(nodeId) {
+  const n = nodesDS.get(nodeId);
+  if (!n) return;
+  const neighborIds = network.getConnectedNodes(nodeId);
+  const neighborItems = neighborIds.map(nid => {
+    const nb = nodesDS.get(nid);
+    const color = nb?.color?.background ?? '#555';
+    return '<span class="neighbor-link" style="border-left-color:' + esc(color) + '" onclick="focusNode(' + JSON.stringify(nid).replace(/"/g, '&quot;') + ')">' + esc(nb ? nb.label : nid) + '</span>';
+  }).join('');
+  const demand = Array.isArray(n._demand) && n._demand.length ? n._demand.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>';
+  const answer = Array.isArray(n._answer) && n._answer.length ? n._answer.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>';
+  document.getElementById('info-content').innerHTML = `
+    <div class="field"><b>${esc(n.label)}</b></div>
+    <div class="field">Status: <span class="pill">${esc(n._status)}</span></div>
+    <div class="field">Community: ${esc(n._community_name)}</div>
+    <div class="field">Source: ${esc(n._sourcePath || '-')}</div>
+    <div class="field">Problem: ${esc(n._problem || '-')}</div>
+    <div class="field">Demand: ${demand}</div>
+    <div class="field">Answer: ${answer}</div>
+    <div class="field">Degree: ${esc(n._degree)}</div>
+    ${neighborIds.length ? '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors (' + neighborIds.length + ')</div>' + neighborItems : ''}
+  `;
+}
+
+function focusNode(nodeId) {
+  network.focus(nodeId, { scale: 1.35, animation: true });
+  network.selectNodes([nodeId]);
+  showInfo(nodeId);
+}
+
+let hoveredNodeId = null;
+network.on('hoverNode', params => {
+  hoveredNodeId = params.node;
+  container.style.cursor = 'pointer';
+});
+network.on('blurNode', () => {
+  hoveredNodeId = null;
+  container.style.cursor = 'default';
+});
+network.on('click', params => {
+  if (params.nodes.length > 0) {
+    showInfo(params.nodes[0]);
+  } else if (hoveredNodeId === null) {
+    document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>';
+  }
+});
+
+const searchInput = document.getElementById('search');
+const searchResults = document.getElementById('search-results');
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  searchResults.innerHTML = '';
+  if (!q) { searchResults.style.display = 'none'; return; }
+  const matches = RAW_NODES.filter(n => n.label.toLowerCase().includes(q)).slice(0, 20);
+  if (!matches.length) { searchResults.style.display = 'none'; return; }
+  searchResults.style.display = 'block';
+  matches.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'search-item';
+    el.textContent = n.label;
+    el.style.borderLeft = '3px solid ' + (n.color?.border ?? '#555');
+    el.onclick = () => {
+      focusNode(n.id);
+      searchResults.style.display = 'none';
+      searchInput.value = '';
+    };
+    searchResults.appendChild(el);
+  });
+});
+
+const hiddenCommunities = new Set();
+const legendEl = document.getElementById('legend');
+LEGEND.forEach(c => {
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  item.innerHTML = '<div class="legend-dot" style="background:' + esc(c.color) + '"></div>' +
+    '<span class="legend-label">' + esc(c.label) + '</span>' +
+    '<span class="legend-count">' + esc(c.count) + '</span>';
+  item.onclick = () => {
+    if (hiddenCommunities.has(c.cid)) {
+      hiddenCommunities.delete(c.cid);
+      item.classList.remove('dimmed');
+    } else {
+      hiddenCommunities.add(c.cid);
+      item.classList.add('dimmed');
+    }
+    nodesDS.update(RAW_NODES
+      .filter(n => n._community === c.cid)
+      .map(n => ({ id: n.id, hidden: hiddenCommunities.has(c.cid) })));
+  };
+  legendEl.appendChild(item);
+});
+
+const firstNew = RAW_NODES.find(n => n._status === 'new');
+if (firstNew) {
+  setTimeout(() => focusNode(firstNew.id), 350);
+}
+</script>
+</body>
+</html>
