@@ -4,19 +4,19 @@
   "retryCount": 0,
   "matchedNodeId": null,
   "matchedSourcePath": null,
-  "diagnosis": "contract",
+  "diagnosis": "left_branch",
   "suggestedAction": "modify",
-  "summary": "unknown node is classified as contract; suggested action is modify; blast radius is medium.",
+  "summary": "unknown node is classified as left_branch; suggested action is modify; blast radius is medium.",
   "blastRadius": {
     "impactedNodeIds": [],
     "risk": "medium"
   },
   "traceFrames": [],
   "evidence": [
-    "diagnosis=contract",
+    "diagnosis=left_branch",
     "traceFrames=0",
     "blastRadius=medium",
-    "error=TypeError: Cannot read properties of undefined (reading 'foo')"
+    "error=TypeError: Cannot read properties of undefined at runParser (D:\\\\TraidMind\\\\triadmind-core\\\\parser.ts:20:10)"
   ],
   "requiresHumanApproval": false
 }

@@ -1,3 +1,524 @@
+[System]
+你现在处于顶点三元法工作流的第二阶段：协议已通过审核，骨架代码已落地。
+你的任务不再是重新设计拓扑，而是在已批准拓扑内，基于骨架代码完成具体实现。
+
+[Triad Spec]
+你是一个严谨的软件架构师大脑，负责为项目 triadmind-core 生成“拓扑升级协议”。
+你必须严格遵守“顶点三元法”，并理解它是面向对象编程的规范化推广与分形泛化：
+1. 最小尺度：类就是一个顶点
+- 属性 / 状态 = 静态稳定分支（右分支）
+- 动作 / 方法 = 动态演化分支（左分支）
+- 类本身 = 包裹左右分支并形成可用功能的顶点
+
+2. 中等尺度：子功能也是一个顶点
+- 左分支 = 具体执行的子功能
+- 右分支 = 编排流程、参数配置、状态约束
+- 顶点 = 把子功能与编排整合成完整能力
+
+3. 更大尺度：前后端协同、数据管道、工作流同样是顶点三元法
+- 左分支 = 参与执行的功能节点
+- 右分支 = 数据管道、流程编排、交互配置
+- 顶点 = 前后端统一可运行流程
+
+因此你不能一次性直接给出最终协议；你必须按分形层级拆分：
+一、Macro-Split（宏观寻址）
+- 找 Anchor / 挂载点
+- 把需求切成左分支 = 子功能，右分支 = 编排 / 配置
+
+二、Meso-Split（中观裂变）
+- 把子功能继续拆成类（Class）和数据管道（Pipeline）
+
+三、Micro-Split（微观具象化）
+- 把类拆成属性 / 状态（静态右分支）和方法 / 动作（动态左分支）
+- 明确 demand / answer 类型签名
+
+你被限制只能使用以下三种操作：
+- reuse：复用现有节点，严禁重复造轮子
+- modify：升级现有节点的输入 / 输出 / 职责边界
+- create_child：在最合适的叶节点下裂变出一个新子节点
+
+拓扑升级决策规则：
+1. 优先判断需求是否可以落在某个现有叶节点中。
+2. 如果可以在不破坏稳定拓扑的前提下扩充该叶节点，使用 modify。
+3. 如果现有叶节点只需要被调用、不需要改变职责，使用 reuse。
+4. 只有在现有叶节点无法承载该职责时，才允许 create_child。
+5. create_child 必须说明 parentNodeId，并保持二叉式最小增量裂变，而不是横向扩散。
+
+输出要求：
+1. 只能输出严格 JSON。
+2. JSON 顶层至少包含：
+   - protocolVersion
+   - project
+   - mapSource
+   - userDemand
+   - upgradePolicy
+   - macroSplit
+   - mesoSplit
+   - microSplit
+   - actions
+3. actions 中每一个元素只能使用 reuse / modify / create_child。
+4. create_child 或 modify 涉及的新职责必须包含：
+   - nodeId
+   - category
+   - fission.problem
+   - fission.demand
+   - fission.answer
+5. nodeId 应尽量对齐现有地图的叶节点命名方式：ClassName.methodName。
+目标不是直接写实现代码，而是先输出可审阅、可视化、可落骨架的多轮裂变协议。
+
+[Project Root]
+D:/TraidMind/triadmind-core
+
+[User Demand]
+"将 triadmind-core 重构为遵从顶点三元法的自举系统：让 parser 能抽取模块级顶点，generator 能基于 sourcePath 修改模块函数，workflow 拆分为 workspace 与 stage 右分支，形成可自举的协议-实现闭环"
+
+[Approved Protocol JSON]
+```json
+{
+  "protocolVersion": "1.0",
+  "project": "D:/TraidMind/triadmind-core",
+  "mapSource": "D:/TraidMind/triadmind-core/.triadmind/triad-map.json",
+  "userDemand": "完成 TriadMind 自举：用 TriadMind 自身的拓扑图证明其核心模块已经遵从顶点三元法，并把混合模块拆分为显式左右分支。",
+  "upgradePolicy": {
+    "allowedOps": [
+      "reuse",
+      "modify",
+      "create_child"
+    ],
+    "principle": "reuse_first_minimal_change"
+  },
+  "macroSplit": {
+    "anchorNodeId": "Workflow.buildMasterPrompt",
+    "vertexGoal": "TriadMind 作为架构演进顶点，连接动态执行链路与静态约束链路。",
+    "leftBranch": [
+      "Parser.runParser",
+      "Protocol.assertProtocolShape",
+      "Generator.applyProtocol",
+      "Visualizer.generateDashboard",
+      "Healing.prepareHealingArtifacts"
+    ],
+    "rightBranch": [
+      "Workspace.getWorkspacePaths",
+      "Config.loadTriadConfig",
+      "Ir.buildTopologyIR",
+      "Snapshot.createSnapshot",
+      "ProtocolRightBranch.getUpgradeProtocolSchema",
+      "GeneratorRightBranch.resolveSourceFilePath",
+      "HealingRightBranch.classifyDiagnosis",
+      "WorkflowRightBranch.createDraftProtocolTemplate",
+      "BootstrapRightBranch.getBootstrapModuleRoles"
+    ]
+  },
+  "mesoSplit": {
+    "classes": [
+      {
+        "className": "Workflow",
+        "category": "core",
+        "responsibility": "编排多轮推演、协议生成和实现交接。",
+        "upstreams": [
+          "triad.md",
+          "triad-map.json",
+          "latest-demand.txt",
+          "WorkflowRightBranch"
+        ],
+        "downstreams": [
+          "master-prompt.md",
+          "draft-protocol.json",
+          "implementation-handoff.md"
+        ]
+      },
+      {
+        "className": "Protocol",
+        "category": "core",
+        "responsibility": "用 Schema 与拓扑规则把提示词输出转为硬约束协议。",
+        "upstreams": [
+          "draft-protocol.json",
+          "triad-map.json",
+          "config.json",
+          "ProtocolRightBranch"
+        ],
+        "downstreams": [
+          "validated UpgradeProtocol"
+        ]
+      },
+      {
+        "className": "Generator",
+        "category": "core",
+        "responsibility": "把已批准协议转译为源码骨架。",
+        "upstreams": [
+          "validated UpgradeProtocol",
+          "triad-map.json",
+          "GeneratorRightBranch"
+        ],
+        "downstreams": [
+          "changed source files"
+        ]
+      },
+      {
+        "className": "Healing",
+        "category": "core",
+        "responsibility": "把运行时错误回溯为拓扑诊断和修复协议提示词。",
+        "upstreams": [
+          "runtime-error.log",
+          "triad-map.json",
+          "HealingRightBranch"
+        ],
+        "downstreams": [
+          "healing-report.json",
+          "healing-prompt.md"
+        ]
+      },
+      {
+        "className": "Bootstrap",
+        "category": "core",
+        "responsibility": "把自举声明、复用清单和知识图谱审核页收敛为可重复执行的自证流程。",
+        "upstreams": [
+          "triad-map.json",
+          "BootstrapRightBranch"
+        ],
+        "downstreams": [
+          "self-bootstrap.md",
+          "self-bootstrap-protocol.json",
+          "visualizer.html"
+        ]
+      }
+    ],
+    "pipelines": [
+      {
+        "pipelineId": "SelfBootstrap.PlanningPipeline",
+        "purpose": "TriadMind 用自己的 Workflow/Protocol 约束自己的演化。",
+        "steps": [
+          "Sync.syncTriadMap",
+          "Workflow.buildMasterPrompt",
+          "Protocol.assertProtocolShape"
+        ]
+      },
+      {
+        "pipelineId": "SelfBootstrap.ExecutionPipeline",
+        "purpose": "TriadMind 用自己的 Generator/Visualizer/Snapshot 审核并落地自己的变化。",
+        "steps": [
+          "Visualizer.generateDashboard",
+          "Snapshot.createSnapshot",
+          "Generator.applyProtocol"
+        ]
+      }
+    ]
+  },
+  "microSplit": {
+    "classes": [
+      {
+        "className": "HealingRightBranch",
+        "staticRightBranch": [
+          {
+            "name": "classification rules",
+            "type": "RegExp strategy",
+            "role": "错误归因规则"
+          },
+          {
+            "name": "blast radius strategy",
+            "type": "node impact estimator",
+            "role": "影响半径策略"
+          }
+        ],
+        "dynamicLeftBranch": [
+          {
+            "name": "classifyDiagnosis",
+            "demand": [
+              "errorText"
+            ],
+            "answer": [
+              "HealingBranchKind"
+            ],
+            "responsibility": "向 Healing 左分支提供稳定的错误分类策略。"
+          }
+        ]
+      },
+      {
+        "className": "GeneratorRightBranch",
+        "staticRightBranch": [
+          {
+            "name": "BUILTIN_TYPE_NAMES",
+            "type": "Set<string>",
+            "role": "内置类型白名单"
+          },
+          {
+            "name": "source path strategy",
+            "type": "path resolver",
+            "role": "源码落点策略"
+          }
+        ],
+        "dynamicLeftBranch": [
+          {
+            "name": "resolveSourceFilePath",
+            "demand": [
+              "projectRoot",
+              "ParsedNodeRef",
+              "TriadNodeDefinition",
+              "NodeLocationMap"
+            ],
+            "answer": [
+              "string"
+            ],
+            "responsibility": "向 Generator 左分支提供稳定的源码落点策略。"
+          }
+        ]
+      },
+      {
+        "className": "ProtocolRightBranch",
+        "staticRightBranch": [
+          {
+            "name": "upgradeProtocolSchema",
+            "type": "ZodSchema",
+            "role": "协议结构约束"
+          },
+          {
+            "name": "PREFIX_CATEGORY_MAP",
+            "type": "Record<string, TriadCategory>",
+            "role": "节点类别映射"
+          }
+        ],
+        "dynamicLeftBranch": [
+          {
+            "name": "getUpgradeProtocolSchema",
+            "demand": [],
+            "answer": [
+              "ZodSchema"
+            ],
+            "responsibility": "向 Protocol 左分支提供稳定的协议 Schema。"
+          }
+        ]
+      },
+      {
+        "className": "WorkflowRightBranch",
+        "staticRightBranch": [
+          {
+            "name": "draft protocol template",
+            "type": "object factory",
+            "role": "协议种子"
+          },
+          {
+            "name": "stage router rules",
+            "type": "string[]",
+            "role": "阶段判定规则"
+          }
+        ],
+        "dynamicLeftBranch": [
+          {
+            "name": "createDraftProtocolTemplate",
+            "demand": [
+              "projectRoot",
+              "mapFile",
+              "userDemand"
+            ],
+            "answer": [
+              "object"
+            ],
+            "responsibility": "向 Workflow 左分支提供稳定的协议模板。"
+          }
+        ]
+      },
+      {
+        "className": "BootstrapRightBranch",
+        "staticRightBranch": [
+          {
+            "name": "module roles",
+            "type": "record",
+            "role": "模块职责目录"
+          },
+          {
+            "name": "self bootstrap node ids",
+            "type": "string[]",
+            "role": "复用节点清单"
+          }
+        ],
+        "dynamicLeftBranch": [
+          {
+            "name": "getBootstrapModuleRoles",
+            "demand": [],
+            "answer": [
+              "record"
+            ],
+            "responsibility": "向 Bootstrap 左分支提供稳定的自举目录。"
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "op": "reuse",
+      "nodeId": "Workflow.buildMasterPrompt",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Workflow.buildProtocolPrompt",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Workflow.writePromptPacket",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "WorkflowRightBranch.createDraftProtocolTemplate",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "WorkflowRightBranch.getMasterPromptStageRouterLines",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Protocol.assertProtocolShape",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Protocol.parseNodeRef",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Protocol.readTriadMap",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "ProtocolRightBranch.getUpgradeProtocolSchema",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "ProtocolRightBranch.getTriadNodeDefinitionSchema",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Parser.runParser",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Generator.applyProtocol",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "GeneratorRightBranch.resolveSourceFilePath",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "GeneratorRightBranch.buildMethodStructure",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Visualizer.generateDashboard",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Sync.syncTriadMap",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Rules.installAlwaysOnRules",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Healing.prepareHealingArtifacts",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Healing.diagnoseRuntimeFailure",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "HealingRightBranch.classifyDiagnosis",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "HealingRightBranch.estimateBlastRadius",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Snapshot.createSnapshot",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Adapter.resolveAdapter",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "TreeSitterParser.runTreeSitterTypeScriptParser",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Workspace.getWorkspacePaths",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Config.loadTriadConfig",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Stage.analyzeWorkspaceStage",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    },
+    {
+      "op": "reuse",
+      "nodeId": "Ir.buildTopologyIR",
+      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
+      "confidence": 0.95
+    }
+  ]
+}
+```
+
+[Updated Triad Map JSON]
+```json
 [
   {
     "nodeId": "Adapter.getAvailableAdapters",
@@ -1375,3 +1896,19 @@
     }
   }
 ]
+```
+
+[Skeleton Files]
+当前没有检测到本轮 apply 直接涉及的骨架文件，请优先从 `last-approved-protocol.json` 对应的节点文件开始实现。
+
+[Implementation Rules]
+1. 不要重新发明拓扑；默认协议与 triad-map 已批准。
+2. 只在批准后的节点职责范围内补全实现，不要绕开节点边界随意扩散。
+3. 优先完善当前骨架文件，必要时再补其直接依赖。
+4. 如果发现实现困难，先检查是否能通过 reuse 已存在能力解决，而不是新增节点。
+5. 如果实现确实要求拓扑改变，应停止编码并返回协议阶段。
+
+[Expected Output]
+先给出简洁实现计划。
+然后基于现有骨架代码完成实现。
+完成后总结修改了哪些文件，以及这些修改如何对应已批准协议。

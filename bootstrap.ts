@@ -1,5 +1,11 @@
 import * as fs from 'fs';
-import * as path from 'path';
+import {
+    getBootstrapModuleRoles,
+    getSelfBootstrapLoopLines,
+    getSelfBootstrapMicroRules,
+    getSelfBootstrapNodeIds,
+    getSelfBootstrapPreamble
+} from './bootstrapRightBranch';
 import { readTriadMap, TriadNodeDefinition, UpgradeProtocol } from './protocol';
 import { normalizePath, WorkspacePaths } from './workspace';
 
@@ -26,91 +32,9 @@ interface SelfBootstrapArchitecture {
     microSplit: BootstrapModule[];
 }
 
-const MODULE_ROLES: Record<string, { role: string; staticRightBranch: string[] }> = {
-    Adapter: {
-        role: '语言适配器选择层，把协议执行委托给当前项目语言插件。',
-        staticRightBranch: ['adapter registry', 'language', 'parserEngine', 'adapterPackage']
-    },
-    Config: {
-        role: '静态配置层，约束解析器、协议置信度、运行时自愈和目录分类。',
-        staticRightBranch: ['TriadConfig', 'DEFAULT_CONFIG', '.triadmind/config.json']
-    },
-    Generator: {
-        role: '骨架落地层，把已批准协议转译为 TypeScript 源码结构。',
-        staticRightBranch: ['nodeLocations', 'exportedTypeNames', 'sourcePath']
-    },
-    Healing: {
-        role: '运行时自愈层，把错误栈映射回拓扑节点并生成修复提示词。',
-        staticRightBranch: ['runtime-error.log', 'healing-report.json', 'healing-prompt.md']
-    },
-    Ir: {
-        role: '跨语言中间表示层，把语言 AST 映射为 Triad-IR。',
-        staticRightBranch: ['TriadTopologyIR', 'TriadIRNode', 'TriadIREdge']
-    },
-    Parser: {
-        role: '源码拓扑抽取层，把 TypeScript 源码抽取为 triad-map 叶节点。',
-        staticRightBranch: ['tsconfig.json', 'JSDoc tags', 'sourcePath']
-    },
-    Protocol: {
-        role: '协议编译器层，用 Schema 和拓扑规则拦截非法演化。',
-        staticRightBranch: ['Zod schemas', 'allowedOps', 'confidence thresholds']
-    },
-    Rules: {
-        role: 'Always-on 规则层，把顶点三元约束写入 AI 助手默认上下文。',
-        staticRightBranch: ['AGENTS.md', '.cursor/rules/triadmind.mdc', 'agent-rules.md']
-    },
-    Snapshot: {
-        role: '安全快照层，为 apply 和自愈循环提供可回滚边界。',
-        staticRightBranch: ['snapshot index', 'snapshot files', 'restore manifest']
-    },
-    Stage: {
-        role: '阶段识别层，判断当前处于规划、审核、实现还是修复阶段。',
-        staticRightBranch: ['StageAnalysisInput', 'StageAnalysisResult']
-    },
-    Sync: {
-        role: '增量同步层，基于文件哈希保持 triad-map 与源码同步。',
-        staticRightBranch: ['sync-manifest.json', 'sha256 file digests']
-    },
-    TreeSitterParser: {
-        role: 'Tree-sitter 解析层，为跨语言泛化提供统一 AST 路径。',
-        staticRightBranch: ['tree-sitter grammar', 'query patterns']
-    },
-    Visualizer: {
-        role: '拓扑审核层，把协议和现有地图渲染为知识图谱。',
-        staticRightBranch: ['visualizer.html', 'node status', 'edge status']
-    },
-    Workflow: {
-        role: '多轮推演编排层，生成 Macro/Meso/Micro/Protocol/Handoff 提示词。',
-        staticRightBranch: ['triad.md', 'master-prompt.md', 'latest-demand.txt']
-    },
-    Workspace: {
-        role: '工作区路径层，统一描述 .triadmind 文件系统边界。',
-        staticRightBranch: ['WorkspacePaths', 'projectRoot', '.triadmind paths']
-    },
-    Bootstrap: {
-        role: '自举证明层，把 TriadMind 自己描述为顶点三元架构。',
-        staticRightBranch: ['self-bootstrap.md', 'self-bootstrap-protocol.json']
-    }
-};
-
-const SELF_BOOTSTRAP_NODE_IDS = [
-    'Workflow.buildMasterPrompt',
-    'Parser.runParser',
-    'Protocol.assertProtocolShape',
-    'Generator.applyProtocol',
-    'Visualizer.generateDashboard',
-    'Sync.syncTriadMap',
-    'Rules.installAlwaysOnRules',
-    'Healing.prepareHealingArtifacts',
-    'Snapshot.createSnapshot',
-    'Adapter.resolveAdapter',
-    'TreeSitterParser.runTreeSitterTypeScriptParser',
-    'Workspace.getWorkspacePaths',
-    'Config.loadTriadConfig',
-    'Stage.analyzeWorkspaceStage',
-    'Ir.buildTopologyIR'
-];
-
+/**
+ * @LeftBranch
+ */
 export function buildSelfBootstrapArchitecture(paths: WorkspacePaths): SelfBootstrapArchitecture {
     const triadMap = readTriadMap(paths.mapFile);
     const modules = buildBootstrapModules(triadMap);
@@ -135,8 +59,10 @@ export function buildSelfBootstrapArchitecture(paths: WorkspacePaths): SelfBoots
                 'WorkspacePaths 定义 .triadmind 静态边界',
                 'TriadConfig 定义语言、解析器、协议和自愈策略',
                 'Triad-IR 定义跨语言中间表示',
-                'Zod Schema 定义协议物理约束',
-                'Snapshots 定义安全回滚边界'
+                'ProtocolRightBranch 定义协议类型与 Schema',
+                'HealingRightBranch 定义错误分类与自愈输出规则',
+                'Snapshots 定义安全回滚边界',
+                'WorkflowRightBranch / BootstrapRightBranch 提供右分支静态目录'
             ]
         },
         mesoSplit: modules,
@@ -144,6 +70,9 @@ export function buildSelfBootstrapArchitecture(paths: WorkspacePaths): SelfBoots
     };
 }
 
+/**
+ * @LeftBranch
+ */
 export function writeSelfBootstrapReport(paths: WorkspacePaths) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
     const architecture = buildSelfBootstrapArchitecture(paths);
@@ -151,15 +80,18 @@ export function writeSelfBootstrapReport(paths: WorkspacePaths) {
     return paths.selfBootstrapFile;
 }
 
+/**
+ * @LeftBranch
+ */
 export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtocol {
     const existingNodes = new Set(readTriadMap(paths.mapFile).map((node) => node.nodeId));
-    const reusableNodes = SELF_BOOTSTRAP_NODE_IDS.filter((nodeId) => existingNodes.has(nodeId));
+    const reusableNodes = getSelfBootstrapNodeIds().filter((nodeId) => existingNodes.has(nodeId));
 
     return {
         protocolVersion: '1.0',
         project: normalizePath(paths.projectRoot),
         mapSource: normalizePath(paths.mapFile),
-        userDemand: '完成 TriadMind 自举：用 TriadMind 自身的拓扑图证明其核心模块已经遵从顶点三元法。',
+        userDemand: '完成 TriadMind 自举：用 TriadMind 自身的拓扑图证明其核心模块已经遵从顶点三元法，并把混合模块拆分为显式左右分支。',
         upgradePolicy: {
             allowedOps: ['reuse', 'modify', 'create_child'],
             principle: 'reuse_first_minimal_change'
@@ -179,7 +111,11 @@ export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtoc
                 'Config.loadTriadConfig',
                 'Ir.buildTopologyIR',
                 'Snapshot.createSnapshot',
-                'Rules.installAlwaysOnRules'
+                'ProtocolRightBranch.getUpgradeProtocolSchema',
+                'GeneratorRightBranch.resolveSourceFilePath',
+                'HealingRightBranch.classifyDiagnosis',
+                'WorkflowRightBranch.createDraftProtocolTemplate',
+                'BootstrapRightBranch.getBootstrapModuleRoles'
             ]
         },
         mesoSplit: {
@@ -188,29 +124,36 @@ export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtoc
                     className: 'Workflow',
                     category: 'core',
                     responsibility: '编排多轮推演、协议生成和实现交接。',
-                    upstreams: ['triad.md', 'triad-map.json', 'latest-demand.txt'],
+                    upstreams: ['triad.md', 'triad-map.json', 'latest-demand.txt', 'WorkflowRightBranch'],
                     downstreams: ['master-prompt.md', 'draft-protocol.json', 'implementation-handoff.md']
                 },
                 {
                     className: 'Protocol',
                     category: 'core',
                     responsibility: '用 Schema 与拓扑规则把提示词输出转为硬约束协议。',
-                    upstreams: ['draft-protocol.json', 'triad-map.json', 'config.json'],
+                    upstreams: ['draft-protocol.json', 'triad-map.json', 'config.json', 'ProtocolRightBranch'],
                     downstreams: ['validated UpgradeProtocol']
                 },
                 {
                     className: 'Generator',
                     category: 'core',
                     responsibility: '把已批准协议转译为源码骨架。',
-                    upstreams: ['validated UpgradeProtocol', 'triad-map.json'],
+                    upstreams: ['validated UpgradeProtocol', 'triad-map.json', 'GeneratorRightBranch'],
                     downstreams: ['changed source files']
                 },
                 {
                     className: 'Healing',
                     category: 'core',
-                    responsibility: '把运行时错误回溯到拓扑节点并生成修复协议提示词。',
-                    upstreams: ['runtime-error.log', 'triad-map.json'],
+                    responsibility: '把运行时错误回溯为拓扑诊断和修复协议提示词。',
+                    upstreams: ['runtime-error.log', 'triad-map.json', 'HealingRightBranch'],
                     downstreams: ['healing-report.json', 'healing-prompt.md']
+                },
+                {
+                    className: 'Bootstrap',
+                    category: 'core',
+                    responsibility: '把自举声明、复用清单和知识图谱审核页收敛为可重复执行的自证流程。',
+                    upstreams: ['triad-map.json', 'BootstrapRightBranch'],
+                    downstreams: ['self-bootstrap.md', 'self-bootstrap-protocol.json', 'visualizer.html']
                 }
             ],
             pipelines: [
@@ -229,32 +172,77 @@ export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtoc
         microSplit: {
             classes: [
                 {
-                    className: 'Protocol',
+                    className: 'HealingRightBranch',
                     staticRightBranch: [
-                        { name: 'upgradeProtocolSchema', type: 'ZodSchema', role: '静态协议约束' },
-                        { name: 'TriadConfig.protocol', type: 'Config', role: '置信度阈值' }
+                        { name: 'classification rules', type: 'RegExp strategy', role: '错误归因规则' },
+                        { name: 'blast radius strategy', type: 'node impact estimator', role: '影响半径策略' }
                     ],
                     dynamicLeftBranch: [
                         {
-                            name: 'assertProtocolShape',
-                            demand: ['UpgradeProtocol', 'ProtocolValidationContext'],
-                            answer: ['UpgradeProtocol'],
-                            responsibility: '拒绝非法操作、非法拓扑和低置信度动作。'
+                            name: 'classifyDiagnosis',
+                            demand: ['errorText'],
+                            answer: ['HealingBranchKind'],
+                            responsibility: '向 Healing 左分支提供稳定的错误分类策略。'
                         }
                     ]
                 },
                 {
-                    className: 'Workflow',
+                    className: 'GeneratorRightBranch',
                     staticRightBranch: [
-                        { name: 'triad.md', type: 'Markdown', role: '方法论约束' },
-                        { name: 'master-prompt.md', type: 'Markdown', role: '统一上下文' }
+                        { name: 'BUILTIN_TYPE_NAMES', type: 'Set<string>', role: '内置类型白名单' },
+                        { name: 'source path strategy', type: 'path resolver', role: '源码落点策略' }
                     ],
                     dynamicLeftBranch: [
                         {
-                            name: 'buildMasterPrompt',
-                            demand: ['WorkspacePaths'],
+                            name: 'resolveSourceFilePath',
+                            demand: ['projectRoot', 'ParsedNodeRef', 'TriadNodeDefinition', 'NodeLocationMap'],
                             answer: ['string'],
-                            responsibility: '组装自举和项目演化使用的总提示词。'
+                            responsibility: '向 Generator 左分支提供稳定的源码落点策略。'
+                        }
+                    ]
+                },
+                {
+                    className: 'ProtocolRightBranch',
+                    staticRightBranch: [
+                        { name: 'upgradeProtocolSchema', type: 'ZodSchema', role: '协议结构约束' },
+                        { name: 'PREFIX_CATEGORY_MAP', type: 'Record<string, TriadCategory>', role: '节点类别映射' }
+                    ],
+                    dynamicLeftBranch: [
+                        {
+                            name: 'getUpgradeProtocolSchema',
+                            demand: [],
+                            answer: ['ZodSchema'],
+                            responsibility: '向 Protocol 左分支提供稳定的协议 Schema。'
+                        }
+                    ]
+                },
+                {
+                    className: 'WorkflowRightBranch',
+                    staticRightBranch: [
+                        { name: 'draft protocol template', type: 'object factory', role: '协议种子' },
+                        { name: 'stage router rules', type: 'string[]', role: '阶段判定规则' }
+                    ],
+                    dynamicLeftBranch: [
+                        {
+                            name: 'createDraftProtocolTemplate',
+                            demand: ['projectRoot', 'mapFile', 'userDemand'],
+                            answer: ['object'],
+                            responsibility: '向 Workflow 左分支提供稳定的协议模板。'
+                        }
+                    ]
+                },
+                {
+                    className: 'BootstrapRightBranch',
+                    staticRightBranch: [
+                        { name: 'module roles', type: 'record', role: '模块职责目录' },
+                        { name: 'self bootstrap node ids', type: 'string[]', role: '复用节点清单' }
+                    ],
+                    dynamicLeftBranch: [
+                        {
+                            name: 'getBootstrapModuleRoles',
+                            demand: [],
+                            answer: ['record'],
+                            responsibility: '向 Bootstrap 左分支提供稳定的自举目录。'
                         }
                     ]
                 }
@@ -269,6 +257,9 @@ export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtoc
     };
 }
 
+/**
+ * @LeftBranch
+ */
 export function writeSelfBootstrapProtocol(paths: WorkspacePaths) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
     const protocol = buildSelfBootstrapProtocol(paths);
@@ -279,7 +270,9 @@ export function writeSelfBootstrapProtocol(paths: WorkspacePaths) {
 }
 
 function buildBootstrapModules(triadMap: TriadNodeDefinition[]) {
+    const roles = getBootstrapModuleRoles();
     const grouped = new Map<string, TriadNodeDefinition[]>();
+
     triadMap.forEach((node) => {
         const moduleName = node.nodeId.split('.')[0] || 'Unknown';
         grouped.set(moduleName, [...(grouped.get(moduleName) ?? []), node]);
@@ -288,7 +281,7 @@ function buildBootstrapModules(triadMap: TriadNodeDefinition[]) {
     return Array.from(grouped.entries())
         .sort(([left], [right]) => left.localeCompare(right))
         .map<BootstrapModule>(([moduleName, nodes]) => {
-            const role = MODULE_ROLES[moduleName] ?? {
+            const role = roles[moduleName as keyof typeof roles] ?? {
                 role: 'TriadMind 核心模块。',
                 staticRightBranch: ['module exports', 'type signatures']
             };
@@ -297,7 +290,7 @@ function buildBootstrapModules(triadMap: TriadNodeDefinition[]) {
                 moduleName,
                 sourcePath: nodes[0]?.sourcePath ?? '',
                 role: role.role,
-                staticRightBranch: role.staticRightBranch,
+                staticRightBranch: [...role.staticRightBranch],
                 dynamicLeftBranch: nodes.map((node) => node.nodeId).sort()
             };
         });
@@ -307,20 +300,20 @@ function renderSelfBootstrapMarkdown(architecture: SelfBootstrapArchitecture) {
     return [
         '# TriadMind Self-Bootstrap Architecture',
         '',
-        '这份文件是 TriadMind 对自己的顶点三元架构声明。它证明 TriadMind 不是只给别的项目立规矩，而是先用同一套规则描述自身。',
+        getSelfBootstrapPreamble(),
         '',
-        '## 1. 顶点',
+        '## 1. Vertex',
         '',
-        `- 名称：\`${architecture.vertex.name}\``,
-        `- 职责：${architecture.vertex.responsibility}`,
-        `- 不变量：${architecture.vertex.invariant}`,
+        `- Name: \`${architecture.vertex.name}\``,
+        `- Responsibility: ${architecture.vertex.responsibility}`,
+        `- Invariant: ${architecture.vertex.invariant}`,
         '',
         '## 2. Macro-Split',
         '',
-        `- 挂载锚点：\`${architecture.macroSplit.anchorNodeId}\``,
-        '- 左分支（动态演化）：',
+        `- Anchor: \`${architecture.macroSplit.anchorNodeId}\``,
+        '- Left Branch:',
         ...architecture.macroSplit.leftBranch.map((item) => `  - ${item}`),
-        '- 右分支（静态稳定）：',
+        '- Right Branch:',
         ...architecture.macroSplit.rightBranch.map((item) => `  - ${item}`),
         '',
         '## 3. Meso-Split',
@@ -328,30 +321,20 @@ function renderSelfBootstrapMarkdown(architecture: SelfBootstrapArchitecture) {
         ...architecture.mesoSplit.flatMap((module) => [
             `### ${module.moduleName}`,
             '',
-            `- 源文件：\`${module.sourcePath}\``,
-            `- 职责：${module.role}`,
-            `- 静态右分支：${module.staticRightBranch.join(' / ')}`,
-            `- 动态左分支：${module.dynamicLeftBranch.map((nodeId) => `\`${nodeId}\``).join(', ')}`,
+            `- Source: \`${module.sourcePath}\``,
+            `- Responsibility: ${module.role}`,
+            `- Static Right Branch: ${module.staticRightBranch.join(' / ')}`,
+            `- Dynamic Left Branch: ${module.dynamicLeftBranch.map((nodeId) => `\`${nodeId}\``).join(', ')}`,
             ''
         ]),
-        '## 4. Micro-Split 判定',
+        '## 4. Micro-Split Rules',
         '',
-        '每个模块内部继续按同一规则分形：',
+        ...getSelfBootstrapMicroRules().map((item) => `- ${item}`),
         '',
-        '- 类型、接口、配置、路径、Schema、缓存、快照属于静态右分支。',
-        '- 导出的函数、命令处理、协议执行、解析、生成、诊断属于动态左分支。',
-        '- 模块本身是顶点，负责把右分支约束包装成可执行的左分支能力。',
-        '',
-        '## 5. 自举闭环',
+        '## 5. Self-Bootstrap Loop',
         '',
         '```text',
-        'triadmind-core 源码',
-        '-> Parser / TreeSitterParser',
-        '-> triad-map.json',
-        '-> self-bootstrap-protocol.json',
-        '-> visualizer.html',
-        '-> AGENTS.md / Cursor rules',
-        '-> 后续所有 TriadMind 改动继续先走协议',
+        ...getSelfBootstrapLoopLines(),
         '```',
         ''
     ].join('\n');

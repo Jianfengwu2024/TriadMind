@@ -1,17 +1,26 @@
 import {
     FunctionDeclaration,
-    FunctionDeclarationStructure,
     MethodDeclaration,
-    MethodDeclarationStructure,
     OptionalKind,
     ParameterDeclarationStructure,
     Project,
-    Scope,
     SourceFile
 } from 'ts-morph';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadTriadConfig } from './config';
+import {
+    buildFunctionStructure,
+    buildMethodStructure,
+    buildParameters,
+    buildTodoStatement,
+    buildTriadGeneratedDoc,
+    collectTypeTokens,
+    NodeLocationMap,
+    resolveSourceFilePath,
+    resolveTypesModuleSpecifier,
+    shouldUseTopLevelFunction
+} from './generatorRightBranch';
 import { getWorkspacePaths } from './workspace';
 import {
     assertProtocolShape,
@@ -27,45 +36,9 @@ import {
     UpgradeProtocol
 } from './protocol';
 
-const BUILTIN_TYPE_NAMES = new Set([
-    'string',
-    'number',
-    'boolean',
-    'void',
-    'null',
-    'undefined',
-    'unknown',
-    'any',
-    'never',
-    'object',
-    'Array',
-    'ReadonlyArray',
-    'Promise',
-    'Record',
-    'Pick',
-    'Omit',
-    'Partial',
-    'Required',
-    'NonNullable',
-    'ReturnType',
-    'Parameters',
-    'Date',
-    'Map',
-    'Set',
-    'WeakMap',
-    'WeakSet',
-    'Blob',
-    'HTMLElement',
-    'HTMLButtonElement',
-    'HTMLDivElement',
-    'HTMLCanvasElement',
-    'MouseEvent'
-]);
-
-interface NodeLocationMap {
-    [nodeId: string]: string;
-}
-
+/**
+ * @LeftBranch
+ */
 export function applyProtocol(projectRoot: string, protocolPath?: string) {
     const resolvedProjectRoot = path.resolve(projectRoot);
     const resolvedProtocolPath = protocolPath ?? path.join(resolvedProjectRoot, '.triadmind', 'draft-protocol.json');
@@ -150,7 +123,7 @@ function upsertNode(
     const sourceFile =
         project.getSourceFile(filePath) ?? project.createSourceFile(filePath, '', { overwrite: false });
 
-    ensureTypeImports(projectRoot, sourceFile, ref, exportedTypeNames, node);
+    ensureTypeImports(projectRoot, sourceFile, exportedTypeNames, node);
 
     if (shouldUseTopLevelFunction(sourceFile, ref, node.sourcePath)) {
         upsertFunctionVertex(sourceFile, ref, node, action);
@@ -206,86 +179,6 @@ function upsertFunctionVertex(
     }
 }
 
-function resolveSourceFilePath(
-    projectRoot: string,
-    ref: ParsedNodeRef,
-    node: TriadNodeDefinition,
-    nodeLocations: NodeLocationMap
-) {
-    const explicitSourcePath = node.sourcePath?.trim();
-    if (explicitSourcePath) {
-        return path.join(projectRoot, explicitSourcePath);
-    }
-
-    const existingSourcePath = nodeLocations[node.nodeId] ?? nodeLocations[ref.normalizedNodeId];
-    if (existingSourcePath) {
-        return path.join(projectRoot, existingSourcePath);
-    }
-
-    const folder = ref.category === 'frontend' || ref.category === 'backend' ? ref.category : 'core';
-    return path.join(projectRoot, 'src', folder, `${ref.className}.ts`);
-}
-
-function buildParameters(demand: string[]) {
-    return demand
-        .map((entry, index) => parseDemandEntry(entry, index))
-        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-        .map<OptionalKind<ParameterDeclarationStructure>>((entry) => ({
-            name: entry.name,
-            type: entry.type
-        }));
-}
-
-function buildMethodStructure(
-    ref: ParsedNodeRef,
-    node: TriadNodeDefinition,
-    parameters: OptionalKind<ParameterDeclarationStructure>[],
-    returnType: string,
-    includeTodo: boolean
-): OptionalKind<MethodDeclarationStructure> {
-    const statements = includeTodo
-        ? [`throw new Error(${JSON.stringify(`TODO: 实现 ${ref.normalizedNodeId}，职责：${node.fission.problem}`)});`]
-        : [];
-
-    return {
-        name: ref.methodName,
-        scope: Scope.Public,
-        parameters,
-        returnType,
-        docs: [
-            {
-                description: `TriadMind 自动生成骨架\n职责：${node.fission.problem}`
-            }
-        ],
-        statements
-    };
-}
-
-function buildFunctionStructure(
-    ref: ParsedNodeRef,
-    node: TriadNodeDefinition,
-    parameters: OptionalKind<ParameterDeclarationStructure>[],
-    returnType: string,
-    includeTodo: boolean
-): OptionalKind<FunctionDeclarationStructure> {
-    const statements = includeTodo
-        ? [`throw new Error(${JSON.stringify(`TODO: 实现 ${ref.normalizedNodeId}，职责：${node.fission.problem}`)});`]
-        : [];
-
-    return {
-        name: ref.methodName,
-        isExported: true,
-        parameters,
-        returnType,
-        docs: [
-            {
-                description: `TriadMind 自动生成骨架\n职责：${node.fission.problem}`
-            }
-        ],
-        statements
-    };
-}
-
 function syncMethod(
     method: MethodDeclaration,
     parameters: OptionalKind<ParameterDeclarationStructure>[],
@@ -313,9 +206,7 @@ function syncMethod(
     replaceDocs(method, node.fission.problem);
 
     if (method.getStatements().length === 0) {
-        method.addStatements([
-            `throw new Error(${JSON.stringify(`TODO: 实现 ${node.nodeId}，职责：${node.fission.problem}`)});`
-        ]);
+        method.addStatements([buildTodoStatement(node.nodeId, node.fission.problem)]);
     }
 }
 
@@ -347,14 +238,13 @@ function syncFunction(
     replaceDocs(fn, node.fission.problem);
 
     if (fn.getStatements().length === 0) {
-        fn.addStatements([`throw new Error(${JSON.stringify(`TODO: 实现 ${node.nodeId}，职责：${node.fission.problem}`)});`]);
+        fn.addStatements([buildTodoStatement(node.nodeId, node.fission.problem)]);
     }
 }
 
 function ensureTypeImports(
     projectRoot: string,
     sourceFile: SourceFile,
-    ref: ParsedNodeRef,
     exportedTypeNames: Set<string>,
     node: TriadNodeDefinition
 ) {
@@ -443,37 +333,11 @@ function loadNodeLocations(projectRoot: string) {
     return {};
 }
 
-function shouldUseTopLevelFunction(sourceFile: SourceFile, ref: ParsedNodeRef, sourcePath?: string) {
-    const existingFunction = sourceFile.getFunction(ref.methodName);
-    if (existingFunction?.isExported()) {
-        return true;
-    }
-
-    if (sourceFile.getClass(ref.className)) {
-        return false;
-    }
-
-    if (!sourcePath) {
-        return false;
-    }
-
-    return normalizeToken(sourceFile.getBaseNameWithoutExtension()) === normalizeToken(ref.className);
-}
-
 function replaceDocs(node: MethodDeclaration | FunctionDeclaration, responsibility: string) {
     node.getJsDocs().forEach((doc) => doc.remove());
     node.addJsDoc({
-        description: `TriadMind 自动生成骨架\n职责：${responsibility}`
+        description: buildTriadGeneratedDoc(responsibility)
     });
-}
-
-function collectTypeTokens(typeText: string) {
-    const matches = typeText.match(/[A-Za-z_]\w*/g) ?? [];
-    return matches.filter((token) => !BUILTIN_TYPE_NAMES.has(token));
-}
-
-function normalizeToken(value: string) {
-    return value.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
 }
 
 function removeStaleTypeImports(sourceFile: SourceFile, moduleSpecifier: string, typeImports: string[]) {
@@ -498,15 +362,6 @@ function removeStaleTypeImports(sourceFile: SourceFile, moduleSpecifier: string,
                 declaration.remove();
             }
         });
-}
-
-function resolveTypesModuleSpecifier(projectRoot: string, sourceFile: SourceFile) {
-    const sourceFilePath = sourceFile.getFilePath();
-    const typesFilePath = path.join(projectRoot, 'src', 'types.ts');
-    const relativePath = path.relative(path.dirname(sourceFilePath), typesFilePath);
-    const withoutExtension = relativePath.replace(/\.ts$/, '');
-    const normalized = withoutExtension.replace(/\\/g, '/');
-    return normalized.startsWith('.') ? normalized : `./${normalized}`;
 }
 
 if (require.main === module) {

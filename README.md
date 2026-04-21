@@ -240,6 +240,69 @@ cd ../microflow-ts && npm run triad:sync -- --force
 cd ../microflow-ts && npm run triad:rules
 ```
 
+## Verified Regression
+
+在完成自举重构后，TriadMind Core 已做过一轮功能回归验证，确认“能自举”且“原功能未失效”。
+
+### Core Commands
+
+在 `triadmind-core` 根目录已验证通过：
+
+```bash
+npm run typecheck
+npm run adapters
+npm run self
+npm run sync
+npm run rules
+npm run heal -- --message "TypeError: Cannot read properties of undefined at runParser (...)"
+npm run plan -- --no-open --apply
+```
+
+验证结果：
+
+- `typecheck` 通过
+- `self` 可重新生成 `.triadmind/self-bootstrap.md`
+- `sync` 可增量同步 `triad-map.json`
+- `rules` 可重新生成 `AGENTS.md` 与 Cursor 规则
+- `heal` 可生成 `healing-report.json` 与 `healing-prompt.md`
+- `plan --apply` 可走完整审核与协议执行流程
+
+### E2E Apply Test
+
+还使用一个最小 TypeScript 临时项目做了真实 E2E 验证：
+
+1. 先运行 `init`
+2. 写入一个 `create_child` 协议
+3. 执行 `plan --no-open --apply`
+4. 确认新骨架文件被生成
+5. 再写入一个 `modify` 协议
+6. 再次执行 `plan --no-open --apply`
+7. 确认函数签名被更新
+
+实际验证到的行为：
+
+- `create_child` 能新增 `CsvExporter.exportState`
+- `modify` 能更新已存在节点的参数签名
+- 当 `modify` 试图改变节点核心职责 `problem` 时，会被协议守卫正确拦截
+
+这说明当前版本在完成 `workflow / bootstrap / protocol / generator / healing` 的左右分支重构后，以下核心能力仍然可用：
+
+- 拓扑扫描
+- 协议校验
+- 图谱审核
+- 骨架生成
+- 协议修改
+- 运行时自愈提示词生成
+
+如果你要在新环境重新复验，推荐最小顺序：
+
+```bash
+npm install
+npm run typecheck
+npm run self
+npm run heal -- --message "TypeError: Cannot read properties of undefined at runParser (...)"
+```
+
 ## Project Status
 
 TriadMind 正从“提示词手册”升级为“架构编译器”：
