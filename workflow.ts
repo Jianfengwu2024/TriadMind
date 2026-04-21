@@ -62,7 +62,11 @@ export function writePromptPacket(paths: WorkspacePaths, userDemand: string) {
         throw new Error(`Cannot find triad-map.json: ${paths.mapFile}`);
     }
 
-    ensureMultiPassTemplates(paths, userDemand);
+    const normalizedDemand = userDemand.trim();
+    const previousDemand = safeRead(paths.demandFile);
+    const shouldResetArtifacts = previousDemand.length > 0 && previousDemand !== normalizedDemand;
+
+    ensureMultiPassTemplates(paths, userDemand, { resetArtifacts: shouldResetArtifacts });
 
     const protocolPrompt = buildProtocolPrompt(paths, userDemand);
     const implementationPrompt = buildImplementationPrompt(paths, userDemand);
@@ -72,7 +76,7 @@ export function writePromptPacket(paths: WorkspacePaths, userDemand: string) {
     fs.writeFileSync(paths.protocolTaskFile, protocolPrompt, 'utf-8');
     fs.writeFileSync(paths.pipelinePromptFile, pipelinePrompt, 'utf-8');
     fs.writeFileSync(paths.implementationPromptFile, implementationPrompt, 'utf-8');
-    fs.writeFileSync(paths.demandFile, userDemand.trim(), 'utf-8');
+    fs.writeFileSync(paths.demandFile, normalizedDemand, 'utf-8');
 
     writeMasterPrompt(paths);
 }
@@ -84,6 +88,15 @@ export function resetPipelineArtifacts(paths: WorkspacePaths, userDemand: string
     fs.writeFileSync(paths.macroSplitFile, JSON.stringify(createMacroSplitSeed(userDemand), null, 2), 'utf-8');
     fs.writeFileSync(paths.mesoSplitFile, JSON.stringify(createMesoSplitSeed(), null, 2), 'utf-8');
     fs.writeFileSync(paths.microSplitFile, JSON.stringify(createMicroSplitSeed(), null, 2), 'utf-8');
+}
+
+/**
+ * @LeftBranch
+ */
+export function ensurePipelineArtifactSeeds(paths: WorkspacePaths, userDemand: string) {
+    writeJsonSeedIfMissing(paths.macroSplitFile, createMacroSplitSeed(userDemand));
+    writeJsonSeedIfMissing(paths.mesoSplitFile, createMesoSplitSeed());
+    writeJsonSeedIfMissing(paths.microSplitFile, createMicroSplitSeed());
 }
 
 /**
@@ -444,8 +457,17 @@ function buildTriadSpec(projectRoot: string) {
 /**
  * @LeftBranch
  */
-export function ensureMultiPassTemplates(paths: WorkspacePaths, userDemand: string) {
-    resetPipelineArtifacts(paths, userDemand);
+export function ensureMultiPassTemplates(
+    paths: WorkspacePaths,
+    userDemand: string,
+    options: { resetArtifacts?: boolean } = {}
+) {
+    if (options.resetArtifacts) {
+        resetPipelineArtifacts(paths, userDemand);
+    } else {
+        ensurePipelineArtifactSeeds(paths, userDemand);
+    }
+
     fs.writeFileSync(paths.macroPromptFile, buildMacroPrompt(paths, userDemand), 'utf-8');
     fs.writeFileSync(paths.mesoPromptFile, buildMesoPrompt(paths, userDemand), 'utf-8');
     fs.writeFileSync(paths.microPromptFile, buildMicroPrompt(paths, userDemand), 'utf-8');
@@ -489,4 +511,12 @@ function readChangedFiles(paths: WorkspacePaths) {
 
 function safeRead(filePath: string) {
     return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8').trim() : '';
+}
+
+function writeJsonSeedIfMissing(filePath: string, seed: unknown) {
+    if (fs.existsSync(filePath)) {
+        return;
+    }
+
+    fs.writeFileSync(filePath, JSON.stringify(seed, null, 2), 'utf-8');
 }

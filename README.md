@@ -156,6 +156,15 @@ TriadMind 会在 `plan` / `apply` 前拦截非法协议：
 - `typescript` + `native`
 - `typescript` + `tree-sitter`
 
+当前代码边界：
+
+- `languageAdapter.ts`：定义跨语言 `LanguageAdapter` 契约
+- `adapterRegistry.ts`：维护适配器注册表，并按 `.triadmind/config.json` 动态路由
+- `typescriptAdapter.ts`：封装 TypeScript 的拓扑解析与协议落地能力
+- `typescriptParser.ts`：TypeScript 原生 AST 拓扑抽取实现
+- `typescriptGenerator.ts`：TypeScript 骨架代码生成实现
+- `parser.ts` / `generator.ts`：纯调度器，不再直接绑定 `ts-morph`
+
 已预留方向：
 
 - `python`

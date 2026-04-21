@@ -1,8 +1,15 @@
 import * as fs from 'fs';
 import { readJsonFile, UpgradeProtocol } from './protocol';
 
-type NodeStatus = 'existing' | 'new' | 'modified' | 'reused' | 'protocol';
-type EdgeType = 'create_child' | 'reuse' | 'modify' | 'protocol_target';
+type NodeStatus = 'existing' | 'new' | 'modified' | 'reused' | 'protocol' | 'left_branch' | 'right_branch';
+type EdgeType =
+    | 'create_child'
+    | 'reuse'
+    | 'modify'
+    | 'protocol_target'
+    | 'triad_left'
+    | 'triad_right';
+type TriadNodeKind = 'vertex' | 'left_branch' | 'right_branch' | 'protocol';
 
 interface TriadMapNode {
     nodeId: string;
@@ -19,6 +26,7 @@ interface KnowledgeNode {
     id: string;
     label: string;
     status: NodeStatus;
+    kind: TriadNodeKind;
     category: string;
     sourcePath: string;
     problem: string;
@@ -26,6 +34,8 @@ interface KnowledgeNode {
     answer: string[];
     community: string;
     communityName: string;
+    triadOwner: string;
+    branchTitle: string;
 }
 
 interface KnowledgeEdge {
@@ -42,7 +52,9 @@ const STATUS_COLORS: Record<NodeStatus, { background: string; border: string; hi
     reused: { background: '#312e12', border: '#fbbf24', highlight: '#fde68a' },
     modified: { background: '#431407', border: '#f97316', highlight: '#fdba74' },
     new: { background: '#082f49', border: '#38bdf8', highlight: '#7dd3fc' },
-    protocol: { background: '#312e81', border: '#a78bfa', highlight: '#ddd6fe' }
+    protocol: { background: '#312e81', border: '#a78bfa', highlight: '#ddd6fe' },
+    left_branch: { background: '#052e16', border: '#22c55e', highlight: '#86efac' },
+    right_branch: { background: '#2e1065', border: '#c084fc', highlight: '#e9d5ff' }
 };
 
 const COMMUNITY_COLORS: Record<string, string> = {
@@ -79,16 +91,19 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
         demand: [],
         answer: [],
         community: 'protocol',
-        communityName: 'Protocol'
+        communityName: 'Protocol',
+        kind: 'protocol',
+        triadOwner: '__protocol__',
+        branchTitle: 'Protocol Vertex'
     });
 
     originalMap.forEach((node) => {
-        nodeMap.set(node.nodeId, toKnowledgeNode(node, 'existing'));
+        upsertTriadVertex(nodeMap, edges, node, 'existing');
     });
 
     protocol.actions.forEach((action) => {
         if (action.op === 'reuse') {
-            const node = ensureNode(nodeMap, {
+            const node = ensureNode(nodeMap, edges, {
                 nodeId: action.nodeId,
                 fission: {
                     problem: action.reason ?? 'Reused by upgrade protocol',
@@ -109,7 +124,7 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
         }
 
         if (action.op === 'modify') {
-            const node = ensureNode(nodeMap, {
+            const node = ensureNode(nodeMap, edges, {
                 nodeId: action.nodeId,
                 category: action.category,
                 sourcePath: action.sourcePath,
@@ -129,7 +144,7 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
             });
 
             (action.reuse ?? []).forEach((reuseTarget) => {
-                ensureNode(nodeMap, { nodeId: reuseTarget });
+                ensureNode(nodeMap, edges, { nodeId: reuseTarget });
                 edges.push({
                     from: action.nodeId,
                     to: reuseTarget,
@@ -142,8 +157,7 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
             return;
         }
 
-        const newNode = toKnowledgeNode(action.node, 'new');
-        nodeMap.set(action.node.nodeId, newNode);
+        upsertTriadVertex(nodeMap, edges, action.node, 'new');
         edges.push({
             from: '__protocol__',
             to: action.node.nodeId,
@@ -153,7 +167,7 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
             highlighted: true
         });
 
-        ensureNode(nodeMap, { nodeId: action.parentNodeId });
+        ensureNode(nodeMap, edges, { nodeId: action.parentNodeId });
         edges.push({
             from: action.parentNodeId,
             to: action.node.nodeId,
@@ -164,7 +178,7 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
         });
 
         (action.reuse ?? []).forEach((reuseTarget) => {
-            ensureNode(nodeMap, { nodeId: reuseTarget });
+            ensureNode(nodeMap, edges, { nodeId: reuseTarget });
             edges.push({
                 from: action.node.nodeId,
                 to: reuseTarget,
@@ -190,6 +204,8 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
         stats: {
             nodes: nodes.length,
             edges: edges.length,
+            vertices: nodes.filter((node) => node.kind === 'vertex').length,
+            branchNodes: nodes.filter((node) => node.kind === 'left_branch' || node.kind === 'right_branch').length,
             newNodes: nodes.filter((node) => node.status === 'new').length,
             modifiedNodes: nodes.filter((node) => node.status === 'modified').length,
             reusedNodes: nodes.filter((node) => node.status === 'reused').length
@@ -203,25 +219,122 @@ function toKnowledgeNode(node: TriadMapNode, status: NodeStatus): KnowledgeNode 
         id: node.nodeId,
         label: node.nodeId,
         status,
+        kind: 'vertex',
         category,
         sourcePath: node.sourcePath ?? '',
         problem: node.fission?.problem ?? '',
         demand: node.fission?.demand ?? [],
         answer: node.fission?.answer ?? [],
         community: category,
-        communityName: toCommunityName(category)
+        communityName: toCommunityName(category),
+        triadOwner: node.nodeId,
+        branchTitle: '顶点：封装左动态分支与右静态分支'
     };
 }
 
-function ensureNode(nodeMap: Map<string, KnowledgeNode>, node: TriadMapNode) {
+function ensureNode(nodeMap: Map<string, KnowledgeNode>, edges: KnowledgeEdge[], node: TriadMapNode) {
     const existing = nodeMap.get(node.nodeId);
     if (existing) {
         return existing;
     }
 
-    const created = toKnowledgeNode(node, 'existing');
-    nodeMap.set(node.nodeId, created);
-    return created;
+    return upsertTriadVertex(nodeMap, edges, node, 'existing');
+}
+
+function upsertTriadVertex(
+    nodeMap: Map<string, KnowledgeNode>,
+    edges: KnowledgeEdge[],
+    node: TriadMapNode,
+    status: NodeStatus
+) {
+    const vertex = toKnowledgeNode(node, status);
+    const existing = nodeMap.get(vertex.id);
+    if (existing) {
+        if (status === 'new' || status === 'modified' || status === 'reused') {
+            existing.status = status;
+        }
+        existing.category = vertex.category;
+        existing.sourcePath = vertex.sourcePath;
+        existing.problem = vertex.problem;
+        existing.demand = vertex.demand;
+        existing.answer = vertex.answer;
+        addTriadBranches(nodeMap, edges, existing);
+        return existing;
+    }
+
+    nodeMap.set(vertex.id, vertex);
+    addTriadBranches(nodeMap, edges, vertex);
+    return vertex;
+}
+
+function addTriadBranches(nodeMap: Map<string, KnowledgeNode>, edges: KnowledgeEdge[], vertex: KnowledgeNode) {
+    if (vertex.id === '__protocol__' || vertex.kind !== 'vertex') {
+        return;
+    }
+
+    const leftId = getLeftBranchId(vertex.id);
+    const rightId = getRightBranchId(vertex.id);
+
+    nodeMap.set(leftId, {
+        ...vertex,
+        id: leftId,
+        label: `左 · ${getMethodName(vertex.id)}`,
+        status: 'left_branch',
+        kind: 'left_branch',
+        problem: vertex.problem,
+        branchTitle: '动态左分支：动作 / 方法 / 流程执行',
+        triadOwner: vertex.id
+    });
+
+    nodeMap.set(rightId, {
+        ...vertex,
+        id: rightId,
+        label: `右 · 契约`,
+        status: 'right_branch',
+        kind: 'right_branch',
+        problem: `静态契约：${vertex.sourcePath || vertex.category}`,
+        branchTitle: '静态右分支：配置 / 状态 / demand-answer 契约',
+        triadOwner: vertex.id
+    });
+
+    addUniqueEdge(edges, {
+        from: leftId,
+        to: vertex.id,
+        type: 'triad_left',
+        label: '左分支',
+        title: `${vertex.id} 的动态左分支`,
+        highlighted: vertex.status === 'new' || vertex.status === 'modified'
+    });
+
+    addUniqueEdge(edges, {
+        from: rightId,
+        to: vertex.id,
+        type: 'triad_right',
+        label: '右分支',
+        title: `${vertex.id} 的静态右分支`,
+        highlighted: vertex.status === 'new' || vertex.status === 'modified'
+    });
+}
+
+function addUniqueEdge(edges: KnowledgeEdge[], edge: KnowledgeEdge) {
+    if (edges.some((item) => item.from === edge.from && item.to === edge.to && item.type === edge.type)) {
+        return;
+    }
+
+    edges.push(edge);
+}
+
+function getLeftBranchId(nodeId: string) {
+    return `${nodeId}::__left`;
+}
+
+function getRightBranchId(nodeId: string) {
+    return `${nodeId}::__right`;
+}
+
+function getMethodName(nodeId: string) {
+    const parts = nodeId.split('.').filter(Boolean);
+    return parts[parts.length - 1] ?? nodeId;
 }
 
 function buildLegend(nodes: Array<KnowledgeNode & { degree: number }>) {
@@ -260,13 +373,20 @@ function buildHtml(
 ) {
     const visNodes = graph.nodes.map((node) => {
         const color = STATUS_COLORS[node.status];
-        const size = node.status === 'new' ? 36 : node.status === 'protocol' ? 32 : 18 + Math.min(node.degree * 4, 20);
+        const size =
+            node.kind === 'left_branch' || node.kind === 'right_branch'
+                ? 15
+                : node.status === 'new'
+                  ? 38
+                  : node.status === 'protocol'
+                    ? 34
+                    : 20 + Math.min(node.degree * 4, 20);
         return {
             id: node.id,
             label: node.label,
-            shape: node.status === 'protocol' ? 'diamond' : 'dot',
+            shape: node.status === 'protocol' ? 'diamond' : node.kind === 'left_branch' ? 'box' : node.kind === 'right_branch' ? 'hexagon' : 'dot',
             size,
-            borderWidth: node.status === 'new' ? 4 : node.status === 'modified' ? 3 : 1.5,
+            borderWidth: node.status === 'new' ? 4 : node.status === 'modified' ? 3 : node.kind === 'left_branch' || node.kind === 'right_branch' ? 2 : 1.5,
             color: {
                 background: color.background,
                 border: color.border,
@@ -277,11 +397,19 @@ function buildHtml(
             },
             font: {
                 color: '#f8fafc',
-                size: node.status === 'new' || node.status === 'modified' || node.status === 'protocol' ? 16 : 0,
+                size:
+                    node.status === 'new' ||
+                    node.status === 'modified' ||
+                    node.status === 'protocol' ||
+                    node.kind === 'left_branch' ||
+                    node.kind === 'right_branch'
+                        ? 14
+                        : 0,
                 face: 'Inter, Segoe UI, sans-serif'
             },
             title: escapeHtml(node.problem || node.label),
             _status: node.status,
+            _kind: node.kind,
             _category: node.category,
             _community: node.community,
             _community_name: node.communityName,
@@ -289,7 +417,9 @@ function buildHtml(
             _problem: node.problem,
             _demand: node.demand,
             _answer: node.answer,
-            _degree: node.degree
+            _degree: node.degree,
+            _triadOwner: node.triadOwner,
+            _branchTitle: node.branchTitle
         };
     });
 
@@ -331,6 +461,8 @@ function buildHtml(
     });
 
     const statusSummary = [
+        `vertices: ${graph.stats.vertices}`,
+        `branches: ${graph.stats.branchNodes}`,
         `new: ${graph.stats.newNodes}`,
         `modified: ${graph.stats.modifiedNodes}`,
         `reused: ${graph.stats.reusedNodes}`
@@ -360,9 +492,16 @@ ${buildStyles()}
   </section>
   <section id="status-legend">
     <h3>Status</h3>
+    <div class="triad-explain">
+      <div><span class="branch-chip left-chip">左</span>动态演化：动作 / 方法 / 流程</div>
+      <div><span class="branch-chip vertex-chip">顶点</span>封装左右分支的可用功能</div>
+      <div><span class="branch-chip right-chip">右</span>静态稳定：状态 / 配置 / 契约</div>
+    </div>
     <div class="status-row"><span class="status-dot status-new"></span>new leaf node</div>
     <div class="status-row"><span class="status-dot status-modified"></span>modified node</div>
     <div class="status-row"><span class="status-dot status-reused"></span>reused node</div>
+    <div class="status-row"><span class="status-dot status-left"></span>left branch: 动态动作 / 方法</div>
+    <div class="status-row"><span class="status-dot status-right"></span>right branch: 静态状态 / 契约</div>
     <div class="status-row"><span class="status-line"></span>highlighted create_child edge</div>
   </section>
   <section id="info-panel">
@@ -380,6 +519,12 @@ ${buildScript(visNodes, visEdges, graph.legend)}
 }
 
 function edgeStyle(edge: KnowledgeEdge) {
+    if (edge.type === 'triad_left') {
+        return { color: '#22c55e', highlight: '#86efac', width: edge.highlighted ? 3 : 1.7, opacity: 0.68, dashes: false };
+    }
+    if (edge.type === 'triad_right') {
+        return { color: '#c084fc', highlight: '#e9d5ff', width: edge.highlighted ? 3 : 1.7, opacity: 0.68, dashes: [4, 3] };
+    }
     if (edge.type === 'create_child') {
         return { color: '#38bdf8', highlight: '#7dd3fc', width: 5, opacity: 0.95, dashes: false };
     }
@@ -475,6 +620,8 @@ function buildStyles() {
   .status-new { color: #38bdf8; background: #082f49; box-shadow: 0 0 14px rgba(56,189,248,.8); }
   .status-modified { color: #fb923c; background: #431407; }
   .status-reused { color: #fbbf24; background: #312e12; }
+  .status-left { color: #22c55e; background: #052e16; }
+  .status-right { color: #c084fc; background: #2e1065; }
   .status-line {
     width: 22px;
     height: 3px;
@@ -482,6 +629,28 @@ function buildStyles() {
     box-shadow: 0 0 10px rgba(56,189,248,.9);
     display: inline-block;
   }
+  .triad-explain {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 9px;
+    margin-bottom: 10px;
+    color: #cbd5e1;
+    font-size: 11px;
+    line-height: 1.7;
+  }
+  .branch-chip {
+    display: inline-block;
+    min-width: 24px;
+    text-align: center;
+    border-radius: 999px;
+    padding: 1px 6px;
+    margin-right: 6px;
+    font-weight: 700;
+  }
+  .left-chip { background: #052e16; color: #86efac; border: 1px solid #22c55e; }
+  .vertex-chip { background: #082f49; color: #7dd3fc; border: 1px solid #38bdf8; }
+  .right-chip { background: #2e1065; color: #e9d5ff; border: 1px solid #c084fc; }
   #info-content {
     font-size: 12px;
     color: #ccc;
@@ -492,6 +661,37 @@ function buildStyles() {
   #info-content .field { margin-bottom: 6px; word-break: break-word; }
   #info-content .field b { color: #f8fafc; }
   #info-content .empty { color: #64748b; font-style: italic; }
+  .triad-card {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    margin: 10px 0;
+  }
+  .triad-col {
+    border-radius: 8px;
+    padding: 8px;
+    border: 1px solid #334155;
+    cursor: pointer;
+    word-break: break-word;
+  }
+  .triad-col:hover { filter: brightness(1.16); }
+  .triad-col b {
+    display: block;
+    color: #f8fafc;
+    margin-bottom: 2px;
+  }
+  .triad-col small {
+    display: block;
+    color: #94a3b8;
+    margin-bottom: 5px;
+  }
+  .triad-col span {
+    display: block;
+    color: #cbd5e1;
+  }
+  .triad-left { background: rgba(5,46,22,.8); border-color: #22c55e; }
+  .triad-vertex { background: rgba(8,47,73,.8); border-color: #38bdf8; }
+  .triad-right { background: rgba(46,16,101,.8); border-color: #c084fc; }
   .pill {
     display: inline-block;
     padding: 2px 6px;
@@ -578,7 +778,7 @@ network.once('stabilizationIterationsDone', () => {
 });
 
 network.on('afterDrawing', function(ctx) {
-  RAW_NODES.filter(n => n._status === 'new').forEach(n => {
+  RAW_NODES.filter(n => n._status === 'new' && n._kind === 'vertex').forEach(n => {
     const pos = network.getPositions([n.id])[n.id];
     if (!pos) return;
     ctx.save();
@@ -596,6 +796,10 @@ network.on('afterDrawing', function(ctx) {
 function showInfo(nodeId) {
   const n = nodesDS.get(nodeId);
   if (!n) return;
+  const ownerId = n._triadOwner || n.id;
+  const owner = nodesDS.get(ownerId) || n;
+  const left = nodesDS.get(ownerId + '::__left');
+  const right = nodesDS.get(ownerId + '::__right');
   const neighborIds = network.getConnectedNodes(nodeId);
   const neighborItems = neighborIds.map(nid => {
     const nb = nodesDS.get(nid);
@@ -604,14 +808,37 @@ function showInfo(nodeId) {
   }).join('');
   const demand = Array.isArray(n._demand) && n._demand.length ? n._demand.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>';
   const answer = Array.isArray(n._answer) && n._answer.length ? n._answer.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>';
+  const ownerDemand = Array.isArray(owner._demand) && owner._demand.length ? owner._demand.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>';
+  const ownerAnswer = Array.isArray(owner._answer) && owner._answer.length ? owner._answer.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>';
   document.getElementById('info-content').innerHTML = \`
     <div class="field"><b>\${esc(n.label)}</b></div>
+    <div class="field">Triad Kind: <span class="pill">\${esc(n._kind)}</span></div>
+    <div class="field">Triad Owner: <span class="pill" onclick="focusNode('\${esc(ownerId)}')" style="cursor:pointer">\${esc(ownerId)}</span></div>
     <div class="field">Status: <span class="pill">\${esc(n._status)}</span></div>
     <div class="field">Community: \${esc(n._community_name)}</div>
     <div class="field">Source: \${esc(n._sourcePath || '-')}</div>
+    <div class="field">Role: \${esc(n._branchTitle || '-')}</div>
     <div class="field">Problem: \${esc(n._problem || '-')}</div>
     <div class="field">Demand: \${demand}</div>
     <div class="field">Answer: \${answer}</div>
+    <div class="triad-card">
+      <div class="triad-col triad-left" onclick="focusNode('\${esc(left?.id || ownerId)}')">
+        <b>左分支</b>
+        <small>动态动作 / 方法</small>
+        <span>\${esc(owner._problem || '-')}</span>
+      </div>
+      <div class="triad-col triad-vertex" onclick="focusNode('\${esc(ownerId)}')">
+        <b>顶点</b>
+        <small>功能封装</small>
+        <span>\${esc(owner.label || ownerId)}</span>
+      </div>
+      <div class="triad-col triad-right" onclick="focusNode('\${esc(right?.id || ownerId)}')">
+        <b>右分支</b>
+        <small>静态契约</small>
+        <span>Demand: \${ownerDemand}</span>
+        <span>Answer: \${ownerAnswer}</span>
+      </div>
+    </div>
     <div class="field">Degree: \${esc(n._degree)}</div>
     \${neighborIds.length ? '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors (' + neighborIds.length + ')</div>' + neighborItems : ''}
   \`;

@@ -70,136 +70,110 @@
 D:/TraidMind/triadmind-core
 
 [User Demand]
-"将 triadmind-core 重构为遵从顶点三元法的自举系统：让 parser 能抽取模块级顶点，generator 能基于 sourcePath 修改模块函数，workflow 拆分为 workspace 与 stage 右分支，形成可自举的协议-实现闭环"
+"重构核心的 AST 解析与代码生成模块，引入"
 
 [Approved Protocol JSON]
 ```json
 {
-  "protocolVersion": "1.0",
-  "project": "D:/TraidMind/triadmind-core",
+  "protocolVersion": "1.1",
+  "project": "triadmind-core",
   "mapSource": "D:/TraidMind/triadmind-core/.triadmind/triad-map.json",
-  "userDemand": "完成 TriadMind 自举：用 TriadMind 自身的拓扑图证明其核心模块已经遵从顶点三元法，并把混合模块拆分为显式左右分支。",
+  "userDemand": "重构核心的 AST 解析与代码生成模块，引入“多语言适配器（Language Adapter）”架构，解除核心引擎对 ts-morph 的硬编码绑定，实现多语言泛化支持。具体要求：1. 定义 LanguageAdapter 接口；2. 封装 TypeScriptAdapter；3. 新增 AdapterRegistry 动态路由；4. 改造 parser 和 generator 为纯调度器。",
   "upgradePolicy": {
     "allowedOps": [
       "reuse",
       "modify",
       "create_child"
     ],
-    "principle": "reuse_first_minimal_change"
+    "principle": "优先复用 Adapter.resolveAdapter、Parser.runParser、Generator.applyProtocol；新增适配器契约、注册表与 TypeScript 适配器；parser/generator 只保留调度职责。"
   },
   "macroSplit": {
-    "anchorNodeId": "Workflow.buildMasterPrompt",
-    "vertexGoal": "TriadMind 作为架构演进顶点，连接动态执行链路与静态约束链路。",
+    "anchorNodeId": "Adapter.resolveAdapter",
+    "vertexGoal": "将 AST 解析与代码生成从 ts-morph 绑定中抽离，升级为 LanguageAdapter 驱动的多语言泛化架构。",
     "leftBranch": [
-      "Parser.runParser",
-      "Protocol.assertProtocolShape",
-      "Generator.applyProtocol",
-      "Visualizer.generateDashboard",
-      "Healing.prepareHealingArtifacts"
+      "定义 LanguageAdapter 统一接口，承载 readTopologyIR、parseTopology 与 applyUpgradeProtocol 动态能力",
+      "封装 TypeScriptAdapter，把现有 TypeScript parser/generator 实现迁入适配器",
+      "新增 AdapterRegistry，根据 .triadmind/config.json 动态选择语言适配器",
+      "改造 parser 和 generator 为纯调度器，只委托当前 Adapter 执行"
     ],
     "rightBranch": [
-      "Workspace.getWorkspacePaths",
-      "Config.loadTriadConfig",
-      "Ir.buildTopologyIR",
-      "Snapshot.createSnapshot",
-      "ProtocolRightBranch.getUpgradeProtocolSchema",
-      "GeneratorRightBranch.resolveSourceFilePath",
-      "HealingRightBranch.classifyDiagnosis",
-      "WorkflowRightBranch.createDraftProtocolTemplate",
-      "BootstrapRightBranch.getBootstrapModuleRoles"
+      "TriadConfig.architecture.language / parserEngine / adapter 作为静态路由配置",
+      "AdapterRegistry 作为稳定适配器目录，保存语言到适配器的映射关系",
+      "Triad-IR / triad-map.json 作为跨语言中间拓扑契约",
+      "协议 Schema 与 reuse/modify/create_child 规则保持核心引擎稳定边界"
     ]
   },
   "mesoSplit": {
     "classes": [
       {
-        "className": "Workflow",
+        "className": "LanguageAdapter",
         "category": "core",
-        "responsibility": "编排多轮推演、协议生成和实现交接。",
+        "responsibility": "定义跨语言适配器契约，统一暴露拓扑解析、协议应用和能力描述入口。",
         "upstreams": [
-          "triad.md",
-          "triad-map.json",
-          "latest-demand.txt",
-          "WorkflowRightBranch"
+          "Adapter.resolveAdapter",
+          "TriadConfig.architecture"
         ],
         "downstreams": [
-          "master-prompt.md",
-          "draft-protocol.json",
-          "implementation-handoff.md"
+          "TypeScriptAdapter",
+          "Parser.runParser",
+          "Generator.applyProtocol"
         ]
       },
       {
-        "className": "Protocol",
+        "className": "TypeScriptAdapter",
         "category": "core",
-        "responsibility": "用 Schema 与拓扑规则把提示词输出转为硬约束协议。",
+        "responsibility": "承接现有 TypeScript AST 解析与代码生成实现，作为 LanguageAdapter 的稳定 TS 插件实现。",
         "upstreams": [
-          "draft-protocol.json",
-          "triad-map.json",
-          "config.json",
-          "ProtocolRightBranch"
+          "LanguageAdapter",
+          "AdapterRegistry"
         ],
         "downstreams": [
-          "validated UpgradeProtocol"
+          "TypeScriptParser",
+          "TypeScriptGenerator",
+          "TreeSitterParser.runTreeSitterTypeScriptParser"
         ]
       },
       {
-        "className": "Generator",
+        "className": "AdapterRegistry",
         "category": "core",
-        "responsibility": "把已批准协议转译为源码骨架。",
+        "responsibility": "维护语言到适配器的静态注册表，并根据项目配置动态解析当前适配器。",
         "upstreams": [
-          "validated UpgradeProtocol",
-          "triad-map.json",
-          "GeneratorRightBranch"
+          "TriadConfig.architecture"
         ],
         "downstreams": [
-          "changed source files"
-        ]
-      },
-      {
-        "className": "Healing",
-        "category": "core",
-        "responsibility": "把运行时错误回溯为拓扑诊断和修复协议提示词。",
-        "upstreams": [
-          "runtime-error.log",
-          "triad-map.json",
-          "HealingRightBranch"
-        ],
-        "downstreams": [
-          "healing-report.json",
-          "healing-prompt.md"
-        ]
-      },
-      {
-        "className": "Bootstrap",
-        "category": "core",
-        "responsibility": "把自举声明、复用清单和知识图谱审核页收敛为可重复执行的自证流程。",
-        "upstreams": [
-          "triad-map.json",
-          "BootstrapRightBranch"
-        ],
-        "downstreams": [
-          "self-bootstrap.md",
-          "self-bootstrap-protocol.json",
-          "visualizer.html"
+          "Adapter.resolveAdapter",
+          "LanguageAdapter"
         ]
       }
     ],
     "pipelines": [
       {
-        "pipelineId": "SelfBootstrap.PlanningPipeline",
-        "purpose": "TriadMind 用自己的 Workflow/Protocol 约束自己的演化。",
+        "pipelineId": "language-adapter-resolution",
+        "purpose": "根据项目静态配置选择当前语言适配器，避免核心引擎硬编码具体语言实现。",
         "steps": [
-          "Sync.syncTriadMap",
-          "Workflow.buildMasterPrompt",
-          "Protocol.assertProtocolShape"
+          "读取 .triadmind/config.json 的 architecture.language / parserEngine / adapter",
+          "AdapterRegistry 校验目标语言是否已注册且可用",
+          "resolveAdapter 返回符合 LanguageAdapter 契约的具体适配器",
+          "parser/generator 调度器只依赖 LanguageAdapter 接口"
         ]
       },
       {
-        "pipelineId": "SelfBootstrap.ExecutionPipeline",
-        "purpose": "TriadMind 用自己的 Generator/Visualizer/Snapshot 审核并落地自己的变化。",
+        "pipelineId": "topology-parse-dispatch",
+        "purpose": "把源码拓扑抽取从 parser.ts 内部实现迁移为适配器委托流程。",
         "steps": [
-          "Visualizer.generateDashboard",
-          "Snapshot.createSnapshot",
-          "Generator.applyProtocol"
+          "ParserDispatcher 接收 projectRoot 与 outputPath",
+          "ParserDispatcher 解析当前 LanguageAdapter",
+          "LanguageAdapter.parseTopology 产出 triad-map 节点",
+          "写入 .triadmind/triad-map.json 并保持跨语言格式一致"
+        ]
+      },
+      {
+        "pipelineId": "protocol-apply-dispatch",
+        "purpose": "把代码骨架生成从 generator.ts 内部实现迁移为适配器委托流程。",
+        "steps": [
+          "GeneratorDispatcher 解析当前 LanguageAdapter",
+          "LanguageAdapter.applyUpgradeProtocol 执行目标语言的 AST 或模板生成",
+          "返回 changedFiles 并触发拓扑同步"
         ]
       }
     ]
@@ -207,138 +181,46 @@ D:/TraidMind/triadmind-core
   "microSplit": {
     "classes": [
       {
-        "className": "HealingRightBranch",
+        "className": "LanguageAdapter",
         "staticRightBranch": [
           {
-            "name": "classification rules",
-            "type": "RegExp strategy",
-            "role": "错误归因规则"
-          },
-          {
-            "name": "blast radius strategy",
-            "type": "node impact estimator",
-            "role": "影响半径策略"
+            "name": "metadata",
+            "type": "language/displayName/parserEngine/adapterPackage/status",
+            "role": "描述适配器稳定身份、解析策略和插件包名。"
           }
         ],
         "dynamicLeftBranch": [
           {
-            "name": "classifyDiagnosis",
+            "name": "readTopologyIR",
             "demand": [
-              "errorText"
+              "string (projectRoot)"
             ],
             "answer": [
-              "HealingBranchKind"
+              "TriadTopologyIR"
             ],
-            "responsibility": "向 Healing 左分支提供稳定的错误分类策略。"
-          }
-        ]
-      },
-      {
-        "className": "GeneratorRightBranch",
-        "staticRightBranch": [
-          {
-            "name": "BUILTIN_TYPE_NAMES",
-            "type": "Set<string>",
-            "role": "内置类型白名单"
+            "responsibility": "读取当前语言项目拓扑并映射为 Triad-IR。"
           },
           {
-            "name": "source path strategy",
-            "type": "path resolver",
-            "role": "源码落点策略"
-          }
-        ],
-        "dynamicLeftBranch": [
-          {
-            "name": "resolveSourceFilePath",
+            "name": "parseTopology",
             "demand": [
-              "projectRoot",
-              "ParsedNodeRef",
-              "TriadNodeDefinition",
-              "NodeLocationMap"
+              "string (projectRoot)",
+              "string | undefined (outputPath)"
             ],
             "answer": [
-              "string"
+              "void"
             ],
-            "responsibility": "向 Generator 左分支提供稳定的源码落点策略。"
-          }
-        ]
-      },
-      {
-        "className": "ProtocolRightBranch",
-        "staticRightBranch": [
-          {
-            "name": "upgradeProtocolSchema",
-            "type": "ZodSchema",
-            "role": "协议结构约束"
+            "responsibility": "把目标语言源码解析为 triad-map 拓扑输出。"
           },
           {
-            "name": "PREFIX_CATEGORY_MAP",
-            "type": "Record<string, TriadCategory>",
-            "role": "节点类别映射"
-          }
-        ],
-        "dynamicLeftBranch": [
-          {
-            "name": "getUpgradeProtocolSchema",
-            "demand": [],
-            "answer": [
-              "ZodSchema"
-            ],
-            "responsibility": "向 Protocol 左分支提供稳定的协议 Schema。"
-          }
-        ]
-      },
-      {
-        "className": "WorkflowRightBranch",
-        "staticRightBranch": [
-          {
-            "name": "draft protocol template",
-            "type": "object factory",
-            "role": "协议种子"
-          },
-          {
-            "name": "stage router rules",
-            "type": "string[]",
-            "role": "阶段判定规则"
-          }
-        ],
-        "dynamicLeftBranch": [
-          {
-            "name": "createDraftProtocolTemplate",
+            "name": "applyUpgradeProtocol",
             "demand": [
-              "projectRoot",
-              "mapFile",
-              "userDemand"
+              "string (projectRoot)",
+              "string | undefined (protocolPath)"
             ],
             "answer": [
-              "object"
+              "{ changedFiles: string[] }"
             ],
-            "responsibility": "向 Workflow 左分支提供稳定的协议模板。"
-          }
-        ]
-      },
-      {
-        "className": "BootstrapRightBranch",
-        "staticRightBranch": [
-          {
-            "name": "module roles",
-            "type": "record",
-            "role": "模块职责目录"
-          },
-          {
-            "name": "self bootstrap node ids",
-            "type": "string[]",
-            "role": "复用节点清单"
-          }
-        ],
-        "dynamicLeftBranch": [
-          {
-            "name": "getBootstrapModuleRoles",
-            "demand": [],
-            "answer": [
-              "record"
-            ],
-            "responsibility": "向 Bootstrap 左分支提供稳定的自举目录。"
+            "responsibility": "把升级协议落地为目标语言骨架代码修改。"
           }
         ]
       }
@@ -347,171 +229,173 @@ D:/TraidMind/triadmind-core
   "actions": [
     {
       "op": "reuse",
-      "nodeId": "Workflow.buildMasterPrompt",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Workflow.buildProtocolPrompt",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Workflow.writePromptPacket",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "WorkflowRightBranch.createDraftProtocolTemplate",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "WorkflowRightBranch.getMasterPromptStageRouterLines",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Protocol.assertProtocolShape",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Protocol.parseNodeRef",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Protocol.readTriadMap",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "ProtocolRightBranch.getUpgradeProtocolSchema",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "ProtocolRightBranch.getTriadNodeDefinitionSchema",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Parser.runParser",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Generator.applyProtocol",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "GeneratorRightBranch.resolveSourceFilePath",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "GeneratorRightBranch.buildMethodStructure",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Visualizer.generateDashboard",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Sync.syncTriadMap",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Rules.installAlwaysOnRules",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Healing.prepareHealingArtifacts",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Healing.diagnoseRuntimeFailure",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "HealingRightBranch.classifyDiagnosis",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "HealingRightBranch.estimateBlastRadius",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Snapshot.createSnapshot",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
       "nodeId": "Adapter.resolveAdapter",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "TreeSitterParser.runTreeSitterTypeScriptParser",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Workspace.getWorkspacePaths",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Config.loadTriadConfig",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
-      "nodeId": "Stage.analyzeWorkspaceStage",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
+      "reason": "复用现有适配器入口作为多语言路由锚点。",
+      "confidence": 0.96
     },
     {
       "op": "reuse",
       "nodeId": "Ir.buildTopologyIR",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
+      "reason": "复用现有 Triad-IR 构建能力作为跨语言拓扑契约。",
+      "confidence": 0.9
+    },
+    {
+      "op": "modify",
+      "nodeId": "Parser.runParser",
+      "category": "core",
+      "sourcePath": "parser.ts",
+      "fission": {
+        "problem": "执行 runParser 流程",
+        "demand": [
+          "string (targetDir)",
+          "string | undefined (outputPath)"
+        ],
+        "answer": [
+          "void"
+        ]
+      },
+      "reason": "parser 改造为纯调度器，委托 LanguageAdapter.parseTopology。",
+      "confidence": 0.92
+    },
+    {
+      "op": "modify",
+      "nodeId": "Generator.applyProtocol",
+      "category": "core",
+      "sourcePath": "generator.ts",
+      "fission": {
+        "problem": "执行 applyProtocol 流程",
+        "demand": [
+          "string (projectRoot)",
+          "string | undefined (protocolPath)"
+        ],
+        "answer": [
+          "{ changedFiles: string[]; }"
+        ]
+      },
+      "reason": "generator 改造为纯调度器，委托 LanguageAdapter.applyUpgradeProtocol。",
+      "confidence": 0.92
+    },
+    {
+      "op": "create_child",
+      "parentNodeId": "Adapter.resolveAdapter",
+      "node": {
+        "nodeId": "AdapterRegistry.registerAdapter",
+        "category": "core",
+        "sourcePath": "adapterRegistry.ts",
+        "fission": {
+          "problem": "执行 registerAdapter 流程",
+          "demand": [
+            "LanguageAdapter (adapter)"
+          ],
+          "answer": [
+            "void"
+          ]
+        }
+      },
+      "reason": "注册表需要独立维护语言到适配器的稳定映射。",
+      "confidence": 0.91
+    },
+    {
+      "op": "create_child",
+      "parentNodeId": "Adapter.resolveAdapter",
+      "node": {
+        "nodeId": "AdapterRegistry.resolveAdapter",
+        "category": "core",
+        "sourcePath": "adapterRegistry.ts",
+        "fission": {
+          "problem": "执行 resolveAdapter 流程",
+          "demand": [
+            "WorkspacePaths | string (pathsOrProjectRoot)"
+          ],
+          "answer": [
+            "LanguageAdapter"
+          ]
+        }
+      },
+      "reason": "把动态路由职责从 adapter.ts 提升为独立注册表顶点。",
+      "confidence": 0.94
+    },
+    {
+      "op": "create_child",
+      "parentNodeId": "Adapter.getAvailableAdapters",
+      "node": {
+        "nodeId": "AdapterRegistry.getAvailableAdapters",
+        "category": "core",
+        "sourcePath": "adapterRegistry.ts",
+        "fission": {
+          "problem": "执行 getAvailableAdapters 流程",
+          "demand": [
+            "None"
+          ],
+          "answer": [
+            "LanguageAdapter[]"
+          ]
+        }
+      },
+      "reason": "把适配器目录读取职责移动到注册表。",
+      "confidence": 0.91
+    },
+    {
+      "op": "create_child",
+      "parentNodeId": "Adapter.resolveAdapter",
+      "node": {
+        "nodeId": "TypeScriptAdapter.readTopologyIR",
+        "category": "core",
+        "sourcePath": "typescriptAdapter.ts",
+        "fission": {
+          "problem": "执行 readTopologyIR 流程",
+          "demand": [
+            "string (projectRoot)"
+          ],
+          "answer": [
+            "TriadTopologyIR"
+          ]
+        }
+      },
+      "reason": "TypeScript 适配器需要封装 Triad-IR 读取能力。",
+      "confidence": 0.9
+    },
+    {
+      "op": "create_child",
+      "parentNodeId": "Parser.runParser",
+      "node": {
+        "nodeId": "TypeScriptAdapter.parseTopology",
+        "category": "core",
+        "sourcePath": "typescriptAdapter.ts",
+        "fission": {
+          "problem": "执行 parseTopology 流程",
+          "demand": [
+            "string (projectRoot)",
+            "string | undefined (outputPath)"
+          ],
+          "answer": [
+            "void"
+          ]
+        }
+      },
+      "reason": "TypeScript 适配器承接原 parser 的语言绑定实现。",
+      "confidence": 0.94
+    },
+    {
+      "op": "create_child",
+      "parentNodeId": "Generator.applyProtocol",
+      "node": {
+        "nodeId": "TypeScriptAdapter.applyUpgradeProtocol",
+        "category": "core",
+        "sourcePath": "typescriptAdapter.ts",
+        "fission": {
+          "problem": "执行 applyUpgradeProtocol 流程",
+          "demand": [
+            "string (projectRoot)",
+            "string | undefined (protocolPath)"
+          ],
+          "answer": [
+            "{ changedFiles: string[] }"
+          ]
+        }
+      },
+      "reason": "TypeScript 适配器承接原 generator 的语言绑定实现。",
+      "confidence": 0.94
     }
   ]
 }
@@ -545,6 +429,48 @@ D:/TraidMind/triadmind-core
       ],
       "answer": [
         "TriadLanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "AdapterRegistry.getAvailableAdapters",
+    "category": "core",
+    "sourcePath": "adapterRegistry.ts",
+    "fission": {
+      "problem": "执行 getAvailableAdapters 流程",
+      "demand": [
+        "None"
+      ],
+      "answer": [
+        "LanguageAdapter[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "AdapterRegistry.registerAdapter",
+    "category": "core",
+    "sourcePath": "adapterRegistry.ts",
+    "fission": {
+      "problem": "执行 registerAdapter 流程",
+      "demand": [
+        "LanguageAdapter (adapter)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "AdapterRegistry.resolveAdapter",
+    "category": "core",
+    "sourcePath": "adapterRegistry.ts",
+    "fission": {
+      "problem": "执行 resolveAdapter 流程",
+      "demand": [
+        "WorkspacePaths | string (pathsOrProjectRoot)"
+      ],
+      "answer": [
+        "LanguageAdapter"
       ]
     }
   },
@@ -741,7 +667,7 @@ D:/TraidMind/triadmind-core
       "problem": "执行 applyProtocol 流程",
       "demand": [
         "string (projectRoot)",
-        "string (protocolPath)"
+        "string | undefined (protocolPath)"
       ],
       "answer": [
         "{ changedFiles: string[]; }"
@@ -1128,7 +1054,7 @@ D:/TraidMind/triadmind-core
       "problem": "执行 runParser 流程",
       "demand": [
         "string (targetDir)",
-        "string (outputPath)"
+        "string | undefined (outputPath)"
       ],
       "answer": [
         "void"
@@ -1413,6 +1339,50 @@ D:/TraidMind/triadmind-core
     }
   },
   {
+    "nodeId": "TypescriptAdapter.applyUpgradeProtocol",
+    "category": "core",
+    "sourcePath": "typescriptAdapter.ts",
+    "fission": {
+      "problem": "执行 applyUpgradeProtocol 流程",
+      "demand": [
+        "string (projectRoot)",
+        "string | undefined (protocolPath)"
+      ],
+      "answer": [
+        "{ changedFiles: string[] }"
+      ]
+    }
+  },
+  {
+    "nodeId": "TypescriptAdapter.parseTopology",
+    "category": "core",
+    "sourcePath": "typescriptAdapter.ts",
+    "fission": {
+      "problem": "执行 parseTopology 流程",
+      "demand": [
+        "string (projectRoot)",
+        "string | undefined (outputPath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "TypescriptAdapter.readTopologyIR",
+    "category": "core",
+    "sourcePath": "typescriptAdapter.ts",
+    "fission": {
+      "problem": "执行 readTopologyIR 流程",
+      "demand": [
+        "string (projectRoot)"
+      ],
+      "answer": [
+        "TriadTopologyIR"
+      ]
+    }
+  },
+  {
     "nodeId": "Visualizer.generateDashboard",
     "category": "core",
     "sourcePath": "visualizer.ts",
@@ -1569,6 +1539,22 @@ D:/TraidMind/triadmind-core
     "sourcePath": "workflow.ts",
     "fission": {
       "problem": "执行 ensureMultiPassTemplates 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)",
+        "{ resetArtifacts?: boolean } (options)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.ensurePipelineArtifactSeeds",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 ensurePipelineArtifactSeeds 流程",
       "demand": [
         "WorkspacePaths (paths)",
         "string (userDemand)"
@@ -1899,7 +1885,611 @@ D:/TraidMind/triadmind-core
 ```
 
 [Skeleton Files]
-当前没有检测到本轮 apply 直接涉及的骨架文件，请优先从 `last-approved-protocol.json` 对应的节点文件开始实现。
+[Skeleton File] parser.ts
+```ts
+import { Project, SourceFile } from 'ts-morph';
+import * as fs from 'fs';
+import * as path from 'path';
+import chalk from 'chalk';
+import { getWorkspacePaths, normalizePath } from './workspace';
+import { loadTriadConfig, resolveCategoryFromConfig, shouldExcludeSourcePath, TriadConfig } from './config';
+
+interface TriadNode {
+    nodeId: string;
+    category: string;
+    sourcePath: string;
+    fission: {
+        problem: string;
+        demand: string[];
+        answer: string[];
+    };
+}
+
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 runParser 流程
+ */
+export function runParser(targetDir: string, outputPath?: string | undefined): void {
+    console.log(chalk.gray('   - [Parser] 正在扫描 TypeScript AST，回写项目拓扑地图...'));
+
+    const tsConfigFilePath = path.join(targetDir, 'tsconfig.json');
+    if (!fs.existsSync(tsConfigFilePath)) {
+        throw new Error(`目标目录下缺少 tsconfig.json：${tsConfigFilePath}`);
+    }
+
+    const triadDir = path.join(targetDir, '.triadmind');
+    fs.mkdirSync(triadDir, { recursive: true });
+    const workspacePaths = getWorkspacePaths(targetDir);
+    const config = loadTriadConfig(workspacePaths);
+
+    const resolvedOutputPath = outputPath ?? path.join(triadDir, 'triad-map.json');
+
+    const project = new Project({
+        tsConfigFilePath
+    });
+
+    const triadGraph: TriadNode[] = [];
+    const sourceFiles = project
+        .getSourceFiles()
+        .filter(
+            (file) =>
+                !file.getFilePath().endsWith('.d.ts') &&
+                !file.getBaseName().endsWith('types.ts') &&
+                !shouldExcludeSourcePath(path.relative(targetDir, file.getFilePath()), config)
+        );
+
+    for (const sourceFile of sourceFiles) {
+        const filePath = sourceFile.getFilePath();
+        const sourcePath = normalizePath(path.relative(targetDir, filePath));
+        const category = resolveCategoryFromConfig(sourcePath, config);
+
+        collectClassMethodNodes(sourceFile, category, sourcePath, triadGraph, config);
+        collectExportedFunctionNodes(sourceFile, category, sourcePath, triadGraph, config);
+    }
+
+    triadGraph.sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+    fs.writeFileSync(resolvedOutputPath, JSON.stringify(triadGraph, null, 2), 'utf-8');
+    console.log(chalk.gray(`   - [Parser] 扫描完成，共抽取 ${triadGraph.length} 个叶节点。`));
+}
+
+function collectClassMethodNodes(
+    sourceFile: SourceFile,
+    category: string,
+    sourcePath: string,
+    triadGraph: TriadNode[],
+    config: TriadConfig
+) {
+    for (const cls of sourceFile.getClasses()) {
+        const className = cls.getName();
+        if (!className) {
+            continue;
+        }
+
+        const classHasTriadTag = hasTriadTag(cls, config);
+
+        for (const method of cls.getMethods()) {
+            if (method.getName() === 'constructor') {
+                continue;
+            }
+
+            const scope = method.getScope();
+            if (scope === 'private' || scope === 'protected') {
+                continue;
+            }
+
+            if (!config.parser.includeUntaggedExports && !classHasTriadTag && !hasTriadTag(method, config)) {
+                continue;
+            }
+
+            const demand = method.getParameters().map((parameter) => {
+                const typeName = parameter.getTypeNode()?.getText() ?? 'unknown';
+                return `${typeName} (${parameter.getName()})`;
+            });
+
+            const answer = method.getReturnTypeNode()?.getText() ?? method.getReturnType().getText(method);
+
+            triadGraph.push({
+                nodeId: `${className}.${method.getName()}`,
+                category,
+                sourcePath,
+                fission: {
+                    problem: `执行 ${method.getName()} 流程`,
+                    demand: demand.length > 0 ? demand : ['None'],
+                    answer: [answer]
+                }
+            });
+        }
+    }
+}
+
+function collectExportedFunctionNodes(
+    sourceFile: SourceFile,
+    category: string,
+    sourcePath: string,
+    triadGraph: TriadNode[],
+    config: TriadConfig
+) {
+    const moduleName = toPascalCase(sourceFile.getBaseNameWithoutExtension());
+
+    for (const fn of sourceFile.getFunctions()) {
+        const functionName = fn.getName();
+        if (!functionName || !fn.isExported()) {
+            continue;
+        }
+
+        if (!config.parser.includeUntaggedExports && !hasTriadTag(fn, config)) {
+            continue;
+        }
+
+        const demand = fn.getParameters().map((parameter) => {
+            const typeName = parameter.getTypeNode()?.getText() ?? 'unknown';
+            return `${typeName} (${parameter.getName()})`;
+        });
+
+        const answer = fn.getReturnTypeNode()?.getText() ?? fn.getReturnType().getText(fn);
+
+        triadGraph.push({
+            nodeId: `${moduleName}.${functionName}`,
+            category,
+            sourcePath,
+            fission: {
+                problem: `执行 ${functionName} 流程`,
+                demand: demand.length > 0 ? demand : ['None'],
+                answer: [answer]
+            }
+        });
+    }
+}
+
+function toPascalCase(value: string) {
+    return value
+        .split(/[^A-Za-z0-9]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('');
+}
+
+function hasTriadTag(node: { getJsDocs(): Array<{ getTags(): Array<{ getTagName(): string }> }> }, config: TriadConfig) {
+    const supportedTags = new Set([
+        config.parser.jsDocTags.triadNode,
+        config.parser.jsDocTags.leftBranch,
+        config.parser.jsDocTags.rightBranch
+    ]);
+
+    return node
+        .getJsDocs()
+        .flatMap((doc) => doc.getTags())
+        .some((tag) => supportedTags.has(tag.getTagName()));
+}
+```
+
+[Skeleton File] generator.ts
+```ts
+import {
+    FunctionDeclaration,
+    MethodDeclaration,
+    OptionalKind,
+    ParameterDeclarationStructure,
+    Project,
+    SourceFile
+} from 'ts-morph';
+import * as fs from 'fs';
+import * as path from 'path';
+import { loadTriadConfig } from './config';
+import {
+    buildFunctionStructure,
+    buildMethodStructure,
+    buildParameters,
+    buildTodoStatement,
+    buildTriadGeneratedDoc,
+    collectTypeTokens,
+    NodeLocationMap,
+    resolveSourceFilePath,
+    resolveTypesModuleSpecifier,
+    shouldUseTopLevelFunction
+} from './generatorRightBranch';
+import { getWorkspacePaths } from './workspace';
+import {
+    assertProtocolShape,
+    CreateChildAction,
+    ModifyAction,
+    parseDemandEntry,
+    parseNodeRef,
+    parseReturnType,
+    ParsedNodeRef,
+    readJsonFile,
+    readTriadMap,
+    TriadNodeDefinition,
+    UpgradeProtocol
+} from './protocol';
+
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 applyProtocol 流程
+ */
+export function applyProtocol(projectRoot: string, protocolPath?: string | undefined): { changedFiles: string[]; } {
+    const resolvedProjectRoot = path.resolve(projectRoot);
+    const resolvedProtocolPath = protocolPath ?? path.join(resolvedProjectRoot, '.triadmind', 'draft-protocol.json');
+    const tsConfigFilePath = path.join(resolvedProjectRoot, 'tsconfig.json');
+
+    if (!fs.existsSync(resolvedProtocolPath)) {
+        throw new Error(`找不到协议文件：${resolvedProtocolPath}`);
+    }
+
+    if (!fs.existsSync(tsConfigFilePath)) {
+        throw new Error(`找不到 tsconfig.json：${tsConfigFilePath}`);
+    }
+
+    const protocol = readJsonFile<UpgradeProtocol>(resolvedProtocolPath);
+    const triadMapPath = path.join(resolvedProjectRoot, '.triadmind', 'triad-map.json');
+    const existingNodes = readTriadMap(triadMapPath);
+    const config = loadTriadConfig(getWorkspacePaths(resolvedProjectRoot));
+    assertProtocolShape(protocol, {
+        existingNodes,
+        minConfidence: config.protocol.minConfidence,
+        requireConfidence: config.protocol.requireConfidence
+    });
+
+    const project = new Project({
+        tsConfigFilePath
+    });
+
+    const exportedTypeNames = getExportedTypeNames(project, resolvedProjectRoot);
+    const nodeLocations = loadNodeLocations(resolvedProjectRoot);
+    const changedFiles = new Set<string>();
+
+    for (const action of protocol.actions) {
+        if (action.op === 'reuse') {
+            continue;
+        }
+
+        if (action.op === 'create_child') {
+            changedFiles.add(
+                upsertNode(project, resolvedProjectRoot, action.node, exportedTypeNames, nodeLocations, action)
+            );
+            continue;
+        }
+
+        if (action.op === 'modify') {
+            changedFiles.add(
+                upsertNode(
+                    project,
+                    resolvedProjectRoot,
+                    {
+                        nodeId: action.nodeId,
+                        category: action.category,
+                        sourcePath: action.sourcePath,
+                        fission: action.fission
+                    },
+                    exportedTypeNames,
+                    nodeLocations,
+                    action
+                )
+            );
+        }
+    }
+
+    project.saveSync();
+    const normalizedFiles = Array.from(changedFiles).map((filePath) => path.relative(resolvedProjectRoot, filePath));
+    console.log(`[TriadMind] 协议执行完成，涉及 ${normalizedFiles.length} 个源码文件。`);
+
+    return {
+        changedFiles: normalizedFiles
+    };
+}
+
+function upsertNode(
+    project: Project,
+    projectRoot: string,
+    node: TriadNodeDefinition,
+    exportedTypeNames: Set<string>,
+    nodeLocations: NodeLocationMap,
+    action: CreateChildAction | ModifyAction
+) {
+    const ref = parseNodeRef(node.nodeId, node.category);
+    const filePath = resolveSourceFilePath(projectRoot, ref, node, nodeLocations);
+    const sourceFile =
+        project.getSourceFile(filePath) ?? project.createSourceFile(filePath, '', { overwrite: false });
+
+    ensureTypeImports(projectRoot, sourceFile, exportedTypeNames, node);
+
+    if (shouldUseTopLevelFunction(sourceFile, ref, node.sourcePath)) {
+        upsertFunctionVertex(sourceFile, ref, node, action);
+    } else {
+        upsertClassVertex(sourceFile, ref, node, action);
+    }
+
+    sourceFile.formatText({
+        indentSize: 4
+    });
+
+    return filePath;
+}
+
+function upsertClassVertex(
+    sourceFile: SourceFile,
+    ref: ParsedNodeRef,
+    node: TriadNodeDefinition,
+    action: CreateChildAction | ModifyAction
+) {
+    const cls =
+        sourceFile.getClass(ref.className) ??
+        sourceFile.addClass({
+            name: ref.className,
+            isExported: true
+        });
+
+    const existingMethod = cls.getMethod(ref.methodName);
+    const parameters = buildParameters(node.fission.demand);
+    const returnType = parseReturnType(node.fission.answer[0] ?? 'void');
+
+    if (!existingMethod) {
+        cls.addMethod(buildMethodStructure(ref, node, parameters, returnType, action.op === 'create_child'));
+    } else {
+        syncMethod(existingMethod, parameters, returnType, node);
+    }
+}
+
+function upsertFunctionVertex(
+    sourceFile: SourceFile,
+    ref: ParsedNodeRef,
+    node: TriadNodeDefinition,
+    action: CreateChildAction | ModifyAction
+) {
+    const existingFunction = sourceFile.getFunction(ref.methodName);
+    const parameters = buildParameters(node.fission.demand);
+    const returnType = parseReturnType(node.fission.answer[0] ?? 'void');
+
+    if (!existingFunction) {
+        sourceFile.addFunction(buildFunctionStructure(ref, node, parameters, returnType, action.op === 'create_child'));
+    } else {
+        syncFunction(existingFunction, parameters, returnType, node);
+    }
+}
+
+function syncMethod(
+    method: MethodDeclaration,
+    parameters: OptionalKind<ParameterDeclarationStructure>[],
+    returnType: string,
+    node: TriadNodeDefinition
+) {
+    const existingParameters = method.getParameters();
+
+    for (let index = existingParameters.length - 1; index >= parameters.length; index -= 1) {
+        existingParameters[index].remove();
+    }
+
+    parameters.forEach((parameter, index) => {
+        const existing = method.getParameters()[index];
+        if (!existing) {
+            method.insertParameter(index, parameter);
+            return;
+        }
+
+        existing.rename(parameter.name);
+        existing.setType(parameter.type ?? 'unknown');
+    });
+
+    method.setReturnType(returnType);
+    replaceDocs(method, node.fission.problem);
+
+    if (method.getStatements().length === 0) {
+        method.addStatements([buildTodoStatement(node.nodeId, node.fission.problem)]);
+    }
+}
+
+function syncFunction(
+    fn: FunctionDeclaration,
+    parameters: OptionalKind<ParameterDeclarationStructure>[],
+    returnType: string,
+    node: TriadNodeDefinition
+) {
+    const existingParameters = fn.getParameters();
+
+    for (let index = existingParameters.length - 1; index >= parameters.length; index -= 1) {
+        existingParameters[index].remove();
+    }
+
+    parameters.forEach((parameter, index) => {
+        const existing = fn.getParameters()[index];
+        if (!existing) {
+            fn.insertParameter(index, parameter);
+            return;
+        }
+
+        existing.rename(parameter.name);
+        existing.setType(parameter.type ?? 'unknown');
+    });
+
+    fn.setReturnType(returnType);
+    fn.setIsExported(true);
+    replaceDocs(fn, node.fission.problem);
+
+    if (fn.getStatements().length === 0) {
+        fn.addStatements([buildTodoStatement(node.nodeId, node.fission.problem)]);
+    }
+}
+
+function ensureTypeImports(
+    projectRoot: string,
+    sourceFile: SourceFile,
+    exportedTypeNames: Set<string>,
+    node: TriadNodeDefinition
+) {
+    const referencedTypes = new Set<string>();
+    for (const demand of node.fission.demand) {
+        const parsed = parseDemandEntry(demand, 0);
+        if (parsed) {
+            collectTypeTokens(parsed.type).forEach((token) => referencedTypes.add(token));
+        }
+    }
+
+    collectTypeTokens(parseReturnType(node.fission.answer[0] ?? 'void')).forEach((token) =>
+        referencedTypes.add(token)
+    );
+
+    const typeImports = Array.from(referencedTypes).filter((token) => exportedTypeNames.has(token));
+    if (typeImports.length === 0) {
+        return;
+    }
+
+    const moduleSpecifier = resolveTypesModuleSpecifier(projectRoot, sourceFile);
+    removeStaleTypeImports(sourceFile, moduleSpecifier, typeImports);
+    const existingImport = sourceFile.getImportDeclaration(
+        (declaration) => declaration.getModuleSpecifierValue() === moduleSpecifier
+    );
+
+    if (!existingImport) {
+        sourceFile.addImportDeclaration({
+            moduleSpecifier,
+            namedImports: typeImports.sort()
+        });
+        return;
+    }
+
+    const existingNames = new Set(existingImport.getNamedImports().map((specifier) => specifier.getName()));
+    typeImports
+        .sort()
+        .filter((name) => !existingNames.has(name))
+        .forEach((name) => existingImport.addNamedImport(name));
+}
+
+function getExportedTypeNames(project: Project, projectRoot: string) {
+    const typesFilePath = path.join(projectRoot, 'src', 'types.ts');
+    const sourceFile = project.getSourceFile(typesFilePath);
+    const exported = new Set<string>();
+
+    if (!sourceFile) {
+        return exported;
+    }
+
+    for (const [name] of sourceFile.getExportedDeclarations()) {
+        exported.add(name);
+    }
+
+    return exported;
+}
+
+function loadNodeLocations(projectRoot: string) {
+    const candidates = [
+        path.join(projectRoot, '.triadmind', 'triad-map.json'),
+        path.join(projectRoot, 'triad-map.json')
+    ];
+
+    for (const candidate of candidates) {
+        if (!fs.existsSync(candidate)) {
+            continue;
+        }
+
+        try {
+            const nodes = JSON.parse(fs.readFileSync(candidate, 'utf-8')) as Array<{
+                nodeId?: string;
+                sourcePath?: string;
+            }>;
+
+            return nodes.reduce<NodeLocationMap>((result, item) => {
+                if (item?.nodeId && item?.sourcePath) {
+                    result[item.nodeId] = item.sourcePath;
+                }
+                return result;
+            }, {});
+        } catch {
+            return {};
+        }
+    }
+
+    return {};
+}
+
+function replaceDocs(node: MethodDeclaration | FunctionDeclaration, responsibility: string) {
+    node.getJsDocs().forEach((doc) => doc.remove());
+    node.addJsDoc({
+        description: buildTriadGeneratedDoc(responsibility)
+    });
+}
+
+function removeStaleTypeImports(sourceFile: SourceFile, moduleSpecifier: string, typeImports: string[]) {
+    const targetNames = new Set(typeImports);
+    sourceFile
+        .getImportDeclarations()
+        .filter((declaration) => {
+            const value = declaration.getModuleSpecifierValue();
+            return value !== moduleSpecifier && value.includes('types');
+        })
+        .forEach((declaration) => {
+            declaration
+                .getNamedImports()
+                .filter((specifier) => targetNames.has(specifier.getName()))
+                .forEach((specifier) => specifier.remove());
+
+            if (
+                declaration.getNamedImports().length === 0 &&
+                !declaration.getDefaultImport() &&
+                !declaration.getNamespaceImport()
+            ) {
+                declaration.remove();
+            }
+        });
+}
+
+if (require.main === module) {
+    applyProtocol(process.argv[2] ?? process.cwd(), process.argv[3]);
+}
+```
+
+[Skeleton File] adapterRegistry.ts
+```ts
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 registerAdapter 流程
+ */
+export function registerAdapter(adapter: LanguageAdapter): void {
+    throw new Error("TODO: 实现 AdapterRegistry.registerAdapter，职责：执行 registerAdapter 流程");
+}
+
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 resolveAdapter 流程
+ */
+export function resolveAdapter(pathsOrProjectRoot: WorkspacePaths | string): LanguageAdapter {
+    throw new Error("TODO: 实现 AdapterRegistry.resolveAdapter，职责：执行 resolveAdapter 流程");
+}
+
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 getAvailableAdapters 流程
+ */
+export function getAvailableAdapters(): LanguageAdapter[] {
+    throw new Error("TODO: 实现 AdapterRegistry.getAvailableAdapters，职责：执行 getAvailableAdapters 流程");
+}
+```
+
+[Skeleton File] typescriptAdapter.ts
+```ts
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 readTopologyIR 流程
+ */
+export function readTopologyIR(projectRoot: string): TriadTopologyIR {
+    throw new Error("TODO: 实现 TypeScriptAdapter.readTopologyIR，职责：执行 readTopologyIR 流程");
+}
+
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 parseTopology 流程
+ */
+export function parseTopology(projectRoot: string, outputPath: string | undefined): void {
+    throw new Error("TODO: 实现 TypeScriptAdapter.parseTopology，职责：执行 parseTopology 流程");
+}
+
+/**
+ * TriadMind 自动生成骨架
+ * 职责：执行 applyUpgradeProtocol 流程
+ */
+export function applyUpgradeProtocol(projectRoot: string, protocolPath: string | undefined): { changedFiles: string[] } {
+    throw new Error("TODO: 实现 TypeScriptAdapter.applyUpgradeProtocol，职责：执行 applyUpgradeProtocol 流程");
+}
+```
 
 [Implementation Rules]
 1. 不要重新发明拓扑；默认协议与 triad-map 已批准。

@@ -1,6 +1,16 @@
 {
-  "anchorNodeId": "",
-  "vertexGoal": "将 triadmind-core 重构为遵从顶点三元法的自举系统：让 parser 能抽取模块级顶点，generator 能基于 sourcePath 修改模块函数，workflow 拆分为 workspace 与 stage 右分支，形成可自举的协议-实现闭环",
-  "leftBranch": [],
-  "rightBranch": []
+  "anchorNodeId": "Adapter.resolveAdapter",
+  "vertexGoal": "将 AST 解析与代码生成从 ts-morph 绑定中抽离，升级为 LanguageAdapter 驱动的多语言泛化架构。",
+  "leftBranch": [
+    "定义 LanguageAdapter 统一接口，承载 readTopologyIR、parseTopology 与 applyUpgradeProtocol 动态能力",
+    "封装 TypeScriptAdapter，把现有 TypeScript parser/generator 实现迁入适配器",
+    "新增 AdapterRegistry，根据 .triadmind/config.json 动态选择语言适配器",
+    "改造 parser 和 generator 为纯调度器，只委托当前 Adapter 执行"
+  ],
+  "rightBranch": [
+    "TriadConfig.architecture.language / parserEngine / adapter 作为静态路由配置",
+    "AdapterRegistry 作为稳定适配器目录，保存语言到适配器的映射关系",
+    "Triad-IR / triad-map.json 作为跨语言中间拓扑契约",
+    "协议 Schema 与 reuse/modify/create_child 规则保持核心引擎稳定边界"
+  ]
 }

@@ -29,12 +29,12 @@
 
 ## 3. Meso-Split
 
-### Adapter
+### AdapterRegistry
 
-- Source: `adapter.ts`
-- Responsibility: 语言适配器选择层，把协议执行委托给当前项目语言插件。
-- Static Right Branch: adapter registry / language / parserEngine / adapterPackage
-- Dynamic Left Branch: `Adapter.getAvailableAdapters`, `Adapter.resolveAdapter`
+- Source: `adapterRegistry.ts`
+- Responsibility: TriadMind 核心模块。
+- Static Right Branch: module exports / type signatures
+- Dynamic Left Branch: `AdapterRegistry.getAvailableAdapters`, `AdapterRegistry.registerAdapter`, `AdapterRegistry.resolveAdapter`
 
 ### Bootstrap
 
@@ -148,6 +148,27 @@
 - Static Right Branch: tree-sitter grammar / query patterns
 - Dynamic Left Branch: `TreeSitterParser.runTreeSitterTypeScriptParser`
 
+### TypescriptAdapter
+
+- Source: `typescriptAdapter.ts`
+- Responsibility: TriadMind 核心模块。
+- Static Right Branch: module exports / type signatures
+- Dynamic Left Branch: `TypescriptAdapter.applyUpgradeProtocol`, `TypescriptAdapter.createTypeScriptAdapter`, `TypescriptAdapter.parseTopology`, `TypescriptAdapter.readTopologyIR`
+
+### TypescriptGenerator
+
+- Source: `typescriptGenerator.ts`
+- Responsibility: TriadMind 核心模块。
+- Static Right Branch: module exports / type signatures
+- Dynamic Left Branch: `TypescriptGenerator.applyTypeScriptProtocol`
+
+### TypescriptParser
+
+- Source: `typescriptParser.ts`
+- Responsibility: TriadMind 核心模块。
+- Static Right Branch: module exports / type signatures
+- Dynamic Left Branch: `TypescriptParser.runTypeScriptParser`
+
 ### Visualizer
 
 - Source: `visualizer.ts`
@@ -160,7 +181,7 @@
 - Source: `workflow.ts`
 - Responsibility: 多轮推演编排左分支，生成 Macro/Meso/Micro/Protocol/Handoff 提示词。
 - Static Right Branch: workflow execution pipeline
-- Dynamic Left Branch: `Workflow.buildImplementationHandoffPrompt`, `Workflow.buildImplementationPrompt`, `Workflow.buildMacroPrompt`, `Workflow.buildMasterPrompt`, `Workflow.buildMesoPrompt`, `Workflow.buildMicroPrompt`, `Workflow.buildPipelinePrompt`, `Workflow.buildProtocolPrompt`, `Workflow.createDraftTemplate`, `Workflow.ensureMultiPassTemplates`, `Workflow.ensureTriadSpec`, `Workflow.resetPipelineArtifacts`, `Workflow.writeImplementationHandoff`, `Workflow.writeMasterPrompt`, `Workflow.writePromptPacket`
+- Dynamic Left Branch: `Workflow.buildImplementationHandoffPrompt`, `Workflow.buildImplementationPrompt`, `Workflow.buildMacroPrompt`, `Workflow.buildMasterPrompt`, `Workflow.buildMesoPrompt`, `Workflow.buildMicroPrompt`, `Workflow.buildPipelinePrompt`, `Workflow.buildProtocolPrompt`, `Workflow.createDraftTemplate`, `Workflow.ensureMultiPassTemplates`, `Workflow.ensurePipelineArtifactSeeds`, `Workflow.ensureTriadSpec`, `Workflow.resetPipelineArtifacts`, `Workflow.writeImplementationHandoff`, `Workflow.writeMasterPrompt`, `Workflow.writePromptPacket`
 
 ### WorkflowRightBranch
 

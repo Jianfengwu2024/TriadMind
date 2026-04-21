@@ -1,4 +1,9 @@
 {
-  "generatedAt": "2026-04-21T10:14:46.043Z",
-  "files": []
+  "generatedAt": "2026-04-21T10:59:57.732Z",
+  "files": [
+    "parser.ts",
+    "generator.ts",
+    "adapterRegistry.ts",
+    "typescriptAdapter.ts"
+  ]
 }

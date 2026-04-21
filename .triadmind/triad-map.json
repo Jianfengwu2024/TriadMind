@@ -1,29 +1,43 @@
 [
   {
-    "nodeId": "Adapter.getAvailableAdapters",
+    "nodeId": "AdapterRegistry.getAvailableAdapters",
     "category": "core",
-    "sourcePath": "adapter.ts",
+    "sourcePath": "adapterRegistry.ts",
     "fission": {
       "problem": "执行 getAvailableAdapters 流程",
       "demand": [
         "None"
       ],
       "answer": [
-        "TriadLanguageAdapter[]"
+        "LanguageAdapter[]"
       ]
     }
   },
   {
-    "nodeId": "Adapter.resolveAdapter",
+    "nodeId": "AdapterRegistry.registerAdapter",
     "category": "core",
-    "sourcePath": "adapter.ts",
+    "sourcePath": "adapterRegistry.ts",
+    "fission": {
+      "problem": "执行 registerAdapter 流程",
+      "demand": [
+        "LanguageAdapter (adapter)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "AdapterRegistry.resolveAdapter",
+    "category": "core",
+    "sourcePath": "adapterRegistry.ts",
     "fission": {
       "problem": "执行 resolveAdapter 流程",
       "demand": [
         "WorkspacePaths | string (pathsOrProjectRoot)"
       ],
       "answer": [
-        "TriadLanguageAdapter"
+        "LanguageAdapter"
       ]
     }
   },
@@ -223,7 +237,7 @@
         "string (protocolPath)"
       ],
       "answer": [
-        "{ changedFiles: string[]; }"
+        "{ changedFiles: string[] }"
       ]
     }
   },
@@ -892,6 +906,94 @@
     }
   },
   {
+    "nodeId": "TypescriptAdapter.applyUpgradeProtocol",
+    "category": "core",
+    "sourcePath": "typescriptAdapter.ts",
+    "fission": {
+      "problem": "执行 applyUpgradeProtocol 流程",
+      "demand": [
+        "string (projectRoot)",
+        "string (protocolPath)"
+      ],
+      "answer": [
+        "{ changedFiles: string[] }"
+      ]
+    }
+  },
+  {
+    "nodeId": "TypescriptAdapter.createTypeScriptAdapter",
+    "category": "core",
+    "sourcePath": "typescriptAdapter.ts",
+    "fission": {
+      "problem": "执行 createTypeScriptAdapter 流程",
+      "demand": [
+        "None"
+      ],
+      "answer": [
+        "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "TypescriptAdapter.parseTopology",
+    "category": "core",
+    "sourcePath": "typescriptAdapter.ts",
+    "fission": {
+      "problem": "执行 parseTopology 流程",
+      "demand": [
+        "string (projectRoot)",
+        "string (outputPath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "TypescriptAdapter.readTopologyIR",
+    "category": "core",
+    "sourcePath": "typescriptAdapter.ts",
+    "fission": {
+      "problem": "执行 readTopologyIR 流程",
+      "demand": [
+        "string (projectRoot)"
+      ],
+      "answer": [
+        "TriadTopologyIR"
+      ]
+    }
+  },
+  {
+    "nodeId": "TypescriptGenerator.applyTypeScriptProtocol",
+    "category": "core",
+    "sourcePath": "typescriptGenerator.ts",
+    "fission": {
+      "problem": "执行 applyTypeScriptProtocol 流程",
+      "demand": [
+        "string (projectRoot)",
+        "string (protocolPath)"
+      ],
+      "answer": [
+        "{ changedFiles: string[] }"
+      ]
+    }
+  },
+  {
+    "nodeId": "TypescriptParser.runTypeScriptParser",
+    "category": "core",
+    "sourcePath": "typescriptParser.ts",
+    "fission": {
+      "problem": "执行 runTypeScriptParser 流程",
+      "demand": [
+        "string (targetDir)",
+        "string (outputPath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
     "nodeId": "Visualizer.generateDashboard",
     "category": "core",
     "sourcePath": "visualizer.ts",
@@ -1048,6 +1150,22 @@
     "sourcePath": "workflow.ts",
     "fission": {
       "problem": "执行 ensureMultiPassTemplates 流程",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "string (userDemand)",
+        "{ resetArtifacts?: boolean } (options)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Workflow.ensurePipelineArtifactSeeds",
+    "category": "core",
+    "sourcePath": "workflow.ts",
+    "fission": {
+      "problem": "执行 ensurePipelineArtifactSeeds 流程",
       "demand": [
         "WorkspacePaths (paths)",
         "string (userDemand)"

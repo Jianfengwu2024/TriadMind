@@ -403,12 +403,6 @@
     },
     {
       "op": "reuse",
-      "nodeId": "Adapter.resolveAdapter",
-      "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
-      "confidence": 0.95
-    },
-    {
-      "op": "reuse",
       "nodeId": "TreeSitterParser.runTreeSitterTypeScriptParser",
       "reason": "自举协议复用该节点作为 TriadMind 自身架构的既有顶点。",
       "confidence": 0.95

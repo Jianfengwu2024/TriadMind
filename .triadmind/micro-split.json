@@ -1,3 +1,149 @@
 {
-  "classes": []
+  "classes": [
+    {
+      "className": "LanguageAdapter",
+      "staticRightBranch": [
+        {
+          "name": "metadata",
+          "type": "language/displayName/parserEngine/adapterPackage/status",
+          "role": "描述适配器稳定身份、解析策略和插件包名。"
+        },
+        {
+          "name": "supportsRuntimeHealing",
+          "type": "boolean",
+          "role": "声明该语言是否支持运行时自愈映射。"
+        }
+      ],
+      "dynamicLeftBranch": [
+        {
+          "name": "readTopologyIR",
+          "demand": [
+            "string (projectRoot)"
+          ],
+          "answer": [
+            "TriadTopologyIR"
+          ],
+          "responsibility": "读取当前语言项目拓扑并映射为 Triad-IR。"
+        },
+        {
+          "name": "parseTopology",
+          "demand": [
+            "string (projectRoot)",
+            "string | undefined (outputPath)"
+          ],
+          "answer": [
+            "void"
+          ],
+          "responsibility": "把目标语言源码解析为 triad-map 拓扑输出。"
+        },
+        {
+          "name": "applyUpgradeProtocol",
+          "demand": [
+            "string (projectRoot)",
+            "string | undefined (protocolPath)"
+          ],
+          "answer": [
+            "{ changedFiles: string[] }"
+          ],
+          "responsibility": "把升级协议落地为目标语言骨架代码修改。"
+        }
+      ]
+    },
+    {
+      "className": "TypeScriptAdapter",
+      "staticRightBranch": [
+        {
+          "name": "metadata",
+          "type": "LanguageAdapter metadata",
+          "role": "声明 TypeScript 适配器身份、包名和稳定状态。"
+        },
+        {
+          "name": "parserEnginePolicy",
+          "type": "TriadParserEngine",
+          "role": "根据配置选择 native 或 tree-sitter 解析路径。"
+        }
+      ],
+      "dynamicLeftBranch": [
+        {
+          "name": "readTopologyIR",
+          "demand": [
+            "string (projectRoot)"
+          ],
+          "answer": [
+            "TriadTopologyIR"
+          ],
+          "responsibility": "读取 TypeScript triad-map 并构建 Triad-IR。"
+        },
+        {
+          "name": "parseTopology",
+          "demand": [
+            "string (projectRoot)",
+            "string | undefined (outputPath)"
+          ],
+          "answer": [
+            "void"
+          ],
+          "responsibility": "封装现有 TypeScript parser 逻辑，并可委托 TreeSitterParser。"
+        },
+        {
+          "name": "applyUpgradeProtocol",
+          "demand": [
+            "string (projectRoot)",
+            "string | undefined (protocolPath)"
+          ],
+          "answer": [
+            "{ changedFiles: string[] }"
+          ],
+          "responsibility": "封装现有 TypeScript generator 逻辑，使用 ts-morph 生成骨架。"
+        }
+      ]
+    },
+    {
+      "className": "AdapterRegistry",
+      "staticRightBranch": [
+        {
+          "name": "adapters",
+          "type": "Map<TriadLanguage, LanguageAdapter>",
+          "role": "保存语言到适配器实例的稳定映射。"
+        },
+        {
+          "name": "plannedAdapters",
+          "type": "LanguageAdapter[]",
+          "role": "声明 Python、Go、Rust 等未来语言，阻止未实现能力伪装可用。"
+        }
+      ],
+      "dynamicLeftBranch": [
+        {
+          "name": "registerAdapter",
+          "demand": [
+            "LanguageAdapter (adapter)"
+          ],
+          "answer": [
+            "void"
+          ],
+          "responsibility": "把语言适配器加入注册表并防止重复覆盖稳定实现。"
+        },
+        {
+          "name": "resolveAdapter",
+          "demand": [
+            "WorkspacePaths | string (pathsOrProjectRoot)"
+          ],
+          "answer": [
+            "LanguageAdapter"
+          ],
+          "responsibility": "读取项目配置并返回当前语言适配器。"
+        },
+        {
+          "name": "getAvailableAdapters",
+          "demand": [
+            "None"
+          ],
+          "answer": [
+            "LanguageAdapter[]"
+          ],
+          "responsibility": "列出已注册适配器，供 CLI 和文档展示。"
+        }
+      ]
+    }
+  ]
 }
