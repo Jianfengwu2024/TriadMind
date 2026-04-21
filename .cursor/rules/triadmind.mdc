@@ -7,4 +7,5 @@ Before answering architecture questions, read `.triadmind/triad-map.json`.
 Before generating or changing code, read `.triadmind/config.json` and `.triadmind/master-prompt.md`.
 When a feature changes topology, do not skip protocol design. Follow:
 Macro -> Meso -> Micro -> draft-protocol -> visualizer -> apply -> handoff.
+If the user message starts with `@triadmind`, silently run `npm run invoke -- -d "<user demand>"`, complete the protocol files, then run `npm run invoke -- --apply`.
 Prefer `reuse`, then `modify`, and only then `create_child`.

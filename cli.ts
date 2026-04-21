@@ -266,6 +266,50 @@ program
     });
 
 program
+    .command('invoke [demand...]')
+    .description('供 AI 助手静默触发的一键入口；兼容 `@triadmind <需求>` 输入')
+    .option('-d, --demand <text>', '显式传入用户需求文本')
+    .option('--apply', '如果 `draft-protocol.json` 已完备，则直接静默执行 plan/apply')
+    .action((demandParts: string[], options: { demand?: string; apply?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        const rawDemand = resolveDemand(demandParts, options.demand, paths);
+        const demand = normalizeInvokeDemand(rawDemand);
+
+        if (!demand) {
+            console.log(chalk.red('❌ 请提供需求文本，例如：triadmind invoke "@triadmind 前端新增导出 CSV 按钮"'));
+            process.exitCode = 1;
+            return;
+        }
+
+        console.log(chalk.cyan('🤖 [TriadMind] 正在准备静默调用入口...'));
+        prepareWorkspace(paths, demand);
+        installAlwaysOnRules(paths);
+
+        console.log(chalk.green(`✅ 静默入口已准备：${paths.implementationPromptFile}`));
+        console.log(chalk.green(`✅ 协议任务文件：${paths.protocolTaskFile}`));
+        console.log(chalk.green(`✅ 协议落盘位置：${paths.draftFile}`));
+
+        if (!options.apply) {
+            console.log(chalk.yellow('➡️ AI 助手应读取 implementation-prompt.md，静默完成 Macro/Meso/Micro/Protocol。'));
+            console.log(chalk.yellow('➡️ 协议保存后，再执行 `npm run invoke -- --apply` 或 `npm run plan -- --no-open --apply`。'));
+            return;
+        }
+
+        try {
+            validateDraftProtocol(paths);
+        } catch (error: any) {
+            console.log(chalk.red(`❌ 当前 draft-protocol.json 尚不能落地：${error.message}`));
+            console.log(chalk.yellow(`➡️ 请先让 AI 助手把完整协议写入 ${paths.draftFile}，然后重试 \`invoke --apply\``));
+            process.exitCode = 1;
+            return;
+        }
+
+        generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile);
+        console.log(chalk.green(`✅ 静默审核图已生成：${paths.visualizerFile}`));
+        executeApply(paths.projectRoot);
+    });
+
+program
     .command('apply')
     .description('直接执行 `draft-protocol.json`，生成 / 更新骨架并刷新 `triad-map.json`')
     .action(() => {
@@ -641,6 +685,10 @@ function resolveDemand(
     }
 
     return '';
+}
+
+function normalizeInvokeDemand(value: string) {
+    return value.trim().replace(/^@?triadmind(?:\s*[:：-]\s*|\s+)/i, '').trim();
 }
 
 program.parse(process.argv);

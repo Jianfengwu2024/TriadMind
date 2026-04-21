@@ -18,6 +18,7 @@
     "protocol": "tsx cli.ts protocol",
     "plan": "tsx cli.ts plan",
     "auto": "tsx cli.ts auto",
+    "invoke": "tsx cli.ts invoke",
     "rules": "tsx cli.ts rules",
     "self": "tsx cli.ts self",
     "adapters": "tsx cli.ts adapters",

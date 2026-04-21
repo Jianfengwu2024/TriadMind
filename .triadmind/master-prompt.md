@@ -1265,7 +1265,8 @@ D:/TraidMind/triadmind-core
       "problem": "执行 createDraftTemplate 流程",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (userDemand)"
+        "unknown (userDemand)",
+        "unknown (force)"
       ],
       "answer": [
         "void"

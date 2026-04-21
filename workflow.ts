@@ -38,10 +38,10 @@ export function ensureTriadSpec(paths: WorkspacePaths, force = false) {
 /**
  * @LeftBranch
  */
-export function createDraftTemplate(paths: WorkspacePaths, userDemand = '') {
+export function createDraftTemplate(paths: WorkspacePaths, userDemand = '', force = false) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
 
-    if (fs.existsSync(paths.draftFile)) {
+    if (!force && fs.existsSync(paths.draftFile)) {
         return;
     }
 
@@ -66,6 +66,7 @@ export function writePromptPacket(paths: WorkspacePaths, userDemand: string) {
     const previousDemand = safeRead(paths.demandFile);
     const shouldResetArtifacts = previousDemand.length > 0 && previousDemand !== normalizedDemand;
 
+    createDraftTemplate(paths, userDemand, shouldResetArtifacts);
     ensureMultiPassTemplates(paths, userDemand, { resetArtifacts: shouldResetArtifacts });
 
     const protocolPrompt = buildProtocolPrompt(paths, userDemand);

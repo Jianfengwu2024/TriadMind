@@ -74,6 +74,7 @@ TriadMind 会在目标项目生成 `.triadmind/` 工作区：
 
 ```bash
 npm run init
+npm run invoke -- -d "@triadmind 你的需求"
 npm run pipeline -- "你的需求"
 npm run protocol -- "你的需求"
 npm run auto -- "你的需求"
@@ -90,6 +91,35 @@ npm run snapshot -- "before-change"
 npm run snapshots
 npm run rollback -- "<snapshot-id>"
 ```
+
+## Silent Invoke
+
+如果你希望 AI 助手在看到 `@triadmind` 后静默调用 TriadMind，可统一使用：
+
+```bash
+npm run invoke -- -d "@triadmind 你的需求"
+```
+
+该命令会自动：
+
+- 刷新 `.triadmind/triad.md`、`master-prompt.md`、`implementation-prompt.md`
+- 写入最新需求到 `.triadmind/latest-demand.txt`
+- 准备 Macro / Meso / Micro / Protocol 所需文件
+- 让 AI 助手围绕 `.triadmind/implementation-prompt.md` 静默完成协议规划
+
+当 AI 已将完整协议落盘到 `.triadmind/draft-protocol.json` 后，再执行：
+
+```bash
+npm run invoke -- --apply
+```
+
+它会静默完成：
+
+- 校验 `draft-protocol.json`
+- 生成 `.triadmind/visualizer.html`
+- 执行 `apply`
+- 刷新 `triad-map.json`
+- 生成 `.triadmind/implementation-handoff.md`
 
 在接入项目中，命令通常带 `triad:` 前缀，例如：
 
