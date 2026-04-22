@@ -63,6 +63,54 @@ type CanonicalNodeEntry = {
 };
 
 const NONE_TOKENS = new Set(['', 'none', 'void', 'null', 'undefined']);
+const GENERIC_CONTRACT_TOKENS = new Set([
+    'str',
+    'string',
+    'std::string',
+    'int',
+    'integer',
+    'short',
+    'byte',
+    'long',
+    'usize',
+    'isize',
+    'u8',
+    'u16',
+    'u32',
+    'u64',
+    'u128',
+    'i8',
+    'i16',
+    'i32',
+    'i64',
+    'i128',
+    'double',
+    'float',
+    'number',
+    'bool',
+    'boolean',
+    'bigint',
+    'symbol',
+    'dict',
+    'list',
+    'vec',
+    'set',
+    'tuple',
+    'any',
+    'unknown',
+    'object',
+    'dict[str,any]',
+    'record<string,any>',
+    'record<string,unknown>',
+    'mapping[str,any]',
+    'list[any]',
+    'array<any>',
+    'array<unknown>',
+    'sequence[any]',
+    'map<string,object>',
+    'map<string,any>',
+    'map<string,unknown>'
+]);
 const MAX_CANONICAL_PERMUTATIONS = 4096;
 
 /**
@@ -989,6 +1037,8 @@ function normalizeAnswerContract(entry: string) {
 function normalizeContractKey(value: string) {
     const compact = value
         .trim()
+        .replace(/^\[generic\]\s*/i, '')
+        .replace(/^typing\./i, '')
         .replace(/\s+/g, ' ')
         .replace(/\s*([<>{}()[\]|,:=&?])\s*/g, '$1');
 
@@ -996,7 +1046,25 @@ function normalizeContractKey(value: string) {
         return null;
     }
 
+    if (isGenericContractKey(compact)) {
+        return null;
+    }
+
     return compact;
+}
+
+function isGenericContractKey(value: string) {
+    const compact = value.toLowerCase().replace(/\s+/g, '');
+    return (
+        GENERIC_CONTRACT_TOKENS.has(compact) ||
+        /^dict\[(str|string),(any|object)\]$/.test(compact) ||
+        /^mapping\[(str|string),(any|object)\]$/.test(compact) ||
+        /^record<(str|string),(any|unknown|object)>$/.test(compact) ||
+        /^map<(str|string),(any|unknown|object)>$/.test(compact) ||
+        /^list\[(any|object)\]$/.test(compact) ||
+        /^array<(any|unknown|object)>$/.test(compact) ||
+        /^sequence\[(any|object)\]$/.test(compact)
+    );
 }
 
 function ensureSet(map: Map<string, Set<string>>, key: string) {

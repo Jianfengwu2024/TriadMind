@@ -46,6 +46,8 @@
       "frontend",
       "backend"
     ],
+    "scanMode": "leaf",
+    "ignoreGenericContracts": true,
     "includeUntaggedExports": true,
     "jsDocTags": {
       "triadNode": "TriadNode",

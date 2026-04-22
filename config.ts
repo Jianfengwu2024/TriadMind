@@ -5,6 +5,7 @@ import { TriadCategory } from './protocol';
 
 export type TriadLanguage = 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'cpp' | 'java';
 export type TriadParserEngine = 'native' | 'tree-sitter';
+export type TriadScanMode = 'leaf' | 'capability' | 'domain';
 
 export interface TriadConfig {
     schemaVersion: string;
@@ -17,6 +18,8 @@ export interface TriadConfig {
     parser: {
         excludePatterns: string[];
         scanCategories: TriadCategory[];
+        scanMode: TriadScanMode;
+        ignoreGenericContracts: boolean;
         includeUntaggedExports: boolean;
         jsDocTags: {
             triadNode: string;
@@ -51,6 +54,8 @@ const DEFAULT_CONFIG: TriadConfig = {
     parser: {
         excludePatterns: ['node_modules', '.triadmind'],
         scanCategories: ['frontend', 'backend'],
+        scanMode: 'leaf',
+        ignoreGenericContracts: true,
         includeUntaggedExports: true,
         jsDocTags: {
             triadNode: 'TriadNode',
@@ -209,6 +214,8 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
         parser: {
             excludePatterns: value.parser?.excludePatterns ?? DEFAULT_CONFIG.parser.excludePatterns,
             scanCategories: normalizeScanCategories(value.parser?.scanCategories),
+            scanMode: normalizeScanMode(value.parser?.scanMode),
+            ignoreGenericContracts: value.parser?.ignoreGenericContracts ?? DEFAULT_CONFIG.parser.ignoreGenericContracts,
             includeUntaggedExports:
                 value.parser?.includeUntaggedExports ?? DEFAULT_CONFIG.parser.includeUntaggedExports,
             jsDocTags: {
@@ -251,6 +258,14 @@ function normalizeScanCategories(value: TriadCategory[] | undefined) {
     const allowed = new Set<TriadCategory>(['frontend', 'backend', 'core']);
     const normalized = value.filter((entry): entry is TriadCategory => allowed.has(entry));
     return normalized.length > 0 ? Array.from(new Set(normalized)) : [...DEFAULT_CONFIG.parser.scanCategories];
+}
+
+function normalizeScanMode(value: TriadScanMode | undefined) {
+    if (value === 'capability' || value === 'domain' || value === 'leaf') {
+        return value;
+    }
+
+    return DEFAULT_CONFIG.parser.scanMode;
 }
 
 function mergeCategoryPatterns(value: string[] | undefined, fallback: string[]) {
