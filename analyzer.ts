@@ -194,54 +194,106 @@ export function normalizeSubgraph(subgraph: any[]): any[] {
 /**
  * @LeftBranch
  */
-export function generateMayanMatrix(normalizedNodes: any[]): number[][] {
-    const nodes = toUniqueTriadNodes(normalizedNodes);
-    const size = nodes.length;
-    const matrix = Array.from({ length: size }, () => Array.from({ length: size }, () => 0));
+export function mapTopologyToYoungPartition(subgraph: any[]): number[] {
+    const normalizedNodes = normalizeSubgraph(subgraph) as TriadMapNode[];
+    return buildYoungPartitionFromNormalizedNodes(normalizedNodes);
+}
 
-    if (size === 0) {
-        return matrix;
+function buildYoungPartitionFromNormalizedNodes(normalizedNodes: TriadMapNode[]): number[] {
+    if (normalizedNodes.length === 0) {
+        return [];
     }
 
-    const graph = buildTopologyGraph(nodes);
-    const indexByNodeId = new Map<string, number>();
+    const graph = buildTopologyGraph(normalizedNodes);
+    const componentLevels = buildComponentLevels(graph);
+    const nodeWeights = buildNodeWeights(normalizedNodes, graph);
+    let maxLevel = 0;
 
-    nodes.forEach((node, index) => {
-        const nodeId = typeof node.nodeId === 'string' ? node.nodeId.trim() : '';
-        if (nodeId) {
-            indexByNodeId.set(nodeId, index);
-        }
-    });
-
-    for (const edge of graph.edges) {
-        const producerIndex = indexByNodeId.get(edge.from);
-        const consumerIndex = indexByNodeId.get(edge.to);
-        if (producerIndex === undefined || consumerIndex === undefined) {
-            continue;
-        }
-
-        matrix[consumerIndex][producerIndex] = 1;
+    for (const level of componentLevels.values()) {
+        maxLevel = Math.max(maxLevel, level);
     }
 
-    return matrix;
+    const partition = Array.from({ length: maxLevel + 1 }, (_, level) => {
+        let width = 0;
+        for (const node of normalizedNodes) {
+            const nodeId = typeof node.nodeId === 'string' ? node.nodeId.trim() : '';
+            if (!nodeId) {
+                continue;
+            }
+
+            const nodeLevel = componentLevels.get(nodeId) ?? 0;
+            if (nodeLevel >= level) {
+                width += nodeWeights.get(nodeId) ?? 1;
+            }
+        }
+        return width;
+    }).filter((width) => width > 0);
+
+    return partition;
 }
 
 /**
  * @LeftBranch
  */
-export function generateFeatureHash(matrix: number[][]): string {
-    const normalizedMatrix = Array.isArray(matrix)
-        ? matrix.map((row) => (Array.isArray(row) ? row.map((value) => (value ? 1 : 0)) : []))
+export function generateMayaSequence(partition: number[]): number[] {
+    const normalizedPartition = Array.isArray(partition)
+        ? partition
+              .map((value) => (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0))
+              .filter((value) => value > 0)
         : [];
-    const size = normalizedMatrix.length;
-    const bitString = normalizedMatrix.map((row) => row.map((value) => (value ? '1' : '0')).join('')).join('');
+
+    if (normalizedPartition.length === 0) {
+        return [];
+    }
+
+    const mayaSequence: number[] = [];
+    const mirroredProfile = normalizedPartition.slice().reverse();
+    let currentWidth = 0;
+
+    for (const rowWidth of mirroredProfile) {
+        for (let cursor = currentWidth; cursor < rowWidth; cursor += 1) {
+            mayaSequence.push(0);
+        }
+
+        mayaSequence.push(1);
+        currentWidth = rowWidth;
+    }
+
+    return mayaSequence;
+}
+
+/**
+ * @LeftBranch
+ */
+export function generateMayaFeatureHash(mayaSequence: number[]): string {
+    const normalizedSequence = Array.isArray(mayaSequence)
+        ? mayaSequence.map((value) => (value ? 1 : 0))
+        : [];
+    const bitString = normalizedSequence.map((value) => (value ? '1' : '0')).join('');
     const digest = createHash('sha256')
-        .update(`mayan:${size}:${bitString}`, 'utf8')
+        .update(`maya:${normalizedSequence.length}:${bitString}`, 'utf8')
         .digest('hex')
         .slice(0, 8)
         .toUpperCase();
 
-    return `Feature-0x${digest}`;
+    return `Maya-ID: 0x${digest}`;
+}
+
+/**
+ * @deprecated Use `generateMayaSequence(mapTopologyToYoungPartition(nodes))`.
+ */
+export function generateMayanMatrix(normalizedNodes: any[]): number[][] {
+    return [generateMayaSequence(mapTopologyToYoungPartition(normalizedNodes))];
+}
+
+/**
+ * @deprecated Use `generateMayaFeatureHash(sequence)`.
+ */
+export function generateFeatureHash(matrix: number[][]): string {
+    const flattened = Array.isArray(matrix)
+        ? matrix.flatMap((row) => (Array.isArray(row) ? row.map((value) => (value ? 1 : 0)) : []))
+        : [];
+    return generateMayaFeatureHash(flattened);
 }
 
 function detectBrokenContracts(oldGraph: TopologyGraph, newGraph: TopologyGraph): BrokenContract[] {
@@ -332,6 +384,117 @@ function buildIncomingAdjacency(graph: TopologyGraph) {
     }
 
     return incoming;
+}
+
+/**
+ * Maps a normalized triad topology into a Young partition by:
+ * 1. Collapsing cycles into strongly connected components.
+ * 2. Using the condensation DAG depth as the partition row index.
+ * 3. Using cumulative architectural complexity as the row width.
+ *
+ * Row `k` contains the sum of weights for every node whose component depth is
+ * greater than or equal to `k`, which guarantees a non-increasing integer
+ * partition and makes isomorphic topologies converge to the same Young shape.
+ */
+function buildComponentLevels(graph: TopologyGraph) {
+    const components = tarjan(graph.adjacency, graph.nodeIds)
+        .map((component) => component.slice().sort())
+        .sort((left, right) => toCycleSignature(left).localeCompare(toCycleSignature(right)));
+    const componentIdByNode = new Map<string, string>();
+    const dag = new Map<string, Set<string>>();
+    const indegree = new Map<string, number>();
+
+    for (const component of components) {
+        const componentId = toCycleSignature(component);
+        dag.set(componentId, new Set<string>());
+        indegree.set(componentId, 0);
+        for (const nodeId of component) {
+            componentIdByNode.set(nodeId, componentId);
+        }
+    }
+
+    for (const [from, downstreams] of graph.adjacency.entries()) {
+        const fromComponentId = componentIdByNode.get(from);
+        if (!fromComponentId) {
+            continue;
+        }
+
+        for (const to of downstreams) {
+            const toComponentId = componentIdByNode.get(to);
+            if (!toComponentId || toComponentId === fromComponentId) {
+                continue;
+            }
+
+            const targets = dag.get(fromComponentId);
+            if (!targets?.has(toComponentId)) {
+                targets?.add(toComponentId);
+                indegree.set(toComponentId, (indegree.get(toComponentId) ?? 0) + 1);
+            }
+        }
+    }
+
+    const levelsByComponent = new Map<string, number>();
+    const queue = Array.from(indegree.entries())
+        .filter(([, degree]) => degree === 0)
+        .map(([componentId]) => componentId)
+        .sort();
+    let cursor = 0;
+
+    while (cursor < queue.length) {
+        const componentId = queue[cursor];
+        cursor += 1;
+        const currentLevel = levelsByComponent.get(componentId) ?? 0;
+
+        for (const nextComponentId of Array.from(dag.get(componentId) ?? []).sort()) {
+            const nextLevel = Math.max(levelsByComponent.get(nextComponentId) ?? 0, currentLevel + 1);
+            levelsByComponent.set(nextComponentId, nextLevel);
+
+            const nextIndegree = (indegree.get(nextComponentId) ?? 0) - 1;
+            indegree.set(nextComponentId, nextIndegree);
+            if (nextIndegree === 0) {
+                queue.push(nextComponentId);
+            }
+        }
+    }
+
+    const levelsByNode = new Map<string, number>();
+    for (const [nodeId, componentId] of componentIdByNode.entries()) {
+        levelsByNode.set(nodeId, levelsByComponent.get(componentId) ?? 0);
+    }
+
+    return levelsByNode;
+}
+
+function buildNodeWeights(nodes: TriadMapNode[], graph: TopologyGraph) {
+    const nodeIdSet = new Set(graph.nodeIds);
+    const weights = new Map<string, number>();
+    const incomingCounts = new Map<string, number>();
+
+    for (const edge of graph.edges) {
+        incomingCounts.set(edge.to, (incomingCounts.get(edge.to) ?? 0) + 1);
+    }
+
+    for (const node of nodes) {
+        const nodeId = typeof node.nodeId === 'string' ? node.nodeId.trim() : '';
+        if (!nodeId) {
+            continue;
+        }
+
+        const demandKeys = getDemandKeys(node);
+        const answerKeys = getAnswerKeys(node);
+        const internalDemandCount = demandKeys.filter((demandKey) =>
+            Array.from(graph.producersByContract.get(demandKey) ?? []).some((producerNodeId) => nodeIdSet.has(producerNodeId))
+        ).length;
+        const internalAnswerCount = answerKeys.filter((answerKey) =>
+            Array.from(graph.consumersByContract.get(answerKey) ?? []).some((consumerNodeId) => nodeIdSet.has(consumerNodeId))
+        ).length;
+        const inDegree = incomingCounts.get(nodeId) ?? 0;
+        const outDegree = Array.from(graph.adjacency.get(nodeId) ?? []).length;
+
+        weights.set(nodeId, 1 + internalDemandCount + internalAnswerCount + inDegree + outDegree);
+    }
+
+    return weights;
 }
 
 function buildCanonicalEntries(
@@ -495,12 +658,12 @@ function resolveCanonicalOrdering(entries: CanonicalNodeEntry[], nodes: TriadMap
 }
 
 function buildCanonicalOrderSignature(order: CanonicalNodeEntry[], _nodes: TriadMapNode[]) {
-    const matrix = generateMayanMatrix(order.map((entry) => entry.node));
-    const flattenedMatrix = matrix.map((row) => row.join('')).join('|');
+    const partition = buildYoungPartitionFromNormalizedNodes(order.map((entry) => entry.node));
+    const mayaSequence = generateMayaSequence(partition);
     const nodeSignature = order
         .map((entry) => `${entry.refinedSignature}::${entry.baseSignature}::${entry.structuralFingerprint}`)
         .join('||');
-    return `${flattenedMatrix}##${nodeSignature}`;
+    return `${partition.join(',')}##${mayaSequence.join('')}##${nodeSignature}`;
 }
 
 function factorial(value: number) {

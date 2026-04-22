@@ -1,60 +1,277 @@
-﻿# TriadMind Core
+# TriadMind Core
 
-TriadMind Core 鏄妸鈥滈《鐐逛笁鍏冩硶鈥濊惤鍦颁负宸ョ▼宸ュ叿閾剧殑鏍稿績寮曟搸銆?
-瀹冧笉瑕佹眰妯″瀷鐩存帴鍐欎唬鐮侊紝鑰屾槸寮哄埗鍏堝畬鎴愶細
+TriadMind Core 是把“顶点三元法”落地为工程工具链的核心引擎。
+
+它不鼓励模型直接写代码，而是强制先完成：
 
 ```text
-闇€姹?-> Macro-Split锛堟寕杞界偣 + 宸﹀彸鍒嗘敮锛?-> Meso-Split锛堝瓙鍔熻兘 / 绫?/ 鏁版嵁绠￠亾锛?-> Micro-Split锛堝睘鎬?/ 鐘舵€?/ 鏂规硶 / 濂戠害锛?-> draft-protocol.json
--> visualizer.html 瀹℃牳
--> apply 楠ㄦ灦钀藉湴
--> implementation-handoff.md 浜岄樁娈靛疄鐜?```
-
-## Core Principles
-
-- `椤剁偣`锛氫竴涓彲鐢ㄥ姛鑳斤紝鏄乏鍙冲垎鏀殑閫昏緫灏佽
-- `宸﹀垎鏀痐锛氬姩鎬佹紨鍖栵紝鍔ㄤ綔銆佹柟娉曘€佹祦绋嬨€佸瓙鍔熻兘鎵ц
-- `鍙冲垎鏀痐锛氶潤鎬佺ǔ瀹氾紝灞炴€с€佺姸鎬併€侀厤缃€佸绾︺€佺紪鎺?- `reuse -> modify -> create_child`锛氭案杩滃厛澶嶇敤锛屽啀鏈€灏忎慨鏀癸紝鏈€鍚庢墠瑁傚彉鏂板彾鑺傜偣
-
-## Current Capabilities
-
-- 涓ユ牸鍗忚鏍￠獙锛氬熀浜?`zod` 鏍￠獙 `draft-protocol.json`
-- 缃俊搴﹀畧鍗細鏀寔 `protocol.minConfidence` / `protocol.requireConfidence`
-- 鍥捐氨寮忓鏍革細`visualizer.html` 宸叉敼涓虹煡璇嗗浘璋遍鏍硷紝绐佸嚭鏂板彾鑺傜偣鍜屾柊澧炶繛绾?- 澧為噺鍚屾锛氬熀浜庢枃浠跺搱甯岀紦瀛橈紝鍙湪婧愮爜鍙樺寲鏃堕噸寤?`triad-map.json`
-- 鎸佺画鐩戝惉锛歚watch` 妯″紡鎸佺画鍚屾鎷撴墤
-- Always-on 瑙勫垯锛氳嚜鍔ㄥ啓鍏?`.triadmind/agent-rules.md`銆乣AGENTS.md`銆乣.cursor/rules/triadmind.mdc`
-- 杩愯鏃惰嚜鎰堣剼鎵嬫灦锛氳繍琛岄敊璇?-> 鑺傜偣鏄犲皠 -> 涓夊厓璇婃柇 -> 淇鍗忚鎻愮ず璇?- 瀹夊叏蹇収锛歚apply` 鍓嶅悗鍙仛鏈湴鍥炴粴淇濇姢
-- 閫傞厤鍣ㄦ灦鏋勶細`adapterRegistry + LanguageAdapter + polyglotAdapter` 宸茬ǔ瀹氭帴鍏?`javascript / python / go / rust / cpp / java`
-- 缁熶竴 Tree-sitter 璺緞锛歚typescript / javascript / python / go / rust / cpp / java` 鍧囬粯璁よ蛋鍚屼竴濂?Tree-sitter AST 鎶藉彇閾捐矾
-- 鍏煎鍥為€€锛歚native` 瑙ｆ瀽鍣ㄤ粎浣滀负鏄惧紡閰嶇疆鐨勫吋瀹硅矾寰勪繚鐣欙紝涓嶅啀浣滀负榛樿宸ヤ笟璺緞
-- Ghost State Scanner锛歚typescriptParser.ts` 涓?`treeSitterParser.ts` 浼氭壂鎻?TypeScript / JavaScript / Python / Go / Rust / C++ / Java 鐨勬柟娉曚綋涓庡嚱鏁颁綋锛屾妸鏈€氳繃鍏ュ弬浼犲叆鐨勯殣寮忎緷璧栬拷鍔犲埌 `fission.demand`
-- 閫氱敤 Ghost 鍐呮牳锛歚treeSitterGhostScanner.ts` 鎻愪緵璺ㄨ瑷€ Tree-sitter `Node.type / Node.text / Cursor` 鎵弿鏍稿績锛岃В鏋愬櫒鍙礋璐ｆ妸 Ghost 寮曠敤鏄犲皠鎴愯瑷€绾х被鍨?- 鏈湴 import 瑙ｆ瀽鍗囩骇锛歍ree-sitter 璺緞鐜板湪浼氫紭鍏堣В鏋愬伐浣滃尯鍐呭彲钀藉湴鐨勬湰鍦板鍏ワ紝鍐嶆妸瀵煎叆绗﹀彿鏄犲皠鍒扮湡瀹炵被鍨嬶紝鑰屼笉鏄彧闈犲悕绉扮寽娴?- 鍙皟鐢ㄧ被鍨嬫帹鏂崌绾э細瑙ｆ瀽鍣ㄤ細涓洪《灞傚嚱鏁?/ 鏂规硶璁板綍杩斿洖绫诲瀷鍏冧俊鎭紝鐢ㄤ簬鍙橀噺鍒濆鍖栥€佽皟鐢ㄨ〃杈惧紡鍜岃法鏂囦欢缁戝畾鐨勪簩娆℃帹鏂?- Ghost 鏍囩鍒嗙骇锛氫細杈撳嚭 `[Ghost:Read]`銆乣[Ghost:Write]`銆乣[Ghost:ReadWrite]`锛岃鐩?`this.xxx` / `self.xxx` / Go receiver 瀛楁 / C++-Java 绫诲瓧娈点€佸鍏ュ崟渚嬩笌妯″潡绾у閮ㄥ彉閲?- 榛樿璺緞鐢熸晥锛氬嵆浣块」鐩繚鎸?`tree-sitter` 浣滀负榛樿瑙ｆ瀽鍣紝涔熶細鎻愬彇 TypeScript / JavaScript / Python 鐨勯殣寮忕姸鎬佷緷璧?
-## Minimal Workflow
-
-鍦ㄧ洰鏍囬」鐩牴鐩綍鎵ц锛?
-```bash
-npm run triad:init
-npm run triad:pipeline -- "浣犵殑闇€姹?
-npm run triad:plan
-npm run triad:apply
-npm run triad:handoff
+需求
+-> Macro-Split（挂载点 + 左右分支）
+-> Meso-Split（子功能 / 类 / 数据管道）
+-> Micro-Split（属性 / 状态 / 方法 / 契约）
+-> draft-protocol.json
+-> visualizer.html 审核
+-> apply 骨架落盘
+-> implementation-handoff.md 二阶段实现
 ```
 
-鎺ㄨ崘鎶?`.triadmind/master-prompt.md` 鍙戠粰褰撳墠瀵硅瘽涓殑澶фā鍨嬶紝璁╁畠鍏堝畬鎴愬崗璁鍒掞紝鍐嶈繘鍏ュ疄鐜般€?
-## Install As CLI
+## 核心理念
 
-鍙戝竷鍒?npm 鍚庯紝鐩爣椤圭洰鍙互杩欐牱瀹夎锛?
+- 顶点：一个可用功能，是左右分支的逻辑包裹
+- 左分支：动态演化，动作、方法、流程、子功能执行
+- 右分支：静态稳定，属性、状态、配置、契约、编排
+- 升级顺序：永远优先 `reuse -> modify -> create_child`
+
+## 当前能力
+
+- 严格协议校验：基于 `zod` 守卫 `draft-protocol.json`
+- 多轮工作流：统一生成 `macro / meso / micro / protocol` 提示包
+- 交互审图：生成 `.triadmind/visualizer.html` 审核拓扑升级
+- 运行时自愈：错误日志 -> 节点映射 -> 修复协议提示
+- 快照回滚：`snapshot / rollback` 保护 `apply`
+- 多语言适配：`typescript / javascript / python / go / rust / cpp / java`
+- 统一 AST 路径：默认走 Tree-sitter
+- Ghost State Scanner：扫描 `this/self`、模块级变量、导入单例等隐式依赖
+- 纯 JSON 拓扑分析：`blast radius`、`cycle`、`drift`、`renormalize`
+- 架构语义指纹：`Triad Topology -> Young Partition -> Maya Sequence -> Maya-ID`
+
+## 架构语义指纹：Sato Maya Diagram × Young Diagram
+
+TriadMind 不再把结构指纹停留在普通二维邻接矩阵上，而是升级为：
+
+```text
+Triad Subgraph
+-> Topological Normalization
+-> Young Partition
+-> Maya Sequence
+-> SHA-256
+-> Maya-ID
+```
+
+在 `analyzer.ts` 中，当前对应的核心函数是：
+
+- `mapTopologyToYoungPartition`
+- `generateMayaSequence`
+- `generateMayaFeatureHash`
+
+其中映射规则为：
+
+- 先对三元子图做确定性规范化排序
+- 再把强连通分量压缩成 DAG
+- 用凝聚图深度决定杨图的“行”
+- 用累计架构复杂度决定每一行宽度
+- 沿杨图右下边界游走，`向右 = 0`，`向下 = 1`
+- 最后得到一条黑白石子直线，也就是 `Maya Sequence`
+
+兼容说明：
+
+- 旧接口 `generateMayanMatrix` 仍保留，但仅作为兼容包装
+- 新文档与新算法统一采用 `Maya / Young` 术语
+
+## TriadMind 自举样例
+
+当前仓库已经对 `triadmind-core` 自身完成一次拓扑刷新。
+
+最新一次 `npm run sync` 的结果：
+
+- 叶节点总数：`119`
+- 模块总数：`27`
+- 完整原始拓扑：`.triadmind/triad-map.json`
+- 完整交互图：`.triadmind/visualizer.html`
+
+### TriadMind 全局拓扑图（模块级）
+
+下面这张图是 `triadmind-core` 自身的模块级拓扑视图；完整叶节点级拓扑请直接打开 `.triadmind/visualizer.html`。
+
+```mermaid
+flowchart LR
+    CLI["cli.ts\n阶段路由 / 生命周期拦截"]
+    Workflow["workflow.ts\n多轮提示词编排"]
+    Protocol["protocol.ts\n协议校验"]
+    Visualizer["visualizer.ts\n拓扑审图"]
+    Sync["sync.ts\n拓扑刷新"]
+    Parser["parser.ts + treeSitterParser.ts\n拓扑提取"]
+    Ghost["treeSitterGhostScanner.ts\n隐式依赖扫描"]
+    Analyzer["analyzer.ts\n拓扑分析 / Maya 指纹"]
+    Generator["generator.ts + typescriptGenerator.ts\n骨架落盘"]
+    Registry["adapterRegistry.ts\n适配器路由"]
+    TSAdapter["typescriptAdapter.ts"]
+    Polyglot["polyglotAdapter.ts"]
+    Healing["healing.ts\n运行时自愈"]
+    Bootstrap["bootstrap.ts\n自举"]
+    Rules["rules.ts\nAlways-on 规则"]
+    Workspace["workspace.ts / config.ts\n路径与配置"]
+    Snapshot["snapshot.ts\n快照回滚"]
+
+    CLI --> Workflow
+    CLI --> Sync
+    CLI --> Protocol
+    CLI --> Analyzer
+    CLI --> Visualizer
+    CLI --> Generator
+    CLI --> Healing
+    CLI --> Bootstrap
+    CLI --> Rules
+    CLI --> Snapshot
+
+    Workflow --> Protocol
+    Workflow --> Visualizer
+    Workflow --> Workspace
+
+    Sync --> Parser
+    Parser --> Ghost
+    Parser --> Registry
+
+    Generator --> Registry
+    Registry --> TSAdapter
+    Registry --> Polyglot
+
+    Analyzer --> Visualizer
+    Analyzer --> Workflow
+    Analyzer --> Protocol
+    Analyzer --> Healing
+
+    Bootstrap --> Workflow
+    Healing --> Analyzer
+    Snapshot --> Generator
+    Workspace --> Workflow
+    Workspace --> Sync
+```
+
+### 单个功能片段样例：Maya 指纹链路
+
+下面选取 `triadmind-core` 自身的一个真实功能片段：
+
+- `Analyzer.mapTopologyToYoungPartition`
+- `Analyzer.generateMayaSequence`
+- `Analyzer.generateMayaFeatureHash`
+
+对应的拓扑片段如下：
+
+```mermaid
+flowchart LR
+    A["Analyzer.mapTopologyToYoungPartition\nanswer: number[]"]
+    B["Analyzer.generateMayaSequence\ndemand: number[]\nanswer: number[]"]
+    C["Analyzer.generateMayaFeatureHash\ndemand: number[]\nanswer: string"]
+
+    A -- "number[]" --> B
+    B -- "number[]" --> C
+    A -. "same contract: number[]" .-> C
+```
+
+对应的三元片段 JSON 样例：
+
+```json
+[
+  {
+    "nodeId": "Analyzer.mapTopologyToYoungPartition",
+    "fission": {
+      "demand": ["any[] (subgraph)"],
+      "answer": ["number[]"]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateMayaSequence",
+    "fission": {
+      "demand": ["number[] (partition)"],
+      "answer": ["number[]"]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateMayaFeatureHash",
+    "fission": {
+      "demand": ["number[] (mayaSequence)"],
+      "answer": ["string"]
+    }
+  }
+]
+```
+
+这个真实片段经过 TriadMind 当前实现计算后，会得到：
+
+```text
+Young Partition: [15, 11, 4]
+Maya Sequence : [0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1]
+Maya Stones   : ⚪ ⚪ ⚪ ⚪ ⚫ ⚪ ⚪ ⚪ ⚪ ⚪ ⚪ ⚫ ⚪ ⚪ ⚪ ⚫
+Maya-ID       : Maya-ID: 0xE76CFCD3
+```
+
+这意味着：
+
+- `Young Partition` 是该拓扑片段的规范整数划分
+- `Maya Sequence` 是边界游走后的 1/0 线性表示
+- `Maya Stones` 是对玛雅黑白石子直线的直观展示
+- `Maya-ID` 是最终稳定结构哈希
+
+只要拓扑结构完全一致，即使 JSON 数组顺序不同，最后得到的 `Maya-ID` 也会完全相同。
+
+## 最小工作流
+
+在目标项目根目录执行：
+
+```bash
+npx triadmind init
+npx triadmind invoke -d "@triadmind 在这里写你的需求"
+npx triadmind invoke --apply
+```
+
+如果你在当前仓库本地开发，也可以直接使用：
+
+```bash
+npm run init
+npm run invoke -- -d "@triadmind 在这里写你的需求"
+npm run invoke -- --apply
+```
+
+## 静默调用
+
+如果 AI 助手看到 `@triadmind` 就应该静默执行 TriadMind 工作流，统一使用：
+
+```bash
+npx triadmind invoke -d "@triadmind 在这里写你的需求"
+```
+
+这一步会自动：
+
+- 刷新 `.triadmind/triad.md`
+- 写入 `.triadmind/master-prompt.md`
+- 更新 `.triadmind/latest-demand.txt`
+- 生成 `macro / meso / micro / protocol` 任务文件
+
+当 AI 已经将完整协议落到 `.triadmind/draft-protocol.json` 后，再执行：
+
+```bash
+npx triadmind invoke --apply
+```
+
+它会继续：
+
+- 校验协议
+- 生成 `.triadmind/visualizer.html`
+- 执行 `apply`
+- 刷新 `triad-map.json`
+- 生成 `implementation-handoff.md`
+
+## 安装
+
+### 作为 CLI 安装
+
 ```bash
 npm install -D triadmind-core
 ```
 
-瀹夎鍚庡彲鐩存帴浣跨敤锛?
+安装后可直接使用：
+
 ```bash
 npx triadmind init
-npx triadmind invoke -d "@triadmind 浣犵殑闇€姹?
-npx triadmind invoke --apply
+npx triadmind sync
+npx triadmind rules
+npx triadmind self
 ```
 
-涔熷彲浠ュ湪鐩爣椤圭洰 `package.json` 涓厤缃剼鏈細
+### 推荐脚本别名
+
+在目标项目 `package.json` 中加入：
 
 ```json
 {
@@ -63,233 +280,170 @@ npx triadmind invoke --apply
     "triad:invoke": "triadmind invoke",
     "triad:apply": "triadmind invoke --apply",
     "triad:sync": "triadmind sync",
-    "triad:self": "triadmind self"
+    "triad:watch": "triadmind watch",
+    "triad:rules": "triadmind rules",
+    "triad:self": "triadmind self",
+    "triad:heal": "triadmind heal"
   }
 }
 ```
 
-鏈粨搴撳彂甯冨墠妫€鏌ワ細
+## 生成文件
 
-```bash
-npm run typecheck
-npm run build
-npm pack --dry-run
-```
+TriadMind 会在目标项目下创建 `.triadmind/`：
 
-姝ｅ紡鍙戝竷锛?
-```bash
-npm login
-npm publish --access public
-```
+- `triad.md`：顶点三元法规范
+- `config.json`：语言 / 解析器 / 协议 / 自愈配置
+- `triad-map.json`：当前项目拓扑图
+- `draft-protocol.json`：待审核升级协议
+- `visualizer.html`：可视化审图页面
+- `master-prompt.md`：统一总提示词
+- `protocol-task.md`：协议阶段任务说明
+- `multi-pass-pipeline.md`：多轮推演说明
+- `implementation-prompt.md`：实现前提示词
+- `implementation-handoff.md`：骨架落盘后的实现提示词
+- `healing-report.json`：运行时诊断报告
+- `healing-prompt.md`：修复协议提示词
+- `cache/sync-manifest.json`：增量同步缓存
+- `snapshots/`：本地回滚快照
 
-## Generated Files
+## 常用命令
 
-TriadMind 浼氬湪鐩爣椤圭洰鐢熸垚 `.triadmind/` 宸ヤ綔鍖猴細
-
-- `triad.md`锛氶《鐐逛笁鍏冩硶瑙勮寖
-- `config.json`锛氭灦鏋勩€佽В鏋愬櫒銆佸崗璁€佽繍琛屾椂鑷剤閰嶇疆
-- `triad-map.json`锛氬綋鍓嶉」鐩嫇鎵戝浘
-- `draft-protocol.json`锛氬緟瀹℃牳鎷撴墤鍗囩骇鍗忚
-- `visualizer.html`锛氱煡璇嗗浘璋卞紡瀹℃牳椤甸潰
-- `master-prompt.md`锛氱粺涓€鎬绘彁绀鸿瘝
-- `protocol-task.md`锛氬崗璁瓙浠诲姟鎻愮ず璇?- `multi-pass-pipeline.md`锛氬杞帹婕旀彁绀鸿瘝
-- `implementation-prompt.md`锛氬疄鐜板墠鎬绘彁绀鸿瘝
-- `implementation-handoff.md`锛氶鏋惰惤鍦板悗鐨勫疄鐜版彁绀鸿瘝
-- `healing-report.json`锛氳繍琛屾椂閿欒璇婃柇鎶ュ憡
-- `healing-prompt.md`锛氳繍琛屾椂鑷剤鎻愮ず璇?- `cache/sync-manifest.json`锛氬閲忓悓姝ョ紦瀛?- `snapshots/`锛氬畨鍏ㄥ揩鐓?
-## Commands
-
-鍦?`triadmind-core` 浠撳簱涓細
+在 `triadmind-core` 仓库中：
 
 ```bash
 npm run init
-npm run invoke -- -d "@triadmind 浣犵殑闇€姹?
-npm run pipeline -- "浣犵殑闇€姹?
-npm run protocol -- "浣犵殑闇€姹?
-npm run auto -- "浣犵殑闇€姹?
+npm run prompt
+npm run pipeline
+npm run macro
+npm run meso
+npm run micro
+npm run protocol
 npm run plan
 npm run apply
-npm run handoff
+npm run auto
+npm run invoke
 npm run sync
 npm run watch
 npm run rules
 npm run self
 npm run heal -- --message "TypeError: ..."
-npm run adapters
 npm run snapshot -- "before-change"
 npm run snapshots
 npm run rollback -- "<snapshot-id>"
+npm run adapters
+npm run typecheck
 ```
 
-## Silent Invoke
+## 协议硬约束
 
-濡傛灉浣犲笇鏈?AI 鍔╂墜鍦ㄧ湅鍒?`@triadmind` 鍚庨潤榛樿皟鐢?TriadMind锛屽彲缁熶竴浣跨敤锛?
-```bash
-npm run invoke -- -d "@triadmind 浣犵殑闇€姹?
-```
+TriadMind 在 `plan / apply` 之前会拦截非法协议：
 
-璇ュ懡浠や細鑷姩锛?
-- 鍒锋柊 `.triadmind/triad.md`銆乣master-prompt.md`銆乣implementation-prompt.md`
-- 鍐欏叆鏈€鏂伴渶姹傚埌 `.triadmind/latest-demand.txt`
-- 鍑嗗 Macro / Meso / Micro / Protocol 鎵€闇€鏂囦欢
-- 璁?AI 鍔╂墜鍥寸粫 `.triadmind/implementation-prompt.md` 闈欓粯瀹屾垚鍗忚瑙勫垝
+- `actions` 不能为空
+- 仅允许 `reuse / modify / create_child`
+- `reuse.nodeId` 必须已存在
+- `modify.nodeId` 必须已存在
+- `modify` 只能升级 `demand / answer`，不能篡改核心职责
+- `create_child.parentNodeId` 必须已存在
+- `create_child.node.nodeId` 必须是新节点
+- 重复目标节点或重复动作会被拒绝
+- 若启用置信度守卫，则低于阈值的动作会被拦截
 
-褰?AI 宸插皢瀹屾暣鍗忚钀界洏鍒?`.triadmind/draft-protocol.json` 鍚庯紝鍐嶆墽琛岋細
+## 跨语言方向
 
-```bash
-npm run invoke -- --apply
-```
+当前稳定支持：
 
-瀹冧細闈欓粯瀹屾垚锛?
-- 鏍￠獙 `draft-protocol.json`
-- 鐢熸垚 `.triadmind/visualizer.html`
-- 鎵ц `apply`
-- 鍒锋柊 `triad-map.json`
-- 鐢熸垚 `.triadmind/implementation-handoff.md`
+- `typescript`
+- `javascript`
+- `python`
+- `go`
+- `rust`
+- `cpp`
+- `java`
 
-鍦ㄦ帴鍏ラ」鐩腑锛屽懡浠ら€氬父甯?`triad:` 鍓嶇紑锛屼緥濡傦細
-
-```bash
-npm run triad:init
-npm run triad:sync -- --force
-npm run triad:watch
-npm run triad:rules
-npm run triad:heal -- --message "TypeError: ..."
-```
-
-## Protocol Hard Constraints
-
-TriadMind 浼氬湪 `plan` / `apply` 鍓嶆嫤鎴潪娉曞崗璁細
-
-- `actions` 涓嶈兘涓虹┖
-- 鍙厑璁?`reuse` / `modify` / `create_child`
-- `reuse.nodeId` 蹇呴』宸插瓨鍦?- `modify.nodeId` 蹇呴』宸插瓨鍦?- `modify` 鍙兘鍗囩骇 `demand` / `answer`锛屼笉鑳界鏀硅妭鐐规牳蹇冭亴璐?- `create_child.parentNodeId` 蹇呴』宸插瓨鍦?- `create_child.node.nodeId` 蹇呴』鏄叏鏂拌妭鐐?- 閲嶅鐩爣鑺傜偣鎴栭噸澶嶅姩浣滀細琚嫤鎴?- 濡傚惎鐢ㄧ疆淇″害瀹堝崼锛屼綆浜庨槇鍊肩殑鍔ㄤ綔浼氳鎷掔粷
-
-## Config Example
-
-`.triadmind/config.json`锛?
-```json
-{
-  "schemaVersion": "1.1",
-  "architecture": {
-    "language": "typescript",
-    "parserEngine": "tree-sitter",
-    "adapter": "@triadmind/plugin-ts"
-  },
-  "parser": {
-    "excludePatterns": ["node_modules", ".triadmind"],
-    "includeUntaggedExports": true,
-    "jsDocTags": {
-      "triadNode": "TriadNode",
-      "leftBranch": "LeftBranch",
-      "rightBranch": "RightBranch"
-    }
-  },
-  "protocol": {
-    "minConfidence": 0.6,
-    "requireConfidence": false
-  },
-  "runtimeHealing": {
-    "enabled": true,
-    "maxAutoRetries": 3,
-    "requireHumanApprovalForContractChanges": true,
-    "snapshotStrategy": "manual"
-  }
-}
-```
-
-## Cross-Language Direction
-
-褰撳墠绋冲畾閫傞厤鍣ㄥ叏閮ㄩ粯璁よ蛋缁熶竴 Tree-sitter AST 璺緞锛?
-- `typescript` + `tree-sitter`
-- `javascript` + `tree-sitter`
-- `python` + `tree-sitter`
-- `go` + `tree-sitter`
-- `rust` + `tree-sitter`
-- `cpp` + `tree-sitter`
-- `java` + `tree-sitter`
-
-褰撳墠浠ｇ爜杈圭晫锛?
-- `languageAdapter.ts`锛氬畾涔夎法璇█ `LanguageAdapter` 濂戠害
-- `adapterRegistry.ts`锛氱淮鎶ら€傞厤鍣ㄦ敞鍐岃〃锛屽苟鎸?`.triadmind/config.json` 鍔ㄦ€佽矾鐢?- `typescriptAdapter.ts`锛氬皝瑁?TypeScript 鐨勬嫇鎵戣В鏋愪笌鍗忚钀藉湴鑳藉姏
-- `polyglotAdapter.ts`锛氬皝瑁?JavaScript / Python / Go / Rust / C++ / Java 鐨勬嫇鎵戣В鏋愪笌鍗忚钀藉湴鑳藉姏
-- `treeSitterParser.ts`锛氱粺涓€ Tree-sitter AST 鍏ュ彛锛岃礋璐ｅ璇█鍑芥暟銆佺被鏂规硶銆佸弬鏁般€佽繑鍥炲€兼娊鍙栵紝骞朵负 TypeScript / JavaScript / Python / Go / Rust / C++ / Java 琛ュ厖 Ghost State Scanner
-- `treeSitterGhostScanner.ts`锛氳瑷€鏃犲叧 Ghost State Scanner锛岀粺涓€鏀堕泦鍙傛暟銆佸眬閮ㄥ彉閲忋€佹爣璇嗙寮曠敤鍜?`this/self` 鐘舵€佽闂?- `typescriptParser.ts`锛歍ypeScript 鍘熺敓 AST 鎷撴墤鎶藉彇瀹炵幇锛屽寘鍚?Ghost State Scanner 闅愬紡渚濊禆鎵弿
-- `typescriptGenerator.ts`锛歍ypeScript 楠ㄦ灦浠ｇ爜鐢熸垚瀹炵幇
-- `analyzer.ts`锛氱函 JSON 鎷撴墤鍒嗘瀽鍐呮牳锛岃礋璐?blast radius銆乧ycle detection銆乼opological drift 涓?renormalization protocol 鐢熸垚锛屼笉渚濊禆浠讳綍 AST 瑙ｆ瀽鍣?- `parser.ts` / `generator.ts`锛氱函璋冨害鍣紝涓嶅啀鐩存帴缁戝畾 `ts-morph`
-
-### CLI lifecycle guard
-
-- `triadmind plan` now computes contract-graph blast radius warnings before review
-- `triadmind apply` now dispatches by detected project language instead of hard-wiring a single generator path
-- `triadmind init` / `triadmind apply` now run `detectTopologicalDrift` after topology refresh and fail fast on degraded results
-- `triadmind renormalize` now detects strongly connected components and writes `.triadmind/renormalize-protocol.json` for language-agnostic macro-node refactoring
-- `visualizer.html` now auto-loads `.triadmind/renormalize-protocol.json` and overlays macro nodes, absorb edges, and renormalization summaries
-
-澶氳瑷€娉涘寲鐨勬€濊矾鏄細
+统一链路为：
 
 ```text
-璇█浠ｇ爜 -> Tree-sitter AST -> Triad-IR -> protocol -> adapter -> 楠ㄦ灦
+Source Code
+-> Tree-sitter AST
+-> Triad Topology
+-> Protocol
+-> Language Adapter
+-> Skeleton Code
 ```
 
-褰撳墠宸ョ▼杈圭晫锛?
-- 鎵€鏈夋敮鎸佽瑷€鐨?`init / sync / invoke --apply / apply` 鍧囧凡缁熶竴鍒?Tree-sitter 鎷撴墤瑙ｆ瀽璺緞
-- `native` 浠呯敤浜庡吋瀹规棫椤圭洰鎴栬皟璇曪紝涓嶅缓璁綔涓烘柊椤圭洰榛樿閰嶇疆
-- 浠ｇ爜鐢熸垚浠嶇敱鍚勮瑷€ adapter 璐熻矗锛岃В鏋愪晶宸蹭粠璇█涓撳睘鎵弿鍗囩骇涓虹粺涓€ AST 璇箟鎶藉彇
-- TypeScript 鍦?`native` 涓?`tree-sitter` 涓ゆ潯瑙ｆ瀽璺緞涓嬮兘浼氬惎鐢?Ghost State Scanner
-- JavaScript 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?class method銆乪xport function銆乪xport arrow function锛屽苟澶嶇敤 TypeScript 鐨勮皟鐢ㄨ〃杈惧紡绫诲瀷鎺ㄦ柇
-- Python 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?class method銆乵odule function銆乣self.xxx`銆佹ā鍧楃骇鐘舵€併€乣import as` / `from ... import ... as ...` 缁戝畾
-- Go 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?method receiver 瀛楁銆佸寘瀵煎叆鍒悕銆佹ā鍧楃骇 `var/const`銆侀《灞傚嚱鏁颁緷璧栦笌鏈枃浠跺嚱鏁拌繑鍥炵被鍨嬫帹鏂?- Rust 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?`self.xxx`銆乣use` 瀵煎叆銆乣static/const`銆乣impl` 鏂规硶涓殑闅愬紡鐘舵€佽闂紝骞朵繚鐣欐湰鍦?crate 璺緞瑙ｆ瀽閽╁瓙
-- C++ 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?class/struct 瀛楁銆佸叏灞€瀵硅薄銆乮nline method銆侀《灞傚嚱鏁帮紝浠ュ強鏈湴 `#include "..."` 澶存枃浠剁鍙疯В鏋?- Java 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?`this.xxx`銆佺被瀛楁銆侀潤鎬佸瓧娈点€佹柟娉曚綋鍐呯殑闅愬紡瀵硅薄渚濊禆锛屼互鍙婂熀浜?`package/import` 鐨勫伐浣滃尯绗﹀彿瑙ｆ瀽
-- `tree-sitter` 璺緞涓嬩細瀵?`this.xxx`銆佺浉瀵瑰鍏ョ粦瀹氥€佹ā鍧楃骇澶栭儴鍙橀噺鍋氳娉曠骇绫诲瀷鎺ㄦ柇
+关键边界：
 
-## Runtime Self-Healing
+- `languageAdapter.ts`：定义跨语言适配器契约
+- `adapterRegistry.ts`：语言路由
+- `typescriptAdapter.ts`：TypeScript 适配器
+- `polyglotAdapter.ts`：JavaScript / Python / Go / Rust / C++ / Java 适配器
+- `treeSitterParser.ts`：统一 AST 入口
+- `treeSitterGhostScanner.ts`：统一 Ghost 核心
+- `parser.ts / generator.ts`：纯调度器
+- `analyzer.ts`：纯 JSON 拓扑分析，不依赖 AST 解析器
 
-杩愯鏃舵姤閿欏悗锛?
+## CLI 生命周期守卫
+
+- `plan`：先做 `blast radius` 预警
+- `apply`：按项目语言分发到对应 `LanguageAdapter`
+- `init / apply`：刷新拓扑后执行 `detectTopologicalDrift`
+- `renormalize`：输出 `.triadmind/renormalize-protocol.json`
+- `visualizer.html`：叠加显示宏节点、吸收边和重整化摘要
+
+## 运行时自愈
+
+运行时报错后：
+
 ```bash
-npm run triad:heal -- --message "TypeError: Cannot read properties of undefined"
+npx triadmind heal --message "TypeError: Cannot read properties of undefined"
 ```
 
-鎴栨妸閿欒鍐欏叆 `.triadmind/runtime-error.log` 鍚庢墽琛岋細
+或先把错误写入 `.triadmind/runtime-error.log` 再执行：
 
 ```bash
-npm run triad:heal
+npx triadmind heal
 ```
 
-褰撳墠鑷剤閾捐矾锛?
+当前链路：
+
 ```text
-閿欒鏃ュ織
--> Trace-to-Node 鑺傜偣鏄犲皠
--> left/right/contract/topology 褰掑洜
--> analyzer.ts contract graph blast radius 鍒嗘瀽
+Runtime Error
+-> Trace-to-Node
+-> left / right / contract / topology diagnosis
+-> blast radius analysis
 -> healing-prompt.md
--> LLM 鐢熸垚 repair protocol
+-> LLM repair protocol
 -> plan / apply
 ```
 
 ## Always-On Rules
 
-鎵ц锛?
+执行：
+
 ```bash
-npm run triad:rules
+npx triadmind rules
 ```
 
-浼氳嚜鍔ㄧ敓鎴愶細
+会自动生成：
 
 - `.triadmind/agent-rules.md`
 - `AGENTS.md`
 - `.cursor/rules/triadmind.mdc`
 
-杩欐牱 AI 鍔╂墜鍦ㄥ疄鐜板墠浼氬厛璇诲彇鎷撴墤鍥俱€侀厤缃拰鎬绘彁绀鸿瘝锛岃€屼笉鏄洿鎺ヨ烦杩涗唬鐮併€?
+这样 AI 助手会先读拓扑、配置和总提示词，再进入实现。
+
 ## Self Bootstrap
 
-TriadMind Core 鍙互鐢ㄨ嚜宸辩殑瑙勫垯鎻忚堪鑷繁锛?
+TriadMind Core 可以用自己的规则描述自己：
+
 ```bash
 cd triadmind-core
 npm run self
 ```
 
-璇ュ懡浠や細鐢熸垚锛?
+会生成：
+
 - `.triadmind/self-bootstrap.md`
 - `.triadmind/self-bootstrap-protocol.json`
 - `.triadmind/draft-protocol.json`
@@ -297,79 +451,30 @@ npm run self
 - `AGENTS.md`
 - `.cursor/rules/triadmind.mdc`
 
-杩欒〃绀?TriadMind 鑷韩涔熻绾冲叆鍚屼竴濂?`triad-map -> protocol -> visualizer -> rules` 闂幆銆?
-## Validation
+这表示 TriadMind 自身已经被纳入同一条：
 
-寮€鍙戞椂鎺ㄨ崘鑷冲皯楠岃瘉锛?
-```bash
-cd triadmind-core && npm run typecheck
-cd ../microflow-ts && npm run triad:sync -- --force
-cd ../microflow-ts && npm run triad:rules
+```text
+triad-map -> protocol -> visualizer -> apply -> rules
 ```
 
-## Verified Regression
+的自举闭环。
 
-鍦ㄥ畬鎴愯嚜涓鹃噸鏋勫悗锛孴riadMind Core 宸插仛杩囦竴杞姛鑳藉洖褰掗獙璇侊紝纭鈥滆兘鑷妇鈥濅笖鈥滃師鍔熻兘鏈け鏁堚€濄€?
-### Core Commands
+## 验证
 
-鍦?`triadmind-core` 鏍圭洰褰曞凡楠岃瘉閫氳繃锛?
-```bash
-npm run typecheck
-npm run adapters
-npm run self
-npm run sync
-npm run rules
-npm run heal -- --message "TypeError: Cannot read properties of undefined at runParser (...)"
-npm run plan -- --no-open --apply
-```
-
-楠岃瘉缁撴灉锛?
-- `typecheck` 閫氳繃
-- `self` 鍙噸鏂扮敓鎴?`.triadmind/self-bootstrap.md`
-- `sync` 鍙閲忓悓姝?`triad-map.json`
-- `rules` 鍙噸鏂扮敓鎴?`AGENTS.md` 涓?Cursor 瑙勫垯
-- `heal` 鍙敓鎴?`healing-report.json` 涓?`healing-prompt.md`
-- `plan --apply` 鍙蛋瀹屾暣瀹℃牳涓庡崗璁墽琛屾祦绋?
-### E2E Apply Test
-
-杩樹娇鐢ㄤ竴涓渶灏?TypeScript 涓存椂椤圭洰鍋氫簡鐪熷疄 E2E 楠岃瘉锛?
-1. 鍏堣繍琛?`init`
-2. 鍐欏叆涓€涓?`create_child` 鍗忚
-3. 鎵ц `plan --no-open --apply`
-4. 纭鏂伴鏋舵枃浠惰鐢熸垚
-5. 鍐嶅啓鍏ヤ竴涓?`modify` 鍗忚
-6. 鍐嶆鎵ц `plan --no-open --apply`
-7. 纭鍑芥暟绛惧悕琚洿鏂?
-瀹為檯楠岃瘉鍒扮殑琛屼负锛?
-- `create_child` 鑳芥柊澧?`CsvExporter.exportState`
-- `modify` 鑳芥洿鏂板凡瀛樺湪鑺傜偣鐨勫弬鏁扮鍚?- 褰?`modify` 璇曞浘鏀瑰彉鑺傜偣鏍稿績鑱岃矗 `problem` 鏃讹紝浼氳鍗忚瀹堝崼姝ｇ‘鎷︽埅
-- TypeScript 鍘熺敓瑙ｆ瀽璺緞鍙瘑鍒?`this.xxx`銆佸鍏ュ崟渚嬨€佹ā鍧楃骇澶栭儴鍙橀噺锛屽苟灏嗗叾杩藉姞鍒?`fission.demand`
-
-杩欒鏄庡綋鍓嶇増鏈湪瀹屾垚 `workflow / bootstrap / protocol / generator / healing` 鐨勫乏鍙冲垎鏀噸鏋勫悗锛屼互涓嬫牳蹇冭兘鍔涗粛鐒跺彲鐢細
-
-- 鎷撴墤鎵弿
-- 鍗忚鏍￠獙
-- 鍥捐氨瀹℃牳
-- 楠ㄦ灦鐢熸垚
-- 鍗忚淇敼
-- 杩愯鏃惰嚜鎰堟彁绀鸿瘝鐢熸垚
-
-濡傛灉浣犺鍦ㄦ柊鐜閲嶆柊澶嶉獙锛屾帹鑽愭渶灏忛『搴忥細
+推荐至少执行：
 
 ```bash
+cd triadmind-core
 npm install
 npm run typecheck
+npm run sync
 npm run self
+npm run rules
 npm run heal -- --message "TypeError: Cannot read properties of undefined at runParser (...)"
 ```
 
-## Project Status
+## 进一步阅读
 
-TriadMind 姝ｄ粠鈥滄彁绀鸿瘝鎵嬪唽鈥濆崌绾т负鈥滄灦鏋勭紪璇戝櫒鈥濓細
-
-- Prompt 绾︽潫 -> Schema 纭害鏉?- 浜哄伐鍚屾 -> 澧為噺鍚屾 / watch
-- 鎵嬪姩鎻愰啋 -> Always-on 瑙勫垯
-- TypeScript 鍗曡绉?-> 閫傞厤鍣?+ Tree-sitter 娉涘寲
-- 浜嬪悗淇?Bug -> 鎷撴墤鎰熺煡鑷剤
-
-濡傛灉浣犺鐪嬪畬鏁磋惤鍦颁娇鐢ㄦ柟寮忥紝璇疯 `triadmind-core/user guide.md`銆?
+- 详细使用手册：`user guide.md`
+- 当前仓库完整拓扑：`.triadmind/triad-map.json`
+- 当前仓库完整可视化：`.triadmind/visualizer.html`

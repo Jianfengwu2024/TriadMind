@@ -61,6 +61,21 @@
     }
   },
   {
+    "nodeId": "Analyzer.detectCycles",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute detectCycles flow",
+      "demand": [
+        "any[] (map)",
+        "[Ghost:Read] getCycles (getCycles)"
+      ],
+      "answer": [
+        "string[][]"
+      ]
+    }
+  },
+  {
     "nodeId": "Analyzer.detectTopologicalDrift",
     "category": "core",
     "sourcePath": "analyzer.ts",
@@ -69,10 +84,115 @@
       "demand": [
         "any[] (oldMap)",
         "any[] (newMap)",
-        "[Ghost:Read] getCycles (getCycles)"
+        "[Ghost:Read] detectCycles (detectCycles)"
       ],
       "answer": [
         "DriftReport"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateFeatureHash",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute generateFeatureHash flow",
+      "demand": [
+        "number[][] (matrix)",
+        "[Ghost:Read] generateMayaFeatureHash (generateMayaFeatureHash)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateMayaFeatureHash",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute generateMayaFeatureHash flow",
+      "demand": [
+        "number[] (mayaSequence)",
+        "[Ghost:Read] createHash (createHash)"
+      ],
+      "answer": [
+        "string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateMayanMatrix",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute generateMayanMatrix flow",
+      "demand": [
+        "any[] (normalizedNodes)",
+        "[Ghost:Read] generateMayaSequence (generateMayaSequence)",
+        "[Ghost:Read] mapTopologyToYoungPartition (mapTopologyToYoungPartition)"
+      ],
+      "answer": [
+        "number[][]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateMayaSequence",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute generateMayaSequence flow",
+      "demand": [
+        "number[] (partition)"
+      ],
+      "answer": [
+        "number[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateRenormalizeProtocol",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute generateRenormalizeProtocol flow",
+      "demand": [
+        "any[] (map)",
+        "string[][] (cycles)"
+      ],
+      "answer": [
+        "RenormalizeProtocol"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.mapTopologyToYoungPartition",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute mapTopologyToYoungPartition flow",
+      "demand": [
+        "any[] (subgraph)",
+        "[Ghost:Read] buildYoungPartitionFromNormalizedNodes (buildYoungPartitionFromNormalizedNodes)"
+      ],
+      "answer": [
+        "number[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.normalizeSubgraph",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute normalizeSubgraph flow",
+      "demand": [
+        "any[] (subgraph)",
+        "[Ghost:Read] cloneJson (cloneJson)"
+      ],
+      "answer": [
+        "any[]"
       ]
     }
   },
@@ -1267,6 +1387,7 @@
         "string (mapPath)",
         "string (protocolPath)",
         "string (outputPath)",
+        "[Ghost:Read] buildHtml (buildHtml)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)"
       ],
