@@ -45,8 +45,16 @@
     "excludePathPatterns": [
       "tests",
       "test",
+      "schema",
       "schemas",
+      "model",
       "models",
+      "entity",
+      "entities",
+      "dto",
+      "vo",
+      "types",
+      "types.py",
       "migrations",
       "alembic/versions",
       "__pycache__",
@@ -69,15 +77,16 @@
       "handle",
       "process",
       "dispatch",
-      "plan",
       "apply",
       "invoke",
-      "call"
+      "plan",
+      "schedule",
+      "orchestrate"
     ],
     "excludeNodeNamePatterns": [
-      "^test_",
-      "^_",
-      "^(get|set|build|parse|format|normalize|sanitize|validate)_",
+      "^(__.*__|_(?!_).*)$",
+      "^(test_.+)$",
+      "^(get|set|build|parse|format|normalize|sanitize|validate|ensure|create|load|save|list|collect|resolve|prepare|read|write|convert|sync|merge|filter|check|infer|guess)_.+$",
       "^__.*__$",
       "^(upgrade|downgrade)$"
     ],
@@ -99,10 +108,14 @@
       "json",
       "request",
       "response",
+      "path",
       "void",
       "none",
       "dict[str,any]",
-      "optional[str]"
+      "optional[str]",
+      "optional[int]",
+      "list[str]",
+      "list[any]"
     ],
     "includeUntaggedExports": true,
     "jsDocTags": {

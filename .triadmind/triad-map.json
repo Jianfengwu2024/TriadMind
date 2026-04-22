@@ -15,21 +15,6 @@
     }
   },
   {
-    "nodeId": "AdapterRegistry.resolveAdapter",
-    "category": "core",
-    "sourcePath": "adapterRegistry.ts",
-    "fission": {
-      "problem": "Adapter Capability: Analyze Adapter registry resolve language",
-      "demand": [
-        "WorkspacePaths | string (pathsOrProjectRoot)",
-        "[Ghost:Read] Map (adapterRegistry)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
     "nodeId": "Analyzer.calculateBlastRadius",
     "category": "core",
     "sourcePath": "analyzer.ts",
@@ -186,68 +171,6 @@
     }
   },
   {
-    "nodeId": "Analyzer.normalizeSubgraph",
-    "category": "core",
-    "sourcePath": "analyzer.ts",
-    "fission": {
-      "problem": "System Capability: Provide Analyzer normalize subgraph any[]",
-      "demand": [
-        "any[] (subgraph)",
-        "[Ghost:Read] cloneJson (cloneJson)"
-      ],
-      "answer": [
-        "any[]"
-      ]
-    }
-  },
-  {
-    "nodeId": "Bootstrap.writeSelfBootstrapProtocol",
-    "category": "core",
-    "sourcePath": "bootstrap.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Bootstrap write self protocol workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Ghost:Read] module (fs)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Bootstrap.writeSelfBootstrapReport",
-    "category": "core",
-    "sourcePath": "bootstrap.ts",
-    "fission": {
-      "problem": "System Capability: Produce Bootstrap write self report workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] renderSelfBootstrapMarkdown (renderSelfBootstrapMarkdown)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Config.createSourcePathFilter",
-    "category": "core",
-    "sourcePath": "config.ts",
-    "fission": {
-      "problem": "System Capability: Produce Config create source path filter string",
-      "demand": [
-        "[Generic] string (projectRoot)",
-        "TriadConfig (config)",
-        "[Ghost:Read] shouldExcludeSourcePath (shouldExcludeSourcePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "Config.describeSourceScanScope",
     "category": "core",
     "sourcePath": "config.ts",
@@ -263,40 +186,6 @@
     }
   },
   {
-    "nodeId": "Config.ensureTriadConfig",
-    "category": "core",
-    "sourcePath": "config.ts",
-    "fission": {
-      "problem": "System Capability: Provide Config ensure triad workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] unknown (force)",
-        "[Ghost:Read] buildDefaultConfig (buildDefaultConfig)",
-        "[Ghost:Read] module (fs)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Config.resolveCategoryFromConfig",
-    "category": "core",
-    "sourcePath": "config.ts",
-    "fission": {
-      "problem": "System Capability: Analyze Config resolve category from triad",
-      "demand": [
-        "[Generic] string (sourcePath)",
-        "TriadConfig (config)",
-        "[Ghost:Read] normalizePath (normalizePath)",
-        "[Ghost:Read] TriadCategory (TriadCategory)"
-      ],
-      "answer": [
-        "TriadCategory"
-      ]
-    }
-  },
-  {
     "nodeId": "Config.shouldExcludeSourcePath",
     "category": "core",
     "sourcePath": "config.ts",
@@ -306,6 +195,7 @@
         "[Generic] string (sourcePath)",
         "TriadConfig (config)",
         "[Ghost:Read] isHardExcludedSourcePath (isHardExcludedSourcePath)",
+        "[Ghost:Read] matchesSourcePathPattern (matchesSourcePathPattern)",
         "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
@@ -346,55 +236,6 @@
     }
   },
   {
-    "nodeId": "GeneratorRightBranch.collectTypeTokens",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "System Capability: Provide Generator right branch collect type tokens string",
-      "demand": [
-        "[Generic] string (typeText)",
-        "[Ghost:Read] getBuiltinTypeNames (getBuiltinTypeNames)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.resolveSourceFilePath",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "System Capability: Analyze Generator right branch resolve source file path string",
-      "demand": [
-        "[Generic] string (projectRoot)",
-        "ParsedNodeRef (ref)",
-        "TriadNodeDefinition (node)",
-        "NodeLocationMap (nodeLocations)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.resolveTypesModuleSpecifier",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "System Capability: Analyze Generator right branch resolve types specifier string",
-      "demand": [
-        "[Generic] string (projectRoot)",
-        "SourceFile (sourceFile)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "GeneratorRightBranch.shouldUseTopLevelFunction",
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
@@ -427,24 +268,6 @@
       ],
       "answer": [
         "HealingDiagnosis"
-      ]
-    }
-  },
-  {
-    "nodeId": "Healing.prepareHealingArtifacts",
-    "category": "core",
-    "sourcePath": "healing.ts",
-    "fission": {
-      "problem": "Execution Capability: Plan Healing prepare artifacts workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] string (errorText)",
-        "[Generic] unknown (retryCount)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] HealingDiagnosis (HealingDiagnosis)"
-      ],
-      "answer": [
-        "void"
       ]
     }
   },
@@ -527,102 +350,6 @@
     }
   },
   {
-    "nodeId": "PolyglotAdapter.createCppAdapter",
-    "category": "core",
-    "sourcePath": "polyglotAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Produce Polyglot adapter create cpp language",
-      "demand": [
-        "None",
-        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
-        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
-    "nodeId": "PolyglotAdapter.createGoAdapter",
-    "category": "core",
-    "sourcePath": "polyglotAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Produce Polyglot adapter create go language",
-      "demand": [
-        "None",
-        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
-        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
-    "nodeId": "PolyglotAdapter.createJavaAdapter",
-    "category": "core",
-    "sourcePath": "polyglotAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Produce Polyglot adapter create java language",
-      "demand": [
-        "None",
-        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
-        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
-    "nodeId": "PolyglotAdapter.createJavaScriptAdapter",
-    "category": "core",
-    "sourcePath": "polyglotAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Produce Polyglot adapter create java script language",
-      "demand": [
-        "None",
-        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
-        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
-    "nodeId": "PolyglotAdapter.createPythonAdapter",
-    "category": "core",
-    "sourcePath": "polyglotAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Produce Polyglot adapter create python language",
-      "demand": [
-        "None",
-        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
-        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
-    "nodeId": "PolyglotAdapter.createRustAdapter",
-    "category": "core",
-    "sourcePath": "polyglotAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Produce Polyglot adapter create rust language",
-      "demand": [
-        "None",
-        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
-        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
     "nodeId": "Protocol.assertProtocolShape",
     "category": "core",
     "sourcePath": "protocol.ts",
@@ -642,55 +369,6 @@
     }
   },
   {
-    "nodeId": "Protocol.normalizeCategory",
-    "category": "core",
-    "sourcePath": "protocol.ts",
-    "fission": {
-      "problem": "Workflow Capability: Provide Protocol normalize category triad",
-      "demand": [
-        "[Generic] string (category)",
-        "TriadCategory (fallback)",
-        "[Ghost:Read] getPrefixCategoryMap (getPrefixCategoryMap)"
-      ],
-      "answer": [
-        "TriadCategory"
-      ]
-    }
-  },
-  {
-    "nodeId": "Protocol.readJsonFile",
-    "category": "core",
-    "sourcePath": "protocol.ts",
-    "fission": {
-      "problem": "Workflow Capability: Analyze Protocol read json file t",
-      "demand": [
-        "[Generic] string (filePath)",
-        "[Ghost:Read] module (fs)"
-      ],
-      "answer": [
-        "T"
-      ]
-    }
-  },
-  {
-    "nodeId": "Protocol.readTriadMap",
-    "category": "core",
-    "sourcePath": "protocol.ts",
-    "fission": {
-      "problem": "Workflow Capability: Analyze Protocol read triad map string",
-      "demand": [
-        "[Generic] string (mapPath)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] getTriadNodeDefinitionSchema (getTriadNodeDefinitionSchema)",
-        "[Ghost:Read] readJsonFile (readJsonFile)",
-        "[Ghost:Read] TriadNodeDefinition (TriadNodeDefinition)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "Rules.installAlwaysOnRules",
     "category": "core",
     "sourcePath": "rules.ts",
@@ -702,56 +380,6 @@
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] module (path)",
         "[Ghost:Read] upsertAgentsMd (upsertAgentsMd)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Snapshot.collectProtocolSnapshotFiles",
-    "category": "core",
-    "sourcePath": "snapshot.ts",
-    "fission": {
-      "problem": "Workflow Capability: Provide Snapshot collect protocol files workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "UpgradeProtocol (protocol)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Snapshot.createSnapshot",
-    "category": "core",
-    "sourcePath": "snapshot.ts",
-    "fission": {
-      "problem": "System Capability: Produce Snapshot create workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] string (label)",
-        "string[] (filePaths)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] normalizePath (normalizePath)",
-        "[Ghost:Read] updateSnapshotIndex (updateSnapshotIndex)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Snapshot.listSnapshots",
-    "category": "core",
-    "sourcePath": "snapshot.ts",
-    "fission": {
-      "problem": "System Capability: Provide Snapshot list snapshots workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -787,24 +415,6 @@
       ],
       "answer": [
         "StageAnalysisResult"
-      ]
-    }
-  },
-  {
-    "nodeId": "Sync.syncTriadMap",
-    "category": "core",
-    "sourcePath": "sync.ts",
-    "fission": {
-      "problem": "Workflow Capability: Coordinate Sync triad map workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] unknown (force)",
-        "[Ghost:Read] default (chalk)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] resolveAdapter (resolveAdapter)"
-      ],
-      "answer": [
-        "void"
       ]
     }
   },
@@ -908,39 +518,6 @@
     }
   },
   {
-    "nodeId": "TypescriptAdapter.createTypeScriptAdapter",
-    "category": "core",
-    "sourcePath": "typescriptAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Produce Typescript adapter create type script language",
-      "demand": [
-        "None",
-        "[Ghost:Read] applyUpgradeProtocol (applyUpgradeProtocol)",
-        "[Ghost:Read] parseTopology (parseTopology)",
-        "[Ghost:Read] readTopologyIR (readTopologyIR)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
-    "nodeId": "TypescriptAdapter.readTopologyIR",
-    "category": "core",
-    "sourcePath": "typescriptAdapter.ts",
-    "fission": {
-      "problem": "Adapter Capability: Analyze Typescript adapter read topology ir triad",
-      "demand": [
-        "[Generic] string (projectRoot)",
-        "[Ghost:Read] buildTopologyIR (buildTopologyIR)",
-        "[Ghost:Read] readTriadMap (readTriadMap)"
-      ],
-      "answer": [
-        "TriadTopologyIR"
-      ]
-    }
-  },
-  {
     "nodeId": "TypescriptGenerator.applyTypeScriptProtocol",
     "category": "core",
     "sourcePath": "typescriptGenerator.ts",
@@ -1001,83 +578,6 @@
     }
   },
   {
-    "nodeId": "Workflow.createDraftTemplate",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Workflow create draft template workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] unknown (userDemand)",
-        "[Generic] unknown (force)",
-        "[Ghost:Read] createDraftProtocolTemplate (createDraftProtocolTemplate)",
-        "[Ghost:Read] module (fs)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.ensureMultiPassTemplates",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "Workflow Capability: Provide Workflow ensure multi pass templates workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] string (userDemand)",
-        "{ resetArtifacts?: boolean } (options)",
-        "[Ghost:Read] buildMacroPrompt (buildMacroPrompt)",
-        "[Ghost:Read] buildMesoPrompt (buildMesoPrompt)",
-        "[Ghost:Read] buildMicroPrompt (buildMicroPrompt)",
-        "[Ghost:Read] ensurePipelineArtifactSeeds (ensurePipelineArtifactSeeds)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] resetPipelineArtifacts (resetPipelineArtifacts)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.ensurePipelineArtifactSeeds",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "Workflow Capability: Provide Workflow ensure artifact seeds workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] string (userDemand)",
-        "[Ghost:Read] createMacroSplitSeed (createMacroSplitSeed)",
-        "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
-        "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
-        "[Ghost:Read] writeJsonSeedIfMissing (writeJsonSeedIfMissing)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.ensureTriadSpec",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "Workflow Capability: Provide Workflow ensure triad spec workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] unknown (force)",
-        "[Ghost:Read] buildTriadSpec (buildTriadSpec)",
-        "[Ghost:Read] ensureTriadConfig (ensureTriadConfig)",
-        "[Ghost:Read] module (fs)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "Workflow.resetPipelineArtifacts",
     "category": "core",
     "sourcePath": "workflow.ts",
@@ -1090,119 +590,6 @@
         "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
         "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
         "[Ghost:Read] module (fs)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.writeImplementationHandoff",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Workflow write implementation handoff workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "ImplementationHandoffInput (input)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] writeMasterPrompt (writeMasterPrompt)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.writeMasterPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Workflow write master prompt workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Ghost:Read] buildMasterPrompt (buildMasterPrompt)",
-        "[Ghost:Read] ensureTriadSpec (ensureTriadSpec)",
-        "[Ghost:Read] module (fs)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.writePromptPacket",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Workflow write prompt packet workspace paths",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Generic] string (userDemand)",
-        "[Ghost:Read] createDraftTemplate (createDraftTemplate)",
-        "[Ghost:Read] ensureMultiPassTemplates (ensureMultiPassTemplates)",
-        "[Ghost:Read] ensureTriadSpec (ensureTriadSpec)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] writeMasterPrompt (writeMasterPrompt)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.createDraftProtocolTemplate",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Workflow right branch create draft protocol template string",
-      "demand": [
-        "[Generic] string (projectRoot)",
-        "[Generic] string (mapFile)",
-        "[Generic] unknown (userDemand)",
-        "[Ghost:Read] normalizePath (normalizePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.createMesoSplitSeed",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Workflow right branch create meso split seed",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.createMicroSplitSeed",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "Workflow Capability: Produce Workflow right branch create micro split seed",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workspace.module_pipeline",
-    "category": "core",
-    "sourcePath": "workspace.ts",
-    "fission": {
-      "problem": "Workflow Capability: Provide Workspace string",
-      "demand": [
-        "[Generic] string (input)"
       ],
       "answer": [
         "void"

@@ -253,7 +253,7 @@ TypeScript 会保留显式业务类型，例如 `GeoTarget`、`GeoResult`；Java
 - 默认 `scanMode = capability`，优先把能力单元而不是碎方法提升成节点。
 - 默认强排除：`node_modules`、`.next`、`venv`、`.venv`、`__pycache__`、`.pytest_cache`、`logs`、`uploads`、`fastgpt_data`、`db`、`tests`、`scripts`、`env`、`vendor`。
 - 默认遇到 `EACCES` / `EPERM` / `ENOENT` 直接跳过，不再让 `@triadmind init` 或 `@triadmind sync` 因权限报错崩掉。
-- 默认忽略低语义契约连边，例如 `str`、`string`、`int`、`bool`、`dict`、`any`、`Dict[str,Any]`、`Optional[str]`。
+- 默认忽略低语义契约连边，例如 `str`、`string`、`int`、`bool`、`dict`、`any`、`Dict[str,Any]`、`Optional[str]`、`Optional[int]`、`Request`、`Response`、`Path`。
 - 默认给可视化加性能护栏：大图时压缩旧节点分支、限制 contract edges、Maya 指纹自动走 fallback。
 
 推荐把 `.triadmind/config.json` 保持为：
@@ -329,7 +329,7 @@ TriadMind 现在默认遵循这个判断原则：
 - API endpoint / CLI command / RPC handler / message consumer
 - service capability / workflow capability / domain capability
 - adapter / gateway / tool / worker / operator / agent execution unit
-- 主动作方法：`execute` / `run` / `handle` / `process` / `dispatch` / `plan` / `apply` / `invoke` / `call`
+- 主动作方法：`execute` / `run` / `handle` / `process` / `dispatch` / `apply` / `invoke` / `plan` / `schedule` / `orchestrate`
 
 默认不提升的对象：
 
@@ -345,3 +345,12 @@ TriadMind 现在默认遵循这个判断原则：
 - `module`：按 `sourcePath` 的文件/模块边界聚合，隐藏模块内部 capability 细节，只保留对外契约。
 - `domain`：按 `category + 目录上下文` 聚合，隐藏领域内部 capability 细节，只保留跨领域契约。
 - 如果仓库非常扁平、目录层次很浅，`domain` 视图可能会故意收敛成很少几个节点。
+## Parser Filtering v0.2 默认行为
+
+现在默认主图是 capability / architecture 视图，不再把实现碎片直接抬成主节点。
+
+- 默认隐藏：私有符号、魔术方法、helper 动词方法、schema/model/entity/dto/type 路径、tests、migrations
+- 默认降噪：`str`、`int`、`dict`、`Any`、`Request`、`Response`、`Path` 等低语义契约边
+- 默认保留：`execute`、`run`、`handle`、`process`、`dispatch`、`apply`、`invoke`、`plan`、`schedule`、`orchestrate`
+- 默认折叠：挂在 capability 下的 helper / leaf 实现不会在 architecture 主图单独出点，但仍保留给 drill-down / leaf 视图
+- 如需最细函数图，请显式让 AI 助手使用 `leaf` 视图

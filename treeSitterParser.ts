@@ -1303,7 +1303,7 @@ function collectTypeScriptClassCapabilityNodes(
 ) {
     const className = getNameText(classNode.childForFieldName('name'));
     const classBody = classNode.childForFieldName('body');
-    if (!className || !classBody) {
+    if (!className || !classBody || isSuppressedCapabilityContainerName(className, config)) {
         return [];
     }
 
@@ -1481,7 +1481,7 @@ function collectJavaScriptClassCapabilityNodes(
 ) {
     const className = getNameText(classNode.childForFieldName('name'));
     const classBody = classNode.childForFieldName('body');
-    if (!className || !classBody) {
+    if (!className || !classBody || isSuppressedCapabilityContainerName(className, config)) {
         return [];
     }
 
@@ -1627,17 +1627,33 @@ const JAVASCRIPT_MAGIC_METHODS = new Set(['toString', 'valueOf', 'toJSON', 'insp
 
 const JAVASCRIPT_HELPER_PREFIXES = [
     '_',
-    'build',
-    'parse',
-    'validate',
     'get',
     'set',
+    'build',
+    'parse',
+    'format',
+    'normalize',
+    'sanitize',
+    'validate',
+    'ensure',
+    'create',
+    'load',
+    'save',
+    'list',
+    'collect',
+    'resolve',
+    'prepare',
+    'read',
+    'write',
+    'convert',
+    'sync',
+    'merge',
+    'filter',
+    'check',
+    'infer',
+    'guess',
     'serialize',
     'deserialize',
-    'format',
-    'cache',
-    'path',
-    'load',
     'dump',
     'helper'
 ];
@@ -1648,11 +1664,11 @@ const JAVASCRIPT_PRIMARY_CAPABILITY_PREFIXES = [
     'handle',
     'process',
     'invoke',
-    'perform',
     'dispatch',
     'orchestrate',
-    'step',
-    'action'
+    'apply',
+    'plan',
+    'schedule'
 ];
 
 const JAVASCRIPT_CAPABILITY_CLASS_SUFFIXES = [
@@ -1674,21 +1690,39 @@ const TYPESCRIPT_PRIMARY_CAPABILITY_PREFIXES = JAVASCRIPT_PRIMARY_CAPABILITY_PRE
 const TYPESCRIPT_CAPABILITY_CLASS_SUFFIXES = JAVASCRIPT_CAPABILITY_CLASS_SUFFIXES;
 
 const JAVA_MAGIC_METHODS = new Set(['toString', 'hashCode', 'equals']);
-const JAVA_HELPER_PREFIXES = ['build', 'parse', 'validate', 'get', 'set', 'serialize', 'deserialize', 'format', 'load', 'dump'];
-const JAVA_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'perform', 'dispatch', 'orchestrate', 'step', 'action'];
+const JAVA_HELPER_PREFIXES = [
+    'get', 'set', 'build', 'parse', 'format', 'normalize', 'sanitize', 'validate', 'ensure', 'create', 'load', 'save',
+    'list', 'collect', 'resolve', 'prepare', 'read', 'write', 'convert', 'sync', 'merge', 'filter', 'check', 'infer',
+    'guess', 'serialize', 'deserialize', 'dump'
+];
+const JAVA_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
 const JAVA_CAPABILITY_CLASS_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
 
-const GO_HELPER_PREFIXES = ['build', 'parse', 'validate', 'get', 'set', 'format', 'load', 'dump'];
-const GO_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'perform', 'dispatch', 'orchestrate', 'step', 'action'];
+const GO_HELPER_PREFIXES = [
+    'get', 'set', 'build', 'parse', 'format', 'normalize', 'sanitize', 'validate', 'ensure', 'create', 'load', 'save',
+    'list', 'collect', 'resolve', 'prepare', 'read', 'write', 'convert', 'sync', 'merge', 'filter', 'check', 'infer',
+    'guess', 'dump'
+];
+const GO_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
 const GO_CAPABILITY_TYPE_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
 
-const RUST_HELPER_PREFIXES = ['build_', 'parse_', 'validate_', 'get_', 'set_', 'format_', 'load_', 'dump_'];
-const RUST_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'perform', 'dispatch', 'orchestrate', 'step', 'action'];
+const RUST_HELPER_PREFIXES = [
+    '_', 'get', 'set', 'build', 'parse', 'format', 'normalize', 'sanitize', 'validate', 'ensure', 'create', 'load',
+    'save', 'list', 'collect', 'resolve', 'prepare', 'read', 'write', 'convert', 'sync', 'merge', 'filter', 'check',
+    'infer', 'guess', 'dump'
+];
+const RUST_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
 const RUST_CAPABILITY_TYPE_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
 
 const CPP_MAGIC_METHODS = new Set(['ToString', 'toString']);
-const CPP_HELPER_PREFIXES = ['Build', 'Parse', 'Validate', 'Get', 'Set', 'Format', 'Load', 'Dump', 'build', 'parse', 'validate', 'get', 'set'];
-const CPP_PRIMARY_CAPABILITY_PREFIXES = ['Execute', 'Run', 'Handle', 'Process', 'Invoke', 'Perform', 'Dispatch', 'Orchestrate', 'Step', 'Action', 'execute', 'run', 'handle', 'process', 'invoke', 'perform', 'dispatch', 'orchestrate', 'step', 'action'];
+const CPP_HELPER_PREFIXES = [
+    'Build', 'Parse', 'Format', 'Normalize', 'Sanitize', 'Validate', 'Ensure', 'Create', 'Load', 'Save', 'List',
+    'Collect', 'Resolve', 'Prepare', 'Read', 'Write', 'Convert', 'Sync', 'Merge', 'Filter', 'Check', 'Infer', 'Guess',
+    'Get', 'Set', 'Dump', 'build', 'parse', 'format', 'normalize', 'sanitize', 'validate', 'ensure', 'create', 'load',
+    'save', 'list', 'collect', 'resolve', 'prepare', 'read', 'write', 'convert', 'sync', 'merge', 'filter', 'check',
+    'infer', 'guess', 'get', 'set', 'dump'
+];
+const CPP_PRIMARY_CAPABILITY_PREFIXES = ['Execute', 'Run', 'Handle', 'Process', 'Invoke', 'Dispatch', 'Orchestrate', 'Apply', 'Plan', 'Schedule', 'execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
 const CPP_CAPABILITY_TYPE_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
 
 type CapabilityCandidateRecord = {
@@ -1699,7 +1733,7 @@ type CapabilityCandidateRecord = {
     decorators?: string[];
 };
 
-const CAPABILITY_ACTION_PREFIXES = ['create', 'submit', 'export', 'import', 'reconcile', 'resolve', 'plan', 'apply', 'sync'];
+const CAPABILITY_ACTION_PREFIXES = ['submit', 'export', 'import', 'reconcile'];
 const CAPABILITY_DECORATOR_PATTERN = /\b(route|get|post|put|delete|patch|task|workflow|tool|step|action|consumer|handler|command|event|rpc)\b/i;
 
 function isConfiguredNoiseCapability(name: string, config?: TriadConfig) {
@@ -1715,6 +1749,15 @@ function isConfiguredNoiseCapability(name: string, config?: TriadConfig) {
             return false;
         }
     });
+}
+
+function isSuppressedCapabilityContainerName(name: string, config?: TriadConfig) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+        return true;
+    }
+
+    return /^_/.test(trimmedName) || /^__.*__$/.test(trimmedName) || isConfiguredNoiseCapability(trimmedName, config);
 }
 
 function isConfiguredPrimaryCapabilityMethod(name: string, config?: TriadConfig) {
@@ -2138,7 +2181,7 @@ function collectPythonClassCapabilityNodes(
 ) {
     const className = getNameText(classNode.childForFieldName('name'));
     const classBody = classNode.childForFieldName('body');
-    if (!className || !classBody) {
+    if (!className || !classBody || isSuppressedCapabilityContainerName(className, config)) {
         return [];
     }
 
@@ -2263,19 +2306,37 @@ const PYTHON_MAGIC_METHODS = new Set([
 
 const PYTHON_HELPER_PREFIXES = [
     '_',
-    'build_',
-    'parse_',
-    'validate_',
-    'get_',
-    'set_',
-    'serialize_',
-    'deserialize_',
-    'format_',
-    'cache_',
-    'path_',
-    'load_',
-    'dump_',
-    'helper_'
+    'get',
+    'set',
+    'build',
+    'parse',
+    'format',
+    'normalize',
+    'sanitize',
+    'validate',
+    'ensure',
+    'create',
+    'load',
+    'save',
+    'list',
+    'collect',
+    'resolve',
+    'prepare',
+    'read',
+    'write',
+    'convert',
+    'sync',
+    'merge',
+    'filter',
+    'check',
+    'infer',
+    'guess',
+    'serialize',
+    'deserialize',
+    'cache',
+    'path',
+    'dump',
+    'helper'
 ];
 
 const PYTHON_PRIMARY_CAPABILITY_PREFIXES = [
@@ -2284,11 +2345,11 @@ const PYTHON_PRIMARY_CAPABILITY_PREFIXES = [
     'handle',
     'process',
     'invoke',
-    'perform',
     'dispatch',
     'orchestrate',
-    'step',
-    'action'
+    'apply',
+    'plan',
+    'schedule'
 ];
 
 const PYTHON_CAPABILITY_CLASS_SUFFIXES = [
@@ -3086,6 +3147,10 @@ function collectGoCapabilityNodes(
     }
 
     for (const [receiverType, records] of methodsByReceiver.entries()) {
+        if (isSuppressedCapabilityContainerName(receiverType, config)) {
+            continue;
+        }
+
         const promotable = records.filter((record) => !isGoNoiseCapability(record.name, config));
         if (promotable.length === 0) {
             continue;
@@ -4072,6 +4137,10 @@ function collectCppCapabilityNodes(
     }
 
     for (const [className, records] of classRecords.entries()) {
+        if (isSuppressedCapabilityContainerName(className, config)) {
+            continue;
+        }
+
         const promotable = records.filter((record) => !isCppNoiseCapability(record.name, config));
         if (promotable.length === 0) {
             continue;
@@ -4122,8 +4191,10 @@ function collectCppCapabilityNodes(
     }
 
     const promotableTopLevel = topLevelRecords.filter((record) => !isCppNoiseCapability(record.name, config));
-    const promotedTopLevel = promotableTopLevel.filter((record) =>
-        shouldPromoteCppCapability(record.name, record.ownerName, config, record)
+    const promotedTopLevel = promotableTopLevel.filter(
+        (record) =>
+            (!record.ownerName || !isSuppressedCapabilityContainerName(record.ownerName, config)) &&
+            shouldPromoteCppCapability(record.name, record.ownerName, config, record)
     );
     for (const record of promotedTopLevel) {
         triadGraph.push(
@@ -4212,6 +4283,10 @@ function collectRustCapabilityNodes(
     }
 
     for (const [implType, records] of implRecords.entries()) {
+        if (isSuppressedCapabilityContainerName(implType, config)) {
+            continue;
+        }
+
         const promotable = records.filter((record) => !isRustNoiseCapability(record.name, config));
         if (promotable.length === 0) {
             continue;

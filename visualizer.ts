@@ -830,7 +830,10 @@ function normalizeContractKey(entry: string, isDemand: boolean, analyzerOptions?
     if (
         ignoreGenericContracts &&
         (genericIgnoreSet.has(compact) ||
-            /^(str|string|int|bool|boolean|dict|list|any|unknown|object|optional\[str\]|dict\[(str|string),(any|object)\]|record<(str|string),(any|unknown|object)>|map<(str|string),(any|unknown|object)>)$/i.test(
+            /^(str|string|std::string|int|integer|short|byte|long|usize|isize|u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|float|double|number|bool|boolean|dict|list|vec|set|tuple|any|unknown|object|json|request|response|path|optional\[str\]|optional\[int\]|list\[str\]|list\[string\]|dict\[(str|string),(any|object)\]|record<(str|string),(any|unknown|object)>|map<(str|string),(any|unknown|object)>)$/i.test(
+                compact
+            ) ||
+            /^(optional\[(str|string|std::string|int|integer|short|byte|long|usize|isize|u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|double|float|number|bool|boolean|bigint|symbol|dict|list|vec|set|tuple|any|unknown|object|json|request|response|path)\]|(list|sequence|vec)\[(str|string|std::string|int|integer|short|byte|long|usize|isize|u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|double|float|number|bool|boolean|bigint|symbol|dict|list|vec|set|tuple|any|unknown|object|json|request|response|path)\]|array<(str|string|std::string|int|integer|short|byte|long|usize|isize|u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|double|float|number|bool|boolean|bigint|symbol|dict|list|vec|set|tuple|any|unknown|object|json|request|response|path)>)$/i.test(
                 compact
             ))
     ) {

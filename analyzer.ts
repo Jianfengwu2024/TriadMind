@@ -104,7 +104,15 @@ const GENERIC_CONTRACT_TOKENS = new Set([
     'any',
     'unknown',
     'object',
+    'json',
+    'request',
+    'response',
+    'path',
     'dict[str,any]',
+    'optional[str]',
+    'optional[int]',
+    'list[str]',
+    'list[string]',
     'record<string,any>',
     'record<string,unknown>',
     'mapping[str,any]',
@@ -117,6 +125,8 @@ const GENERIC_CONTRACT_TOKENS = new Set([
     'map<string,unknown>'
 ]);
 const MAX_CANONICAL_PERMUTATIONS = 4096;
+const GENERIC_ATOMIC_CONTRACT_PATTERN =
+    '(str|string|std::string|int|integer|short|byte|long|usize|isize|u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|double|float|number|bool|boolean|bigint|symbol|dict|list|vec|set|tuple|any|unknown|object|json|request|response|path)';
 
 /**
  * @LeftBranch
@@ -1085,7 +1095,10 @@ function isGenericContractKey(value: string, options?: AnalyzerOptions) {
         /^map<(str|string),(any|unknown|object)>$/.test(compact) ||
         /^list\[(any|object)\]$/.test(compact) ||
         /^array<(any|unknown|object)>$/.test(compact) ||
-        /^sequence\[(any|object)\]$/.test(compact)
+        /^sequence\[(any|object)\]$/.test(compact) ||
+        new RegExp(`^optional\\[${GENERIC_ATOMIC_CONTRACT_PATTERN}\\]$`).test(compact) ||
+        new RegExp(`^(list|sequence|vec)\\[${GENERIC_ATOMIC_CONTRACT_PATTERN}\\]$`).test(compact) ||
+        new RegExp(`^array<${GENERIC_ATOMIC_CONTRACT_PATTERN}>$`).test(compact)
     );
 }
 

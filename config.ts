@@ -70,8 +70,16 @@ const DEFAULT_CONFIG: TriadConfig = {
         excludePathPatterns: [
             'tests',
             'test',
+            'schema',
             'schemas',
+            'model',
             'models',
+            'entity',
+            'entities',
+            'dto',
+            'vo',
+            'types',
+            'types.py',
             'migrations',
             'alembic/versions',
             '__pycache__',
@@ -85,11 +93,22 @@ const DEFAULT_CONFIG: TriadConfig = {
         scanCategories: ['frontend', 'backend'],
         scanMode: 'capability',
         capabilityThreshold: 4,
-        entryMethodNames: ['execute', 'run', 'handle', 'process', 'dispatch', 'plan', 'apply', 'invoke', 'call'],
+        entryMethodNames: [
+            'execute',
+            'run',
+            'handle',
+            'process',
+            'dispatch',
+            'apply',
+            'invoke',
+            'plan',
+            'schedule',
+            'orchestrate'
+        ],
         excludeNodeNamePatterns: [
-            '^test_',
-            '^_',
-            '^(get|set|build|parse|format|normalize|sanitize|validate)_',
+            '^(__.*__|_(?!_).*)$',
+            '^(test_.+)$',
+            '^(get|set|build|parse|format|normalize|sanitize|validate|ensure|create|load|save|list|collect|resolve|prepare|read|write|convert|sync|merge|filter|check|infer|guess)_.+$',
             '^__.*__$',
             '^(upgrade|downgrade)$'
         ],
@@ -111,10 +130,14 @@ const DEFAULT_CONFIG: TriadConfig = {
             'json',
             'request',
             'response',
+            'path',
             'void',
             'none',
             'dict[str,any]',
-            'optional[str]'
+            'optional[str]',
+            'optional[int]',
+            'list[str]',
+            'list[any]'
         ],
         includeUntaggedExports: true,
         jsDocTags: {
@@ -241,9 +264,7 @@ export function shouldExcludeSourcePath(sourcePath: string, config: TriadConfig)
     }
 
     const configuredPatterns = [...(config.parser.excludePatterns ?? []), ...(config.parser.excludePathPatterns ?? [])];
-    return configuredPatterns.some((pattern) =>
-        normalizedPath.includes(normalizePath(pattern).toLowerCase())
-    );
+    return configuredPatterns.some((pattern) => matchesSourcePathPattern(normalizedPath, pattern));
 }
 
 export function createSourcePathFilter(projectRoot: string, config: TriadConfig) {
@@ -393,6 +414,35 @@ function normalizeScanMode(value: TriadScanMode | undefined) {
 
 function mergeGenericContractIgnoreList(value: string[] | undefined) {
     return mergeStringList(value, DEFAULT_CONFIG.parser.genericContractIgnoreList);
+}
+
+function matchesSourcePathPattern(normalizedPath: string, pattern: string) {
+    const normalizedPattern = normalizePath(String(pattern ?? '').trim()).toLowerCase();
+    if (!normalizedPattern) {
+        return false;
+    }
+
+    if (isRegexLikePattern(normalizedPattern)) {
+        try {
+            return new RegExp(normalizedPattern, 'i').test(normalizedPath);
+        } catch {
+            return false;
+        }
+    }
+
+    if (normalizedPath === normalizedPattern) {
+        return true;
+    }
+
+    return (
+        normalizedPath.startsWith(`${normalizedPattern}/`) ||
+        normalizedPath.endsWith(`/${normalizedPattern}`) ||
+        normalizedPath.includes(`/${normalizedPattern}/`)
+    );
+}
+
+function isRegexLikePattern(value: string) {
+    return /[\\^$|()[\]{}+?]/.test(value);
 }
 
 function mergeStringList(value: string[] | undefined, fallback: string[]) {
