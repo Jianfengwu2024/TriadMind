@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { TriadConfig, TriadLanguage, resolveCategoryFromConfig, shouldExcludeSourcePath } from './config';
+import { scanTreeSitterGhostReferences, TreeSitterGhostAccessMode } from './treeSitterGhostScanner';
 import { normalizePath } from './workspace';
 
 interface TriadNode {
@@ -38,37 +39,6 @@ interface TypeScriptGhostContext {
     importedBindings: Map<string, TypeScriptBindingInfo>;
     moduleBindings: Map<string, TypeScriptBindingInfo>;
 }
-
-interface TypeScriptMemberRoot {
-    kind: 'this' | 'identifier';
-    name: string;
-}
-
-const BUILTIN_GHOST_GLOBALS = new Set([
-    'Array',
-    'Boolean',
-    'Date',
-    'Error',
-    'Intl',
-    'JSON',
-    'Map',
-    'Math',
-    'Number',
-    'Object',
-    'Promise',
-    'Reflect',
-    'RegExp',
-    'Set',
-    'String',
-    'Symbol',
-    'WeakMap',
-    'WeakSet',
-    'console',
-    'document',
-    'globalThis',
-    'process',
-    'window'
-]);
 
 const TREE_SITTER_LANGUAGES: Record<TriadLanguage, any> = {
     typescript: TypeScript.typescript,
@@ -410,81 +380,22 @@ function collectTypeScriptGhostDemand(
     ghostContext: TypeScriptGhostContext,
     classPropertyTypes = new Map<string, string>()
 ) {
-    const bodyNode = executableNode.childForFieldName('body');
-    if (!bodyNode) {
-        return [];
-    }
-
-    const parameterNames = new Set(extractParameterNames(executableNode.childForFieldName('parameters')));
-    const localNames = new Set(parameterNames);
     const ghostStates = new Map<string, { typeName: string; read: boolean; write: boolean }>();
 
-    for (const declarator of bodyNode.descendantsOfType('variable_declarator')) {
-        const nameNode = declarator.childForFieldName('name') ?? declarator.namedChildren[0];
-        for (const name of extractBindingNames(nameNode)) {
-            localNames.add(name);
-        }
-    }
-
-    for (const fn of bodyNode.descendantsOfType('function_declaration')) {
-        const localName = getNameText(fn.childForFieldName('name'));
-        if (localName) {
-            localNames.add(localName);
-        }
-    }
-
-    for (const cls of bodyNode.descendantsOfType('class_declaration')) {
-        const localName = getNameText(cls.childForFieldName('name'));
-        if (localName) {
-            localNames.add(localName);
-        }
-    }
-
-    for (const memberNode of bodyNode.descendantsOfType('member_expression')) {
-        if (!isOutermostMemberExpression(memberNode)) {
+    for (const reference of scanTreeSitterGhostReferences(executableNode)) {
+        if (reference.kind === 'self') {
+            const propertyName = reference.propertyName ?? reference.rootName;
+            const typeName = classPropertyTypes.get(propertyName) ?? 'unknown';
+            registerGhostState(ghostStates, reference.label, typeName, reference.mode);
             continue;
         }
 
-        const root = getTypeScriptMemberRoot(memberNode);
-        if (!root || !root.name || localNames.has(root.name) || BUILTIN_GHOST_GLOBALS.has(root.name)) {
-            continue;
-        }
-
-        if (root.kind === 'this') {
-            const typeName = classPropertyTypes.get(root.name) ?? 'unknown';
-            registerGhostState(ghostStates, `this.${root.name}`, typeName, getTreeSitterGhostAccessMode(memberNode));
-            continue;
-        }
-
-        const binding = ghostContext.importedBindings.get(root.name) ?? ghostContext.moduleBindings.get(root.name);
+        const binding = ghostContext.importedBindings.get(reference.rootName) ?? ghostContext.moduleBindings.get(reference.rootName);
         if (!binding) {
             continue;
         }
 
-        registerGhostState(ghostStates, root.name, binding.typeName, getTreeSitterGhostAccessMode(memberNode));
-    }
-
-    for (const identifierNode of bodyNode.descendantsOfType('identifier')) {
-        const localName = identifierNode.text;
-        if (!localName || localNames.has(localName) || BUILTIN_GHOST_GLOBALS.has(localName)) {
-            continue;
-        }
-
-        if (isTreeSitterDeclarationName(identifierNode) || isTreeSitterMemberPropertyName(identifierNode)) {
-            continue;
-        }
-
-        const parent = identifierNode.parent;
-        if (parent && parent.type === 'member_expression' && parent.namedChildren[0]?.id === identifierNode.id) {
-            continue;
-        }
-
-        const binding = ghostContext.importedBindings.get(localName) ?? ghostContext.moduleBindings.get(localName);
-        if (!binding) {
-            continue;
-        }
-
-        registerGhostState(ghostStates, localName, binding.typeName, getTreeSitterGhostAccessMode(identifierNode));
+        registerGhostState(ghostStates, reference.label, binding.typeName, reference.mode);
     }
 
     return Array.from(ghostStates.entries())
@@ -504,7 +415,7 @@ function registerGhostState(
     ghostStates: Map<string, { typeName: string; read: boolean; write: boolean }>,
     label: string,
     typeName: string,
-    mode: 'read' | 'write' | 'readwrite'
+    mode: TreeSitterGhostAccessMode
 ) {
     const current = ghostStates.get(label) ?? {
         typeName: normalizeTypeText(typeName || 'unknown'),
@@ -524,109 +435,6 @@ function registerGhostState(
     }
 
     ghostStates.set(label, current);
-}
-
-function getTreeSitterGhostAccessMode(node: Parser.SyntaxNode) {
-    const target = getTreeSitterAccessTarget(node);
-    const parent = target.parent;
-    if (!parent) {
-        return 'read' as const;
-    }
-
-    if (parent.type === 'assignment_expression' && parent.namedChildren[0]?.id === target.id) {
-        return 'write' as const;
-    }
-
-    if (parent.type === 'augmented_assignment_expression' && parent.namedChildren[0]?.id === target.id) {
-        return 'readwrite' as const;
-    }
-
-    if (parent.type === 'update_expression' && parent.namedChildren.some((child) => child.id === target.id)) {
-        return 'readwrite' as const;
-    }
-
-    return 'read' as const;
-}
-
-function getTreeSitterAccessTarget(node: Parser.SyntaxNode) {
-    let current = node;
-
-    while (current.parent) {
-        const parent = current.parent;
-        if (parent.type === 'member_expression' && parent.namedChildren[0]?.id === current.id) {
-            current = parent;
-            continue;
-        }
-
-        if (
-            parent.type === 'parenthesized_expression' ||
-            parent.type === 'as_expression' ||
-            parent.type === 'satisfies_expression' ||
-            parent.type === 'non_null_expression' ||
-            parent.type === 'type_assertion'
-        ) {
-            current = parent;
-            continue;
-        }
-
-        return current;
-    }
-
-    return current;
-}
-
-function getTypeScriptMemberRoot(node: Parser.SyntaxNode): TypeScriptMemberRoot | null {
-    let current: Parser.SyntaxNode | null = node;
-
-    while (current?.type === 'member_expression') {
-        const objectNode: Parser.SyntaxNode | null = current.namedChildren[0] ?? null;
-        if (!objectNode) {
-            return null;
-        }
-
-        if (objectNode.type === 'this') {
-            const propertyName = getNameText(current.namedChildren[1] ?? current.childForFieldName('property'));
-            return propertyName ? { kind: 'this', name: propertyName } : null;
-        }
-
-        if (objectNode.type === 'identifier') {
-            return { kind: 'identifier', name: objectNode.text };
-        }
-
-        current = objectNode;
-    }
-
-    return null;
-}
-
-function isOutermostMemberExpression(node: Parser.SyntaxNode) {
-    return !(node.parent && node.parent.type === 'member_expression' && node.parent.namedChildren[0]?.id === node.id);
-}
-
-function isTreeSitterDeclarationName(node: Parser.SyntaxNode) {
-    const parent = node.parent;
-    if (!parent || (node.type !== 'identifier' && node.type !== 'type_identifier')) {
-        return false;
-    }
-
-    return (
-        ((parent.type === 'variable_declarator' || parent.type === 'pair_pattern') && parent.namedChildren[0]?.id === node.id) ||
-        ((parent.type === 'required_parameter' || parent.type === 'optional_parameter' || parent.type === 'rest_pattern') &&
-            parent.namedChildren[0]?.id === node.id) ||
-        ((parent.type === 'function_declaration' ||
-            parent.type === 'method_definition' ||
-            parent.type === 'class_declaration' ||
-            parent.type === 'public_field_definition' ||
-            parent.type === 'enum_declaration') &&
-            parent.namedChildren[0]?.id === node.id) ||
-        ((parent.type === 'import_specifier' || parent.type === 'namespace_import' || parent.type === 'import_clause') &&
-            parent.namedChildren.includes(node))
-    );
-}
-
-function isTreeSitterMemberPropertyName(node: Parser.SyntaxNode) {
-    const parent = node.parent;
-    return !!parent && parent.type === 'member_expression' && parent.namedChildren[1]?.id === node.id;
 }
 
 function mergeDemandEntries(demand: string[], ghostDemand: string[]) {
