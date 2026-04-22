@@ -165,7 +165,7 @@ function collectLanguageNodes(
         case 'typescript':
             return collectTypeScriptNodes(rootNode, source, filePath, sourcePath, category, config, parsedFiles);
         case 'javascript':
-            return collectJavaScriptNodes(rootNode, source, filePath, sourcePath, category, config);
+            return collectJavaScriptNodes(rootNode, source, filePath, sourcePath, category, config, parsedFiles);
         case 'python':
             return collectPythonNodes(rootNode, sourcePath, category);
         case 'go':
@@ -883,30 +883,34 @@ function collectJavaScriptNodes(
     filePath: string,
     sourcePath: string,
     category: string,
-    config: TriadConfig
+    config: TriadConfig,
+    parsedFiles: ParsedSourceFile[]
 ) {
     const triadGraph: TriadNode[] = [];
     const moduleName = toPascalCase(path.basename(filePath).replace(/\.(jsx?|mjs|cjs)$/, ''));
+    const ghostContext = buildJavaScriptGhostContext(rootNode, filePath, parsedFiles);
 
-    for (const classNode of rootNode.namedChildren.filter((node) => node.type === 'class_declaration')) {
+    for (const classNode of rootNode.descendantsOfType('class_declaration')) {
         const className = getNameText(classNode.childForFieldName('name'));
         const classBody = classNode.childForFieldName('body');
         if (!className || !classBody) {
             continue;
         }
 
+        const classPropertyTypes = collectJavaScriptClassPropertyTypes(classNode, ghostContext);
         for (const methodNode of classBody.namedChildren.filter((node) => node.type === 'method_definition')) {
             const methodName = getNameText(methodNode.childForFieldName('name'));
             if (!methodName || methodName === 'constructor') {
                 continue;
             }
 
+            const ghostDemand = collectTypeScriptGhostDemand(methodNode, ghostContext, classPropertyTypes);
             triadGraph.push(
                 createTriadNode(
                     `${className}.${methodName}`,
                     category,
                     sourcePath,
-                    parseJsParameters(methodNode.childForFieldName('parameters')),
+                    mergeDemandEntries(parseJsParameters(methodNode.childForFieldName('parameters')), ghostDemand),
                     ['unknown']
                 )
             );
@@ -916,19 +920,20 @@ function collectJavaScriptNodes(
     const topLevelNodes = config.parser.includeUntaggedExports ? rootNode.namedChildren : rootNode.namedChildren.filter((node) => node.type === 'export_statement');
     for (const topLevelNode of topLevelNodes) {
         if (topLevelNode.type === 'export_statement') {
-            triadGraph.push(...collectJavaScriptExportNode(topLevelNode, moduleName, category, sourcePath));
+            triadGraph.push(...collectJavaScriptExportNode(topLevelNode, moduleName, category, sourcePath, ghostContext));
             continue;
         }
 
         if (topLevelNode.type === 'function_declaration') {
             const functionName = getNameText(topLevelNode.childForFieldName('name'));
             if (functionName) {
+                const ghostDemand = collectTypeScriptGhostDemand(topLevelNode, ghostContext);
                 triadGraph.push(
                     createTriadNode(
                         `${moduleName}.${functionName}`,
                         category,
                         sourcePath,
-                        parseJsParameters(topLevelNode.childForFieldName('parameters')),
+                        mergeDemandEntries(parseJsParameters(topLevelNode.childForFieldName('parameters')), ghostDemand),
                         ['unknown']
                     )
                 );
@@ -937,30 +942,186 @@ function collectJavaScriptNodes(
         }
 
         if (topLevelNode.type === 'lexical_declaration' || topLevelNode.type === 'variable_declaration') {
-            triadGraph.push(...collectJavaScriptVariableFunctions(topLevelNode, moduleName, category, sourcePath));
+            triadGraph.push(...collectJavaScriptVariableFunctions(topLevelNode, moduleName, category, sourcePath, ghostContext));
         }
     }
 
     return triadGraph;
 }
 
+function buildJavaScriptGhostContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
+    return {
+        importedBindings: collectJavaScriptImportedBindings(rootNode, filePath, parsedFiles),
+        moduleBindings: collectJavaScriptModuleBindings(rootNode)
+    };
+}
+
+function collectJavaScriptImportedBindings(
+    rootNode: Parser.SyntaxNode,
+    filePath: string,
+    parsedFiles: ParsedSourceFile[]
+) {
+    const bindings = new Map<string, TypeScriptBindingInfo>();
+
+    for (const importNode of rootNode.descendantsOfType('import_statement')) {
+        const modulePath = getImportModulePath(importNode);
+        const targetFile = resolveImportedParsedFile(filePath, modulePath, parsedFiles);
+
+        for (const importClause of importNode.namedChildren.filter((node) => node.type === 'import_clause')) {
+            for (const child of importClause.namedChildren) {
+                if (child.type === 'identifier') {
+                    const localName = child.text;
+                    bindings.set(localName, {
+                        typeName: resolveJavaScriptImportedBindingType(targetFile, 'default', localName)
+                    });
+                    continue;
+                }
+
+                if (child.type === 'named_imports') {
+                    for (const specifier of child.namedChildren.filter((node) => node.type === 'import_specifier')) {
+                        const identifiers = specifier.namedChildren.filter((node) => node.type === 'identifier');
+                        const importedName = identifiers[0]?.text ?? '';
+                        const localName = identifiers[identifiers.length - 1]?.text ?? importedName;
+                        if (!localName) {
+                            continue;
+                        }
+
+                        bindings.set(localName, {
+                            typeName: resolveJavaScriptImportedBindingType(targetFile, importedName, localName)
+                        });
+                    }
+                    continue;
+                }
+
+                if (child.type === 'namespace_import') {
+                    const localName = getFirstNamedChildText(child, ['identifier']);
+                    if (localName) {
+                        bindings.set(localName, {
+                            typeName: 'module'
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    for (const requireCall of rootNode.descendantsOfType('call_expression')) {
+        if (requireCall.namedChildren[0]?.text !== 'require') {
+            continue;
+        }
+
+        const parent = requireCall.parent;
+        if (!parent || parent.type !== 'variable_declarator') {
+            continue;
+        }
+
+        const nameNode = parent.childForFieldName('name') ?? parent.namedChildren[0] ?? null;
+        const localNames = extractBindingNames(nameNode);
+        if (localNames.length === 0) {
+            continue;
+        }
+
+        const modulePath = requireCall.namedChildren.find((node) => node.type === 'arguments')?.namedChildren[0]?.text.replace(/^['"]|['"]$/g, '') ?? '';
+        const targetFile = resolveImportedParsedFile(filePath, modulePath, parsedFiles);
+        for (const localName of localNames) {
+            bindings.set(localName, {
+                typeName: resolveJavaScriptImportedBindingType(targetFile, localName, localName)
+            });
+        }
+    }
+
+    return bindings;
+}
+
+function collectJavaScriptModuleBindings(rootNode: Parser.SyntaxNode) {
+    const bindings = new Map<string, TypeScriptBindingInfo>();
+
+    for (const child of rootNode.namedChildren) {
+        const declarationNode = child.type === 'export_statement' ? child.namedChildren[0] : child;
+        if (!declarationNode) {
+            continue;
+        }
+
+        if (declarationNode.type === 'lexical_declaration' || declarationNode.type === 'variable_declaration') {
+            for (const declarator of declarationNode.namedChildren.filter((node) => node.type === 'variable_declarator')) {
+                const nameNode = declarator.childForFieldName('name') ?? declarator.namedChildren[0];
+                const localName = extractBindingNames(nameNode)[0];
+                if (!localName) {
+                    continue;
+                }
+
+                bindings.set(localName, {
+                    typeName: inferJavaScriptDeclaratorType(declarator, localName)
+                });
+            }
+            continue;
+        }
+
+        if (declarationNode.type === 'function_declaration') {
+            const localName = getNameText(declarationNode.childForFieldName('name'));
+            if (localName) {
+                bindings.set(localName, {
+                    typeName: localName
+                });
+            }
+            continue;
+        }
+
+        if (declarationNode.type === 'class_declaration') {
+            const localName = getNameText(declarationNode.childForFieldName('name'));
+            if (localName) {
+                bindings.set(localName, {
+                    typeName: localName
+                });
+            }
+        }
+    }
+
+    return bindings;
+}
+
+function collectJavaScriptClassPropertyTypes(
+    classNode: Parser.SyntaxNode,
+    ghostContext: TypeScriptGhostContext
+) {
+    const propertyTypes = new Map<string, string>();
+    const classBody = classNode.childForFieldName('body');
+    if (!classBody) {
+        return propertyTypes;
+    }
+
+    for (const child of classBody.namedChildren.filter((node) => node.type === 'field_definition' || node.type === 'public_field_definition')) {
+        const propertyName = getNameText(child.childForFieldName('name') ?? child.namedChildren[0]);
+        if (!propertyName) {
+            continue;
+        }
+
+        const valueNode = child.childForFieldName('value') ?? child.namedChildren[1] ?? null;
+        propertyTypes.set(propertyName, inferJavaScriptValueType(valueNode, propertyName, ghostContext));
+    }
+
+    return propertyTypes;
+}
+
 function collectJavaScriptExportNode(
     exportNode: Parser.SyntaxNode,
     moduleName: string,
     category: string,
-    sourcePath: string
+    sourcePath: string,
+    ghostContext: TypeScriptGhostContext
 ) {
     const triadGraph: TriadNode[] = [];
     const functionNode = exportNode.namedChildren.find((node) => node.type === 'function_declaration');
     if (functionNode) {
         const functionName = getNameText(functionNode.childForFieldName('name'));
         if (functionName) {
+            const ghostDemand = collectTypeScriptGhostDemand(functionNode, ghostContext);
             triadGraph.push(
                 createTriadNode(
                     `${moduleName}.${functionName}`,
                     category,
                     sourcePath,
-                    parseJsParameters(functionNode.childForFieldName('parameters')),
+                    mergeDemandEntries(parseJsParameters(functionNode.childForFieldName('parameters')), ghostDemand),
                     ['unknown']
                 )
             );
@@ -972,7 +1133,7 @@ function collectJavaScriptExportNode(
         (node) => node.type === 'lexical_declaration' || node.type === 'variable_declaration'
     );
     if (declarationNode) {
-        triadGraph.push(...collectJavaScriptVariableFunctions(declarationNode, moduleName, category, sourcePath));
+        triadGraph.push(...collectJavaScriptVariableFunctions(declarationNode, moduleName, category, sourcePath, ghostContext));
     }
 
     return triadGraph;
@@ -982,7 +1143,8 @@ function collectJavaScriptVariableFunctions(
     declarationNode: Parser.SyntaxNode,
     moduleName: string,
     category: string,
-    sourcePath: string
+    sourcePath: string,
+    ghostContext: TypeScriptGhostContext
 ) {
     const triadGraph: TriadNode[] = [];
 
@@ -999,18 +1161,80 @@ function collectJavaScriptVariableFunctions(
             continue;
         }
 
+        const ghostDemand = collectTypeScriptGhostDemand(valueNode, ghostContext);
         triadGraph.push(
             createTriadNode(
                 `${moduleName}.${functionName}`,
                 category,
                 sourcePath,
-                parseJsParameters(valueNode.childForFieldName('parameters')),
+                mergeDemandEntries(parseJsParameters(valueNode.childForFieldName('parameters')), ghostDemand),
                 ['unknown']
             )
         );
     }
 
     return triadGraph;
+}
+
+function resolveJavaScriptImportedBindingType(
+    targetFile: ParsedSourceFile | undefined,
+    importedName: string,
+    localName: string
+) {
+    if (!targetFile) {
+        return guessBindingTypeFromName(importedName || localName);
+    }
+
+    const exportedType = lookupJavaScriptExportedBindingType(targetFile.rootNode, importedName || localName);
+    return exportedType || guessBindingTypeFromName(importedName || localName);
+}
+
+function lookupJavaScriptExportedBindingType(rootNode: Parser.SyntaxNode, bindingName: string) {
+    for (const child of rootNode.namedChildren.filter((node) => node.type === 'export_statement')) {
+        const declarationNode = child.namedChildren[0];
+        if (!declarationNode) {
+            continue;
+        }
+
+        if (declarationNode.type === 'class_declaration') {
+            const name = getNameText(declarationNode.childForFieldName('name'));
+            if (name === bindingName || bindingName === 'default') {
+                return name || bindingName;
+            }
+        }
+
+        if (declarationNode.type === 'function_declaration') {
+            const name = getNameText(declarationNode.childForFieldName('name'));
+            if (name === bindingName || bindingName === 'default') {
+                return name || bindingName;
+            }
+        }
+
+        if (declarationNode.type === 'lexical_declaration' || declarationNode.type === 'variable_declaration') {
+            for (const declarator of declarationNode.namedChildren.filter((node) => node.type === 'variable_declarator')) {
+                const nameNode = declarator.childForFieldName('name') ?? declarator.namedChildren[0];
+                const localName = extractBindingNames(nameNode)[0];
+                if (localName === bindingName || bindingName === 'default') {
+                    return inferJavaScriptDeclaratorType(declarator, localName || bindingName);
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+function inferJavaScriptDeclaratorType(declarator: Parser.SyntaxNode, fallbackName: string) {
+    const valueNode = declarator.childForFieldName('value') ?? declarator.namedChildren[1] ?? null;
+    return inferJavaScriptValueType(valueNode, fallbackName);
+}
+
+function inferJavaScriptValueType(
+    valueNode: Parser.SyntaxNode | null,
+    fallbackName: string,
+    ghostContext?: TypeScriptGhostContext
+) {
+    return inferTypeScriptValueType(valueNode, fallbackName, ghostContext);
 }
 
 function collectPythonNodes(rootNode: Parser.SyntaxNode, sourcePath: string, category: string) {
