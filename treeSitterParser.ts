@@ -139,9 +139,9 @@ function collectLanguageNodes(
         case 'python':
             return collectPythonNodes(rootNode, filePath, sourcePath, category, parsedFiles);
         case 'go':
-            return collectGoNodes(rootNode, sourcePath, category);
+            return collectGoNodes(rootNode, filePath, sourcePath, category, parsedFiles);
         case 'rust':
-            return collectRustNodes(rootNode, filePath, sourcePath, category);
+            return collectRustNodes(rootNode, filePath, sourcePath, category, parsedFiles);
         case 'cpp':
             return collectCppNodes(rootNode, filePath, sourcePath, category);
         case 'java':
@@ -1467,9 +1467,214 @@ function inferPythonValueType(
     return guessBindingTypeFromName(fallbackName);
 }
 
-function collectGoNodes(rootNode: Parser.SyntaxNode, sourcePath: string, category: string) {
+function buildGoGhostContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
+    return {
+        importedBindings: collectGoImportedBindings(rootNode, filePath, parsedFiles),
+        moduleBindings: collectGoModuleBindings(rootNode)
+    };
+}
+
+function collectGoImportedBindings(
+    rootNode: Parser.SyntaxNode,
+    _filePath: string,
+    _parsedFiles: ParsedSourceFile[]
+) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const importDeclaration of rootNode.descendantsOfType('import_declaration')) {
+        for (const importSpec of importDeclaration.descendantsOfType('import_spec')) {
+            const aliasNode = importSpec.namedChildren.find((node) => node.type === 'package_identifier');
+            const moduleNode = importSpec.namedChildren.find(
+                (node) => node.type === 'interpreted_string_literal' || node.type === 'raw_string_literal'
+            );
+            const modulePath = stripQuotedLiteral(moduleNode?.text ?? '');
+            const localName = aliasNode?.text || modulePath.split('/').pop() || '';
+            if (!localName || localName === '_' || localName === '.') {
+                continue;
+            }
+
+            bindings.set(localName, {
+                typeName: 'module'
+            });
+        }
+    }
+
+    return bindings;
+}
+
+function collectGoModuleBindings(rootNode: Parser.SyntaxNode) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const child of rootNode.namedChildren) {
+        if (child.type === 'function_declaration') {
+            const localName = getNameText(child.childForFieldName('name'));
+            if (localName) {
+                bindings.set(localName, { typeName: localName });
+            }
+            continue;
+        }
+
+        if (child.type === 'type_declaration') {
+            for (const typeSpec of child.namedChildren.filter((node) => node.type === 'type_spec')) {
+                const localName = getNameText(typeSpec.namedChildren.find((node) => node.type === 'type_identifier') ?? null);
+                if (localName) {
+                    bindings.set(localName, { typeName: localName });
+                }
+            }
+            continue;
+        }
+
+        if (child.type !== 'var_declaration' && child.type !== 'const_declaration') {
+            continue;
+        }
+
+        for (const specNode of child.namedChildren.filter((node) => node.type === 'var_spec' || node.type === 'const_spec')) {
+            const nameNodes = specNode.namedChildren.filter((node) => node.type === 'identifier');
+            if (nameNodes.length === 0) {
+                continue;
+            }
+
+            const typeName = inferGoBindingType(specNode, nameNodes[0]?.text ?? 'unknown');
+            for (const nameNode of nameNodes) {
+                bindings.set(nameNode.text, { typeName });
+            }
+        }
+    }
+
+    return bindings;
+}
+
+function collectGoStructPropertyTypes(rootNode: Parser.SyntaxNode, receiverType: string) {
+    const propertyTypes = new Map<string, string>();
+    if (!receiverType) {
+        return propertyTypes;
+    }
+
+    for (const typeDeclaration of rootNode.namedChildren.filter((node) => node.type === 'type_declaration')) {
+        for (const typeSpec of typeDeclaration.namedChildren.filter((node) => node.type === 'type_spec')) {
+            const typeName = getNameText(typeSpec.namedChildren.find((node) => node.type === 'type_identifier') ?? null);
+            if (typeName !== receiverType) {
+                continue;
+            }
+
+            const structNode = typeSpec.namedChildren.find((node) => node.type === 'struct_type');
+            const fieldList = structNode?.namedChildren.find((node) => node.type === 'field_declaration_list') ?? null;
+            if (!fieldList) {
+                continue;
+            }
+
+            for (const fieldNode of fieldList.namedChildren.filter((node) => node.type === 'field_declaration')) {
+                const fieldNames = fieldNode.namedChildren.filter((node) => node.type === 'field_identifier');
+                const typeNode = [...fieldNode.namedChildren]
+                    .reverse()
+                    .find((node) => node.type !== 'field_identifier');
+                const typeNameText = normalizeTypeText(typeNode?.text ?? 'unknown');
+                for (const fieldName of fieldNames) {
+                    propertyTypes.set(fieldName.text, typeNameText);
+                }
+            }
+        }
+    }
+
+    return propertyTypes;
+}
+
+function collectGoGhostDemand(
+    executableNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext,
+    classPropertyTypes = new Map<string, string>(),
+    receiverBindingName = ''
+) {
+    const ghostStates = new Map<string, { typeName: string; read: boolean; write: boolean }>();
+    const selfNames = receiverBindingName ? [receiverBindingName] : [];
+
+    for (const reference of scanTreeSitterGhostReferences(executableNode, {
+        localDeclarationNodes: ['short_var_declaration', 'var_spec', 'const_spec', 'range_clause'],
+        memberExpressionNodes: ['selector_expression'],
+        functionBodyNodes: ['block'],
+        selfNames
+    })) {
+        if (reference.kind === 'self') {
+            const propertyName = reference.propertyName ?? reference.rootName;
+            const typeName = classPropertyTypes.get(propertyName) ?? 'unknown';
+            registerGhostState(ghostStates, reference.label, typeName, reference.mode);
+            continue;
+        }
+
+        const binding = ghostContext.importedBindings.get(reference.rootName) ?? ghostContext.moduleBindings.get(reference.rootName);
+        if (!binding) {
+            continue;
+        }
+
+        registerGhostState(ghostStates, reference.label, binding.typeName, reference.mode);
+    }
+
+    return Array.from(ghostStates.entries())
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, state]) => {
+            if (state.read && state.write) {
+                return `[Ghost:ReadWrite] ${state.typeName} (${label})`;
+            }
+            if (state.write) {
+                return `[Ghost:Write] ${state.typeName} (${label})`;
+            }
+            return `[Ghost:Read] ${state.typeName} (${label})`;
+        });
+}
+
+function inferGoBindingType(specNode: Parser.SyntaxNode, fallbackName: string) {
+    const namedChildren = specNode.namedChildren;
+    const explicitTypeNode = namedChildren.find(
+        (node) =>
+            node.type !== 'identifier' &&
+            node.type !== 'expression_list' &&
+            node.type !== 'interpreted_string_literal' &&
+            node.type !== 'raw_string_literal'
+    );
+    if (explicitTypeNode) {
+        return normalizeTypeText(explicitTypeNode.text);
+    }
+
+    const expressionList = namedChildren.find((node) => node.type === 'expression_list') ?? null;
+    const valueNode = expressionList?.namedChildren[0] ?? null;
+    if (!valueNode) {
+        return guessBindingTypeFromName(fallbackName);
+    }
+
+    if (valueNode.type === 'composite_literal') {
+        return normalizeTypeText(valueNode.namedChildren[0]?.text ?? fallbackName);
+    }
+
+    if (valueNode.type === 'call_expression') {
+        return guessBindingTypeFromName(getNameText(valueNode.namedChildren[0] ?? null) || fallbackName);
+    }
+
+    if (valueNode.type === 'identifier') {
+        return guessBindingTypeFromName(valueNode.text);
+    }
+
+    return guessBindingTypeFromName(fallbackName);
+}
+
+function extractGoReceiverBindingName(receiverNode: Parser.SyntaxNode | null) {
+    if (!receiverNode) {
+        return '';
+    }
+
+    const match = receiverNode.text.replace(/[()]/g, '').trim().match(/^([A-Za-z_]\w*)\b/);
+    return match?.[1] ?? '';
+}
+
+function collectGoNodes(
+    rootNode: Parser.SyntaxNode,
+    filePath: string,
+    sourcePath: string,
+    category: string,
+    parsedFiles: ParsedSourceFile[]
+) {
     const triadGraph: TriadNode[] = [];
     const moduleName = toPascalCase(path.basename(sourcePath).replace(/\.go$/, ''));
+    const ghostContext = buildGoGhostContext(rootNode, filePath, parsedFiles);
 
     for (const node of rootNode.namedChildren) {
         if (node.type === 'method_declaration') {
@@ -1480,12 +1685,15 @@ function collectGoNodes(rootNode: Parser.SyntaxNode, sourcePath: string, categor
                 continue;
             }
 
+            const receiverBindingName = extractGoReceiverBindingName(receiver);
+            const classPropertyTypes = collectGoStructPropertyTypes(rootNode, receiverType);
+            const ghostDemand = collectGoGhostDemand(node, ghostContext, classPropertyTypes, receiverBindingName);
             triadGraph.push(
                 createTriadNode(
                     `${receiverType}.${methodName}`,
                     category,
                     sourcePath,
-                    parseGoParametersAst(node.childForFieldName('parameters')),
+                    mergeDemandEntries(parseGoParametersAst(node.childForFieldName('parameters')), ghostDemand),
                     [extractGoReturnType(node)]
                 )
             );
@@ -1498,12 +1706,13 @@ function collectGoNodes(rootNode: Parser.SyntaxNode, sourcePath: string, categor
                 continue;
             }
 
+            const ghostDemand = collectGoGhostDemand(node, ghostContext);
             triadGraph.push(
                 createTriadNode(
                     `${moduleName}.${functionName}`,
                     category,
                     sourcePath,
-                    parseGoParametersAst(node.childForFieldName('parameters')),
+                    mergeDemandEntries(parseGoParametersAst(node.childForFieldName('parameters')), ghostDemand),
                     [extractGoReturnType(node)]
                 )
             );
@@ -1513,9 +1722,191 @@ function collectGoNodes(rootNode: Parser.SyntaxNode, sourcePath: string, categor
     return triadGraph;
 }
 
-function collectRustNodes(rootNode: Parser.SyntaxNode, filePath: string, sourcePath: string, category: string) {
+function buildRustGhostContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
+    return {
+        importedBindings: collectRustImportedBindings(rootNode, filePath, parsedFiles),
+        moduleBindings: collectRustModuleBindings(rootNode)
+    };
+}
+
+function collectRustImportedBindings(
+    rootNode: Parser.SyntaxNode,
+    _filePath: string,
+    _parsedFiles: ParsedSourceFile[]
+) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const useDeclaration of rootNode.descendantsOfType('use_declaration')) {
+        for (const binding of collectRustUseBindings(useDeclaration)) {
+            bindings.set(binding.localName, {
+                typeName: binding.typeName
+            });
+        }
+    }
+
+    return bindings;
+}
+
+function collectRustUseBindings(node: Parser.SyntaxNode): Array<{ localName: string; typeName: string }> {
+    if (node.type === 'use_as_clause') {
+        const aliasNode = node.namedChildren[node.namedChildren.length - 1] ?? null;
+        const importedNode = node.namedChildren[0] ?? null;
+        const localName = getNameText(aliasNode);
+        const importedName = getNameText(importedNode);
+        if (!localName) {
+            return [];
+        }
+
+        return [{ localName, typeName: guessBindingTypeFromName(importedName || localName) }];
+    }
+
+    if (node.type === 'scoped_use_list') {
+        const useListNode = node.namedChildren.find((child) => child.type === 'use_list') ?? null;
+        return useListNode ? useListNode.namedChildren.flatMap((child) => collectRustUseBindings(child)) : [];
+    }
+
+    if (node.type === 'use_list') {
+        return node.namedChildren.flatMap((child) => collectRustUseBindings(child));
+    }
+
+    if (node.type === 'scoped_identifier') {
+        if (node.parent?.type === 'use_as_clause') {
+            return [];
+        }
+
+        const localName = getNameText(node);
+        return localName ? [{ localName, typeName: guessBindingTypeFromName(localName) }] : [];
+    }
+
+    if (node.type === 'identifier' && (node.parent?.type === 'use_declaration' || node.parent?.type === 'use_list')) {
+        return [{ localName: node.text, typeName: guessBindingTypeFromName(node.text) }];
+    }
+
+    return node.namedChildren.flatMap((child) => collectRustUseBindings(child));
+}
+
+function collectRustModuleBindings(rootNode: Parser.SyntaxNode) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const child of rootNode.namedChildren) {
+        if (child.type === 'function_item') {
+            const localName = getNameText(child.childForFieldName('name'));
+            if (localName) {
+                bindings.set(localName, { typeName: localName });
+            }
+            continue;
+        }
+
+        if (child.type === 'struct_item' || child.type === 'enum_item' || child.type === 'trait_item' || child.type === 'type_item') {
+            const localName = getFirstNamedChildText(child, ['type_identifier']);
+            if (localName) {
+                bindings.set(localName, { typeName: localName });
+            }
+            continue;
+        }
+
+        if (child.type !== 'static_item' && child.type !== 'const_item') {
+            continue;
+        }
+
+        const localName = getNameText(child.childForFieldName('name') ?? child.namedChildren.find((node) => node.type === 'identifier') ?? null);
+        if (!localName) {
+            continue;
+        }
+
+        const explicitType = child.childForFieldName('type') ?? child.namedChildren.find((node) => node.type.endsWith('_type')) ?? null;
+        bindings.set(localName, {
+            typeName: normalizeTypeText(explicitType?.text ?? guessBindingTypeFromName(localName))
+        });
+    }
+
+    return bindings;
+}
+
+function collectRustStructPropertyTypes(rootNode: Parser.SyntaxNode, implType: string) {
+    const propertyTypes = new Map<string, string>();
+    if (!implType) {
+        return propertyTypes;
+    }
+
+    for (const structNode of rootNode.namedChildren.filter((node) => node.type === 'struct_item')) {
+        const typeName = getFirstNamedChildText(structNode, ['type_identifier']);
+        if (typeName !== implType) {
+            continue;
+        }
+
+        const fieldList = structNode.namedChildren.find((node) => node.type === 'field_declaration_list') ?? null;
+        if (!fieldList) {
+            continue;
+        }
+
+        for (const fieldNode of fieldList.namedChildren.filter((node) => node.type === 'field_declaration')) {
+            const fieldName = getNameText(fieldNode.namedChildren.find((node) => node.type === 'field_identifier') ?? null);
+            const typeNode = [...fieldNode.namedChildren]
+                .reverse()
+                .find((node) => node.type !== 'field_identifier');
+            if (!fieldName) {
+                continue;
+            }
+
+            propertyTypes.set(fieldName, normalizeTypeText(typeNode?.text ?? 'unknown'));
+        }
+    }
+
+    return propertyTypes;
+}
+
+function collectRustGhostDemand(
+    executableNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext,
+    classPropertyTypes = new Map<string, string>()
+) {
+    const ghostStates = new Map<string, { typeName: string; read: boolean; write: boolean }>();
+
+    for (const reference of scanTreeSitterGhostReferences(executableNode, {
+        localDeclarationNodes: ['let_declaration'],
+        memberExpressionNodes: ['field_expression'],
+        functionBodyNodes: ['block'],
+        selfNames: ['self']
+    })) {
+        if (reference.kind === 'self') {
+            const propertyName = reference.propertyName ?? reference.rootName;
+            const typeName = classPropertyTypes.get(propertyName) ?? 'unknown';
+            registerGhostState(ghostStates, reference.label, typeName, reference.mode);
+            continue;
+        }
+
+        const binding = ghostContext.importedBindings.get(reference.rootName) ?? ghostContext.moduleBindings.get(reference.rootName);
+        if (!binding) {
+            continue;
+        }
+
+        registerGhostState(ghostStates, reference.label, binding.typeName, reference.mode);
+    }
+
+    return Array.from(ghostStates.entries())
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, state]) => {
+            if (state.read && state.write) {
+                return `[Ghost:ReadWrite] ${state.typeName} (${label})`;
+            }
+            if (state.write) {
+                return `[Ghost:Write] ${state.typeName} (${label})`;
+            }
+            return `[Ghost:Read] ${state.typeName} (${label})`;
+        });
+}
+
+function collectRustNodes(
+    rootNode: Parser.SyntaxNode,
+    filePath: string,
+    sourcePath: string,
+    category: string,
+    parsedFiles: ParsedSourceFile[]
+) {
     const triadGraph: TriadNode[] = [];
     const moduleName = toPascalCase(path.basename(filePath).replace(/\.rs$/, ''));
+    const ghostContext = buildRustGhostContext(rootNode, filePath, parsedFiles);
 
     for (const node of rootNode.namedChildren) {
         if (node.type === 'impl_item') {
@@ -1525,18 +1916,20 @@ function collectRustNodes(rootNode: Parser.SyntaxNode, filePath: string, sourceP
                 continue;
             }
 
+            const classPropertyTypes = collectRustStructPropertyTypes(rootNode, implType);
             for (const functionNode of declarationList.namedChildren.filter((child) => child.type === 'function_item')) {
                 const functionName = getNameText(functionNode.childForFieldName('name'));
                 if (!functionName) {
                     continue;
                 }
 
+                const ghostDemand = collectRustGhostDemand(functionNode, ghostContext, classPropertyTypes);
                 triadGraph.push(
                     createTriadNode(
                         `${implType}.${functionName}`,
                         category,
                         sourcePath,
-                        parseRustParametersAst(functionNode.childForFieldName('parameters')),
+                        mergeDemandEntries(parseRustParametersAst(functionNode.childForFieldName('parameters')), ghostDemand),
                         [extractRustReturnType(functionNode)]
                     )
                 );
@@ -1550,12 +1943,13 @@ function collectRustNodes(rootNode: Parser.SyntaxNode, filePath: string, sourceP
                 continue;
             }
 
+            const ghostDemand = collectRustGhostDemand(node, ghostContext);
             triadGraph.push(
                 createTriadNode(
                     `${moduleName}.${functionName}`,
                     category,
                     sourcePath,
-                    parseRustParametersAst(node.childForFieldName('parameters')),
+                    mergeDemandEntries(parseRustParametersAst(node.childForFieldName('parameters')), ghostDemand),
                     [extractRustReturnType(node)]
                 )
             );
@@ -1895,6 +2289,10 @@ function extractGoReceiverType(receiverNode: Parser.SyntaxNode | null) {
     const receiverText = receiverNode.text.replace(/[()]/g, '').trim();
     const match = receiverText.match(/(?:[A-Za-z_]\w*\s+)?\*?([A-Za-z_]\w*)$/);
     return match?.[1] ?? '';
+}
+
+function stripQuotedLiteral(value: string) {
+    return value.replace(/^['"`]|['"`]$/g, '');
 }
 
 function createTriadNode(nodeId: string, category: string, sourcePath: string, demand: string[], answer: string[]): TriadNode {

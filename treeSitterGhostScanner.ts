@@ -381,6 +381,7 @@ function mergeAccessMode(
 function isAssignmentNode(node: Parser.SyntaxNode) {
     return (
         node.type === 'assignment_expression' ||
+        node.type === 'compound_assignment_expr' ||
         node.type === 'augmented_assignment_expression' ||
         node.type === 'augmented_assignment' ||
         node.type === 'assignment_statement' ||
@@ -391,6 +392,10 @@ function isAssignmentNode(node: Parser.SyntaxNode) {
 function isExpressionWrapper(node: Parser.SyntaxNode) {
     return (
         node.type === 'parenthesized_expression' ||
+        node.type === 'expression_statement' ||
+        node.type === 'expression_list' ||
+        node.type === 'index_expression' ||
+        node.type === 'subscript' ||
         node.type === 'as_expression' ||
         node.type === 'satisfies_expression' ||
         node.type === 'non_null_expression' ||
