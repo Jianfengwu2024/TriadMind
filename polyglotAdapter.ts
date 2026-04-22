@@ -1,6 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { loadTriadConfig, resolveCategoryFromConfig, shouldExcludeSourcePath, TriadConfig, TriadLanguage } from './config';
+import {
+    createSourcePathFilter,
+    describeSourceScanScope,
+    loadTriadConfig,
+    resolveCategoryFromConfig,
+    TriadConfig,
+    TriadLanguage
+} from './config';
 import { buildTopologyIR, TriadTopologyIR } from './ir';
 import { LanguageAdapter } from './languageAdapter';
 import {
@@ -134,10 +141,18 @@ function runPolyglotParser(language: PolyglotLanguage, projectRoot: string, outp
     const descriptor = DESCRIPTORS[language];
     const nodes: TriadNodeDefinition[] = [];
     const targetOutput = outputPath ?? paths.mapFile;
+    const includeSourcePath = createSourcePathFilter(projectRoot, config);
+    const scanScope = describeSourceScanScope(projectRoot, config);
+
+    if (scanScope.mode === 'scoped') {
+        console.log(`   - [Polyglot] scan scope: ${scanScope.patterns.join(', ')}`);
+    } else {
+        console.log('   - [Polyglot] frontend/backend feature roots not found; falling back to all source files.');
+    }
 
     walkProject(projectRoot, (absolutePath) => {
         const sourcePath = normalizePath(path.relative(projectRoot, absolutePath));
-        if (!descriptor.filePatterns.test(absolutePath) || shouldExcludeSourcePath(sourcePath, config)) {
+        if (!descriptor.filePatterns.test(absolutePath) || !includeSourcePath(sourcePath)) {
             return;
         }
 

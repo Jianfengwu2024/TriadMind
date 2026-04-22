@@ -9,7 +9,13 @@ import TypeScript = require('tree-sitter-typescript');
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
-import { TriadConfig, TriadLanguage, resolveCategoryFromConfig, shouldExcludeSourcePath } from './config';
+import {
+    createSourcePathFilter,
+    describeSourceScanScope,
+    TriadConfig,
+    TriadLanguage,
+    resolveCategoryFromConfig
+} from './config';
 import { scanTreeSitterGhostReferences, TreeSitterGhostAccessMode } from './treeSitterGhostScanner';
 import { normalizePath } from './workspace';
 
@@ -2562,9 +2568,18 @@ function collectJavaNodes(
 
 function collectSourceFiles(language: TriadLanguage, targetDir: string, config: TriadConfig) {
     const files: string[] = [];
+    const includeSourcePath = createSourcePathFilter(targetDir, config);
+    const scanScope = describeSourceScanScope(targetDir, config);
+
+    if (scanScope.mode === 'scoped') {
+        console.log(chalk.gray(`   - [TreeSitter] 扫描作用域：${scanScope.patterns.join(', ')}`));
+    } else {
+        console.log(chalk.gray('   - [TreeSitter] 未发现前后端功能目录，回退到全项目源码扫描。'));
+    }
+
     walk(targetDir, (filePath) => {
         const relativePath = path.relative(targetDir, filePath);
-        if (shouldExcludeSourcePath(relativePath, config)) {
+        if (!includeSourcePath(relativePath)) {
             return;
         }
 

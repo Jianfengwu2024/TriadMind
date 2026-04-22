@@ -61,6 +61,20 @@
     }
   },
   {
+    "nodeId": "Analyzer.calculateProducerConsumerEdges",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute calculateProducerConsumerEdges flow",
+      "demand": [
+        "any[] (map)"
+      ],
+      "answer": [
+        "RemovedEdge[]"
+      ]
+    }
+  },
+  {
     "nodeId": "Analyzer.detectCycles",
     "category": "core",
     "sourcePath": "analyzer.ts",
@@ -329,6 +343,37 @@
     }
   },
   {
+    "nodeId": "Config.createSourcePathFilter",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "execute createSourcePathFilter flow",
+      "demand": [
+        "string (projectRoot)",
+        "TriadConfig (config)",
+        "[Ghost:Read] shouldExcludeSourcePath (shouldExcludeSourcePath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Config.describeSourceScanScope",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "execute describeSourceScanScope flow",
+      "demand": [
+        "string (projectRoot)",
+        "TriadConfig (config)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
     "nodeId": "Config.ensureTriadConfig",
     "category": "core",
     "sourcePath": "config.ts",
@@ -388,6 +433,7 @@
       "demand": [
         "string (sourcePath)",
         "TriadConfig (config)",
+        "[Ghost:Read] isHardExcludedSourcePath (isHardExcludedSourcePath)",
         "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [

@@ -177,6 +177,21 @@ export function detectTopologicalDrift(oldMap: any[], newMap: any[]): DriftRepor
 /**
  * @LeftBranch
  */
+export function calculateProducerConsumerEdges(map: any[]): RemovedEdge[] {
+    const graph = buildTopologyGraph(map);
+    return graph.edges
+        .slice()
+        .sort(
+            (left, right) =>
+                left.from.localeCompare(right.from) ||
+                left.to.localeCompare(right.to) ||
+                left.contract.localeCompare(right.contract)
+        );
+}
+
+/**
+ * @LeftBranch
+ */
 export function normalizeSubgraph(subgraph: any[]): any[] {
     const nodes = toUniqueTriadNodes(subgraph);
     if (nodes.length <= 1) {

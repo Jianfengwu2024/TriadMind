@@ -8,21 +8,43 @@
   "categories": {
     "frontend": [
       "src/frontend",
-      "frontend"
+      "frontend",
+      "src/client",
+      "client",
+      "src/web",
+      "web",
+      "src/app",
+      "app",
+      "apps/frontend",
+      "packages/frontend"
     ],
     "backend": [
       "src/backend",
-      "backend"
+      "backend",
+      "src/server",
+      "server",
+      "src/api",
+      "api",
+      "apps/backend",
+      "packages/backend"
     ],
     "core": [
       "src/core",
-      "core"
+      "core",
+      "src/shared",
+      "shared",
+      "src/lib",
+      "lib"
     ]
   },
   "parser": {
     "excludePatterns": [
       "node_modules",
       ".triadmind"
+    ],
+    "scanCategories": [
+      "frontend",
+      "backend"
     ],
     "includeUntaggedExports": true,
     "jsDocTags": {

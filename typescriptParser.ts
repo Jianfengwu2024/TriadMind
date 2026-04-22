@@ -11,7 +11,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { getWorkspacePaths, normalizePath } from './workspace';
-import { loadTriadConfig, resolveCategoryFromConfig, shouldExcludeSourcePath, TriadConfig } from './config';
+import {
+    createSourcePathFilter,
+    describeSourceScanScope,
+    loadTriadConfig,
+    resolveCategoryFromConfig,
+    TriadConfig
+} from './config';
 
 interface TriadNode {
     nodeId: string;
@@ -74,6 +80,8 @@ export function runTypeScriptParser(targetDir: string, outputPath?: string): voi
     fs.mkdirSync(triadDir, { recursive: true });
     const workspacePaths = getWorkspacePaths(targetDir);
     const config = loadTriadConfig(workspacePaths);
+    const includeSourcePath = createSourcePathFilter(targetDir, config);
+    const scanScope = describeSourceScanScope(targetDir, config);
 
     const resolvedOutputPath = outputPath ?? path.join(triadDir, 'triad-map.json');
 
@@ -88,8 +96,14 @@ export function runTypeScriptParser(targetDir: string, outputPath?: string): voi
             (file) =>
                 !file.getFilePath().endsWith('.d.ts') &&
                 !file.getBaseName().endsWith('types.ts') &&
-                !shouldExcludeSourcePath(path.relative(targetDir, file.getFilePath()), config)
+                includeSourcePath(path.relative(targetDir, file.getFilePath()))
         );
+
+    if (scanScope.mode === 'scoped') {
+        console.log(chalk.gray(`   - [Parser] 扫描作用域：${scanScope.patterns.join(', ')}`));
+    } else {
+        console.log(chalk.gray('   - [Parser] 未发现前后端功能目录，回退到全项目源码扫描。'));
+    }
 
     for (const sourceFile of sourceFiles) {
         const filePath = sourceFile.getFilePath();

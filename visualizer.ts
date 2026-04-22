@@ -2,6 +2,7 @@
 import * as fs from 'fs';
 import { readJsonFile, UpgradeProtocol } from './protocol';
 import {
+    calculateProducerConsumerEdges,
     generateMayaFeatureHash,
     generateMayaSequence,
     mapTopologyToYoungPartition,
@@ -9,7 +10,7 @@ import {
 } from './analyzer';
 
 type NodeStatus = 'existing' | 'new' | 'modified' | 'reused' | 'protocol' | 'left_branch' | 'right_branch' | 'macro';
-type EdgeType = 'create_child' | 'reuse' | 'modify' | 'protocol_target' | 'triad_left' | 'triad_right' | 'renormalize_absorb' | 'renormalize_contract';
+type EdgeType = 'create_child' | 'reuse' | 'modify' | 'protocol_target' | 'triad_left' | 'triad_right' | 'renormalize_absorb' | 'renormalize_contract' | 'producer_consumer';
 type TriadNodeKind = 'vertex' | 'left_branch' | 'right_branch' | 'protocol' | 'macro';
 
 interface TriadMapNode {
@@ -125,6 +126,7 @@ function readRenormalizeProtocol(mapPath: string, outputPath: string) {
 function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProtocol, renormalizeProtocol?: RenormalizeProtocol) {
     const nodeMap = new Map<string, KnowledgeNode>();
     const edges: KnowledgeEdge[] = [];
+    const previewMap = buildPreviewTopology(originalMap, protocol);
 
     nodeMap.set('__protocol__', {
         id: '__protocol__', label: 'Upgrade Protocol', status: 'protocol', kind: 'protocol', category: 'protocol',
@@ -174,6 +176,23 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
         if ((action.new_demand ?? []).length > 0 || (action.new_answer ?? []).length > 0) {
             addUniqueEdge(edges, { from: '__protocol__', to: action.macro_node_id, type: 'renormalize_contract', label: 'renormalize', title: `${action.macro_node_id} exposes external contract boundary`, highlighted: false });
         }
+    });
+
+    calculateProducerConsumerEdges(previewMap).forEach((edge) => {
+        const fromNode = nodeMap.get(edge.from);
+        const toNode = nodeMap.get(edge.to);
+        if (!fromNode || !toNode) return;
+        if (fromNode.kind !== 'vertex' && fromNode.kind !== 'macro') return;
+        if (toNode.kind !== 'vertex' && toNode.kind !== 'macro') return;
+
+        addUniqueEdge(edges, {
+            from: edge.from,
+            to: edge.to,
+            type: 'producer_consumer',
+            label: '',
+            title: `${edge.from} supplies ${edge.contract} to ${edge.to}`,
+            highlighted: fromNode.status === 'new' || fromNode.status === 'modified' || toNode.status === 'new' || toNode.status === 'modified'
+        });
     });
 
     const nodes = Array.from(nodeMap.values()).map((node) => ({ ...node, degree: edges.filter((edge) => edge.from === node.id || edge.to === node.id).length }));
@@ -382,6 +401,7 @@ ${buildScript(visNodes, visEdges, graph.legend, mayaData)}
 function edgeStyle(edge: KnowledgeEdge) {
     if (edge.type === 'triad_left') return { color: '#22c55e', highlight: '#86efac', width: edge.highlighted ? 3 : 1.7, opacity: 0.68, dashes: false };
     if (edge.type === 'triad_right') return { color: '#c084fc', highlight: '#e9d5ff', width: edge.highlighted ? 3 : 1.7, opacity: 0.68, dashes: [4, 3] };
+    if (edge.type === 'producer_consumer') return { color: '#fbbf24', highlight: '#fde68a', width: edge.highlighted ? 2.8 : 1.8, opacity: edge.highlighted ? 0.82 : 0.5, dashes: [9, 4] };
     if (edge.type === 'create_child') return { color: '#38bdf8', highlight: '#7dd3fc', width: 5, opacity: 0.95, dashes: false };
     if (edge.type === 'protocol_target') return { color: '#a78bfa', highlight: '#ddd6fe', width: 3, opacity: 0.75, dashes: [8, 5] };
     if (edge.type === 'modify') return { color: '#fb923c', highlight: '#fdba74', width: 3, opacity: 0.8, dashes: false };

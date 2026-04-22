@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { resolveAdapter } from './adapter';
-import { loadTriadConfig, shouldExcludeSourcePath } from './config';
+import { createSourcePathFilter, loadTriadConfig } from './config';
 import { normalizePath, WorkspacePaths } from './workspace';
 
 interface SourceFileDigest {
@@ -73,7 +73,8 @@ export function watchTriadMap(paths: WorkspacePaths) {
 
         const relativePath = normalizePath(String(filename));
         const config = loadTriadConfig(paths);
-        if (shouldExcludeSourcePath(relativePath, config)) {
+        const includeSourcePath = createSourcePathFilter(paths.projectRoot, config);
+        if (!includeSourcePath(relativePath)) {
             return;
         }
 
@@ -104,10 +105,11 @@ function buildManifest(paths: WorkspacePaths): SyncManifest {
 
 function collectSourceFiles(paths: WorkspacePaths) {
     const config = loadTriadConfig(paths);
+    const includeSourcePath = createSourcePathFilter(paths.projectRoot, config);
     const files: string[] = [];
     walk(paths.projectRoot, (filePath) => {
         const relativePath = normalizePath(path.relative(paths.projectRoot, filePath));
-        if (shouldExcludeSourcePath(relativePath, config)) {
+        if (!includeSourcePath(relativePath)) {
             return;
         }
 

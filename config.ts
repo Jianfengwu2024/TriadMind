@@ -16,6 +16,7 @@ export interface TriadConfig {
     categories: Record<TriadCategory, string[]>;
     parser: {
         excludePatterns: string[];
+        scanCategories: TriadCategory[];
         includeUntaggedExports: boolean;
         jsDocTags: {
             triadNode: string;
@@ -43,12 +44,13 @@ const DEFAULT_CONFIG: TriadConfig = {
         adapter: '@triadmind/plugin-ts'
     },
     categories: {
-        frontend: ['src/frontend', 'frontend'],
-        backend: ['src/backend', 'backend'],
-        core: ['src/core', 'core']
+        frontend: ['src/frontend', 'frontend', 'src/client', 'client', 'src/web', 'web', 'src/app', 'app', 'apps/frontend', 'packages/frontend'],
+        backend: ['src/backend', 'backend', 'src/server', 'server', 'src/api', 'api', 'apps/backend', 'packages/backend'],
+        core: ['src/core', 'core', 'src/shared', 'shared', 'src/lib', 'lib']
     },
     parser: {
         excludePatterns: ['node_modules', '.triadmind'],
+        scanCategories: ['frontend', 'backend'],
         includeUntaggedExports: true,
         jsDocTags: {
             triadNode: 'TriadNode',
@@ -87,6 +89,26 @@ const LANGUAGE_PARSER_ENGINE: Record<TriadLanguage, TriadParserEngine> = {
     cpp: 'tree-sitter',
     java: 'tree-sitter'
 };
+
+const HARD_EXCLUDE_SEGMENTS = new Set([
+    'db',
+    'database',
+    'databases',
+    'prisma',
+    'migration',
+    'migrations',
+    'test',
+    'tests',
+    '__tests__',
+    'spec',
+    'specs',
+    'script',
+    'scripts',
+    'env',
+    'vendor'
+]);
+
+const HARD_EXCLUDE_BASENAME_PATTERNS = [/^\.env(\..+)?$/i];
 
 export function ensureTriadConfig(paths: WorkspacePaths, force = false) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
@@ -129,9 +151,40 @@ export function resolveCategoryFromConfig(sourcePath: string, config: TriadConfi
 
 export function shouldExcludeSourcePath(sourcePath: string, config: TriadConfig) {
     const normalizedPath = normalizePath(sourcePath).toLowerCase();
+    if (isHardExcludedSourcePath(normalizedPath)) {
+        return true;
+    }
+
     return (config.parser.excludePatterns ?? []).some((pattern) =>
         normalizedPath.includes(normalizePath(pattern).toLowerCase())
     );
+}
+
+export function createSourcePathFilter(projectRoot: string, config: TriadConfig) {
+    const activePatterns = resolveActiveScanPatterns(projectRoot, config);
+
+    return (sourcePath: string) => {
+        if (shouldExcludeSourcePath(sourcePath, config)) {
+            return false;
+        }
+
+        if (activePatterns.length === 0) {
+            return true;
+        }
+
+        const normalizedPath = normalizeScopePath(sourcePath);
+        return activePatterns.some(
+            (pattern) => normalizedPath === pattern || normalizedPath.startsWith(`${pattern}/`)
+        );
+    };
+}
+
+export function describeSourceScanScope(projectRoot: string, config: TriadConfig) {
+    const activePatterns = resolveActiveScanPatterns(projectRoot, config);
+    return {
+        mode: activePatterns.length > 0 ? 'scoped' : 'fallback_all',
+        patterns: activePatterns
+    };
 }
 
 function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
@@ -149,12 +202,13 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             adapter: value.architecture?.adapter ?? LANGUAGE_ADAPTER_PACKAGE[language]
         },
         categories: {
-            frontend: value.categories?.frontend ?? DEFAULT_CONFIG.categories.frontend,
-            backend: value.categories?.backend ?? DEFAULT_CONFIG.categories.backend,
-            core: value.categories?.core ?? DEFAULT_CONFIG.categories.core
+            frontend: mergeCategoryPatterns(value.categories?.frontend, DEFAULT_CONFIG.categories.frontend),
+            backend: mergeCategoryPatterns(value.categories?.backend, DEFAULT_CONFIG.categories.backend),
+            core: mergeCategoryPatterns(value.categories?.core, DEFAULT_CONFIG.categories.core)
         },
         parser: {
             excludePatterns: value.parser?.excludePatterns ?? DEFAULT_CONFIG.parser.excludePatterns,
+            scanCategories: normalizeScanCategories(value.parser?.scanCategories),
             includeUntaggedExports:
                 value.parser?.includeUntaggedExports ?? DEFAULT_CONFIG.parser.includeUntaggedExports,
             jsDocTags: {
@@ -187,6 +241,54 @@ function buildDefaultConfig(language: TriadLanguage): TriadConfig {
             adapter: LANGUAGE_ADAPTER_PACKAGE[language]
         }
     };
+}
+
+function normalizeScanCategories(value: TriadCategory[] | undefined) {
+    if (!Array.isArray(value) || value.length === 0) {
+        return [...DEFAULT_CONFIG.parser.scanCategories];
+    }
+
+    const allowed = new Set<TriadCategory>(['frontend', 'backend', 'core']);
+    const normalized = value.filter((entry): entry is TriadCategory => allowed.has(entry));
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : [...DEFAULT_CONFIG.parser.scanCategories];
+}
+
+function mergeCategoryPatterns(value: string[] | undefined, fallback: string[]) {
+    const items = Array.isArray(value) ? value : [];
+    return Array.from(new Set([...items, ...fallback].filter((item) => typeof item === 'string' && item.trim())));
+}
+
+function resolveActiveScanPatterns(projectRoot: string, config: TriadConfig) {
+    const scanCategories = normalizeScanCategories(config.parser.scanCategories);
+    const patterns = scanCategories.flatMap((category) => config.categories[category] ?? []);
+
+    return Array.from(
+        new Set(
+            patterns
+                .map((pattern) => normalizeScopePath(pattern))
+                .filter(Boolean)
+                .filter((pattern) => fs.existsSync(path.join(projectRoot, pattern)))
+        )
+    );
+}
+
+function normalizeScopePath(value: string) {
+    return normalizePath(value)
+        .replace(/^\.?\//, '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+}
+
+function isHardExcludedSourcePath(sourcePath: string) {
+    const normalizedPath = normalizeScopePath(sourcePath);
+    const segments = normalizedPath.split('/').filter(Boolean);
+
+    if (segments.some((segment) => HARD_EXCLUDE_SEGMENTS.has(segment))) {
+        return true;
+    }
+
+    const basename = segments[segments.length - 1] ?? '';
+    return HARD_EXCLUDE_BASENAME_PATTERNS.some((pattern) => pattern.test(basename));
 }
 
 function normalizeLanguage(
