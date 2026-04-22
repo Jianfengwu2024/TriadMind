@@ -62,6 +62,11 @@ type CanonicalNodeEntry = {
     structuralFingerprint: string;
 };
 
+export interface AnalyzerOptions {
+    ignoreGenericContracts?: boolean;
+    genericContractIgnoreList?: string[];
+}
+
 const NONE_TOKENS = new Set(['', 'none', 'void', 'null', 'undefined']);
 const GENERIC_CONTRACT_TOKENS = new Set([
     'str',
@@ -116,12 +121,17 @@ const MAX_CANONICAL_PERMUTATIONS = 4096;
 /**
  * @LeftBranch
  */
-export function calculateBlastRadius(map: any[], targetNodeId: string, isContractChange: boolean): string[] {
+export function calculateBlastRadius(
+    map: any[],
+    targetNodeId: string,
+    isContractChange: boolean,
+    options?: AnalyzerOptions
+): string[] {
     if (!isContractChange) {
         return [];
     }
 
-    const graph = buildTopologyGraph(map);
+    const graph = buildTopologyGraph(map, options);
     if (!graph.adjacency.has(targetNodeId)) {
         return [];
     }
@@ -155,20 +165,20 @@ export function calculateBlastRadius(map: any[], targetNodeId: string, isContrac
 /**
  * @LeftBranch
  */
-export function detectCycles(map: any[]): string[][] {
-    const graph = buildTopologyGraph(map);
+export function detectCycles(map: any[], options?: AnalyzerOptions): string[][] {
+    const graph = buildTopologyGraph(map, options);
     return getCycles(graph);
 }
 
 /**
  * @LeftBranch
  */
-export function generateRenormalizeProtocol(map: any[], cycles: string[][]): RenormalizeProtocol {
-    const graph = buildTopologyGraph(map);
+export function generateRenormalizeProtocol(map: any[], cycles: string[][], options?: AnalyzerOptions): RenormalizeProtocol {
+    const graph = buildTopologyGraph(map, options);
     const nodeMap = buildNodeMap(map);
     const actions = cycles
         .filter((cycle) => cycle.length > 0)
-        .map((cycle) => buildRenormalizeAction(cycle, graph, nodeMap));
+        .map((cycle) => buildRenormalizeAction(cycle, graph, nodeMap, options));
 
     const summary =
         actions.length > 0
@@ -189,12 +199,12 @@ export function generateRenormalizeProtocol(map: any[], cycles: string[][]): Ren
 /**
  * @LeftBranch
  */
-export function detectTopologicalDrift(oldMap: any[], newMap: any[]): DriftReport {
-    const oldGraph = buildTopologyGraph(oldMap);
-    const newGraph = buildTopologyGraph(newMap);
+export function detectTopologicalDrift(oldMap: any[], newMap: any[], options?: AnalyzerOptions): DriftReport {
+    const oldGraph = buildTopologyGraph(oldMap, options);
+    const newGraph = buildTopologyGraph(newMap, options);
 
     const oldCycleSignatures = new Set(getCycleSignatures(oldGraph));
-    const newCycles = detectCycles(newMap).filter((cycle) => !oldCycleSignatures.has(toCycleSignature(cycle)));
+    const newCycles = detectCycles(newMap, options).filter((cycle) => !oldCycleSignatures.has(toCycleSignature(cycle)));
 
     const brokenContracts = detectBrokenContracts(oldGraph, newGraph);
     const removedEdges = detectRemovedEdges(oldGraph, newGraph);
@@ -225,8 +235,8 @@ export function detectTopologicalDrift(oldMap: any[], newMap: any[]): DriftRepor
 /**
  * @LeftBranch
  */
-export function calculateProducerConsumerEdges(map: any[]): RemovedEdge[] {
-    const graph = buildTopologyGraph(map);
+export function calculateProducerConsumerEdges(map: any[], options?: AnalyzerOptions): RemovedEdge[] {
+    const graph = buildTopologyGraph(map, options);
     return graph.edges
         .slice()
         .sort(
@@ -875,7 +885,7 @@ function tarjan(adjacency: Map<string, Set<string>>, nodeIds: string[]) {
     return components;
 }
 
-function buildTopologyGraph(map: any[]): TopologyGraph {
+function buildTopologyGraph(map: any[], options?: AnalyzerOptions): TopologyGraph {
     const nodeIds: string[] = [];
     const adjacency = new Map<string, Set<string>>();
     const edges: RemovedEdge[] = [];
@@ -895,11 +905,11 @@ function buildTopologyGraph(map: any[]): TopologyGraph {
         nodeIds.push(nodeId);
         adjacency.set(nodeId, new Set<string>());
 
-        for (const answerKey of getAnswerKeys(item)) {
+        for (const answerKey of getAnswerKeys(item, options)) {
             ensureSet(producersByContract, answerKey).add(nodeId);
         }
 
-        demandKeysByNode.set(nodeId, getDemandKeys(item));
+        demandKeysByNode.set(nodeId, getDemandKeys(item, options));
     }
 
     for (const nodeId of nodeIds) {
@@ -950,7 +960,8 @@ function buildNodeMap(map: any[]) {
 function buildRenormalizeAction(
     cycle: string[],
     graph: TopologyGraph,
-    nodeMap: Map<string, TriadMapNode>
+    nodeMap: Map<string, TriadMapNode>,
+    options?: AnalyzerOptions
 ): RenormalizeAction {
     const cycleNodeIds = cycle.slice().sort();
     const cycleNodeIdSet = new Set(cycleNodeIds);
@@ -969,7 +980,7 @@ function buildRenormalizeAction(
     }
 
     for (const nodeId of cycleNodeIds) {
-        const answerKeys = getAnswerKeys(nodeMap.get(nodeId) ?? {});
+        const answerKeys = getAnswerKeys(nodeMap.get(nodeId) ?? {}, options);
         for (const answerKey of answerKeys) {
             const consumers = getConsumersForContract(answerKey, graph);
             const hasExternalConsumer = consumers.some((consumerNodeId) => !cycleNodeIdSet.has(consumerNodeId));
@@ -1003,15 +1014,15 @@ function buildMacroNodeId(nodeIds: string[]) {
     return `MacroNode.${signature || 'Cycle'}`;
 }
 
-function getDemandKeys(node: TriadMapNode) {
+function getDemandKeys(node: TriadMapNode, options?: AnalyzerOptions) {
     return getFissionArray(node, 'demand')
-        .map((entry) => normalizeDemandContract(entry))
+        .map((entry) => normalizeDemandContract(entry, options))
         .filter((entry): entry is string => Boolean(entry));
 }
 
-function getAnswerKeys(node: TriadMapNode) {
+function getAnswerKeys(node: TriadMapNode, options?: AnalyzerOptions) {
     return getFissionArray(node, 'answer')
-        .map((entry) => normalizeAnswerContract(entry))
+        .map((entry) => normalizeAnswerContract(entry, options))
         .filter((entry): entry is string => Boolean(entry));
 }
 
@@ -1020,21 +1031,21 @@ function getFissionArray(node: TriadMapNode, key: 'demand' | 'answer') {
     return Array.isArray(value) ? value.map((entry) => String(entry ?? '').trim()) : [];
 }
 
-function normalizeDemandContract(entry: string) {
+function normalizeDemandContract(entry: string, options?: AnalyzerOptions) {
     if (!entry || /^\[ghost/i.test(entry)) {
         return null;
     }
 
     const match = entry.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
     const typeText = match ? match[1].trim() : entry.trim();
-    return normalizeContractKey(typeText);
+    return normalizeContractKey(typeText, options);
 }
 
-function normalizeAnswerContract(entry: string) {
-    return normalizeContractKey(entry);
+function normalizeAnswerContract(entry: string, options?: AnalyzerOptions) {
+    return normalizeContractKey(entry, options);
 }
 
-function normalizeContractKey(value: string) {
+function normalizeContractKey(value: string, options?: AnalyzerOptions) {
     const compact = value
         .trim()
         .replace(/^\[generic\]\s*/i, '')
@@ -1046,17 +1057,28 @@ function normalizeContractKey(value: string) {
         return null;
     }
 
-    if (isGenericContractKey(compact)) {
+    if (isGenericContractKey(compact, options)) {
         return null;
     }
 
     return compact;
 }
 
-function isGenericContractKey(value: string) {
+function isGenericContractKey(value: string, options?: AnalyzerOptions) {
+    if (options?.ignoreGenericContracts === false) {
+        return false;
+    }
+
     const compact = value.toLowerCase().replace(/\s+/g, '');
+    const customIgnoreSet = new Set(
+        (options?.genericContractIgnoreList ?? [])
+            .map((item) => String(item ?? '').toLowerCase().replace(/\s+/g, ''))
+            .filter(Boolean)
+    );
+
     return (
         GENERIC_CONTRACT_TOKENS.has(compact) ||
+        customIgnoreSet.has(compact) ||
         /^dict\[(str|string),(any|object)\]$/.test(compact) ||
         /^mapping\[(str|string),(any|object)\]$/.test(compact) ||
         /^record<(str|string),(any|unknown|object)>$/.test(compact) ||

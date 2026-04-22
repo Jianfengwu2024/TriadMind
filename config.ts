@@ -5,7 +5,7 @@ import { TriadCategory } from './protocol';
 
 export type TriadLanguage = 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'cpp' | 'java';
 export type TriadParserEngine = 'native' | 'tree-sitter';
-export type TriadScanMode = 'leaf' | 'capability' | 'domain';
+export type TriadScanMode = 'leaf' | 'capability' | 'module' | 'domain';
 
 export interface TriadConfig {
     schemaVersion: string;
@@ -17,15 +17,25 @@ export interface TriadConfig {
     categories: Record<TriadCategory, string[]>;
     parser: {
         excludePatterns: string[];
+        excludePathPatterns: string[];
         scanCategories: TriadCategory[];
         scanMode: TriadScanMode;
+        capabilityThreshold: number;
+        entryMethodNames: string[];
+        excludeNodeNamePatterns: string[];
         ignoreGenericContracts: boolean;
+        genericContractIgnoreList: string[];
         includeUntaggedExports: boolean;
         jsDocTags: {
             triadNode: string;
             leftBranch: string;
             rightBranch: string;
         };
+    };
+    visualizer: {
+        maxContractEdges: number;
+        fastMayaThreshold: number;
+        maxRenderNodes: number;
     };
     protocol: {
         minConfidence: number;
@@ -53,15 +63,57 @@ const DEFAULT_CONFIG: TriadConfig = {
     },
     parser: {
         excludePatterns: ['node_modules', '.triadmind'],
+        excludePathPatterns: [
+            'tests',
+            'test',
+            '__pycache__',
+            'node_modules',
+            'venv',
+            '.venv',
+            '.next',
+            'dist',
+            'build'
+        ],
         scanCategories: ['frontend', 'backend'],
-        scanMode: 'leaf',
+        scanMode: 'capability',
+        capabilityThreshold: 4,
+        entryMethodNames: ['execute', 'run', 'handle', 'process', 'dispatch', 'plan', 'apply', 'invoke', 'call'],
+        excludeNodeNamePatterns: [
+            '^test_',
+            '^_',
+            '^(get|set|build|parse|format|normalize|sanitize|validate)_'
+        ],
         ignoreGenericContracts: true,
+        genericContractIgnoreList: [
+            'str',
+            'string',
+            'int',
+            'number',
+            'bool',
+            'boolean',
+            'float',
+            'dict',
+            'object',
+            'list',
+            'array',
+            'any',
+            'unknown',
+            'void',
+            'none',
+            'dict[str,any]',
+            'optional[str]'
+        ],
         includeUntaggedExports: true,
         jsDocTags: {
             triadNode: 'TriadNode',
             leftBranch: 'LeftBranch',
             rightBranch: 'RightBranch'
         }
+    },
+    visualizer: {
+        maxContractEdges: 1200,
+        fastMayaThreshold: 10,
+        maxRenderNodes: 400
     },
     protocol: {
         minConfidence: 0.6,
@@ -107,13 +159,24 @@ const HARD_EXCLUDE_SEGMENTS = new Set([
     '__tests__',
     'spec',
     'specs',
+    '.next',
+    'venv',
+    '.venv',
+    '__pycache__',
+    '.pytest_cache',
     'script',
     'scripts',
     'env',
-    'vendor'
+    'vendor',
+    'logs',
+    'uploads',
+    'fastgpt_data',
+    'dist',
+    'build',
+    'target'
 ]);
 
-const HARD_EXCLUDE_BASENAME_PATTERNS = [/^\.env(\..+)?$/i];
+const HARD_EXCLUDE_BASENAME_PATTERNS = [/^\.env(\..+)?$/i, /^diagnostic\.data$/i];
 
 export function ensureTriadConfig(paths: WorkspacePaths, force = false) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
@@ -160,7 +223,8 @@ export function shouldExcludeSourcePath(sourcePath: string, config: TriadConfig)
         return true;
     }
 
-    return (config.parser.excludePatterns ?? []).some((pattern) =>
+    const configuredPatterns = [...(config.parser.excludePatterns ?? []), ...(config.parser.excludePathPatterns ?? [])];
+    return configuredPatterns.some((pattern) =>
         normalizedPath.includes(normalizePath(pattern).toLowerCase())
     );
 }
@@ -213,9 +277,23 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
         },
         parser: {
             excludePatterns: value.parser?.excludePatterns ?? DEFAULT_CONFIG.parser.excludePatterns,
+            excludePathPatterns: mergeStringList(
+                value.parser?.excludePathPatterns,
+                DEFAULT_CONFIG.parser.excludePathPatterns
+            ),
             scanCategories: normalizeScanCategories(value.parser?.scanCategories),
             scanMode: normalizeScanMode(value.parser?.scanMode),
+            capabilityThreshold: normalizePositiveInteger(
+                value.parser?.capabilityThreshold,
+                DEFAULT_CONFIG.parser.capabilityThreshold
+            ),
+            entryMethodNames: mergeStringList(value.parser?.entryMethodNames, DEFAULT_CONFIG.parser.entryMethodNames),
+            excludeNodeNamePatterns: mergeStringList(
+                value.parser?.excludeNodeNamePatterns,
+                DEFAULT_CONFIG.parser.excludeNodeNamePatterns
+            ),
             ignoreGenericContracts: value.parser?.ignoreGenericContracts ?? DEFAULT_CONFIG.parser.ignoreGenericContracts,
+            genericContractIgnoreList: mergeGenericContractIgnoreList(value.parser?.genericContractIgnoreList),
             includeUntaggedExports:
                 value.parser?.includeUntaggedExports ?? DEFAULT_CONFIG.parser.includeUntaggedExports,
             jsDocTags: {
@@ -223,6 +301,20 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
                 leftBranch: value.parser?.jsDocTags?.leftBranch ?? DEFAULT_CONFIG.parser.jsDocTags.leftBranch,
                 rightBranch: value.parser?.jsDocTags?.rightBranch ?? DEFAULT_CONFIG.parser.jsDocTags.rightBranch
             }
+        },
+        visualizer: {
+            maxContractEdges: normalizePositiveInteger(
+                value.visualizer?.maxContractEdges,
+                DEFAULT_CONFIG.visualizer.maxContractEdges
+            ),
+            fastMayaThreshold: normalizePositiveInteger(
+                value.visualizer?.fastMayaThreshold,
+                DEFAULT_CONFIG.visualizer.fastMayaThreshold
+            ),
+            maxRenderNodes: normalizePositiveInteger(
+                value.visualizer?.maxRenderNodes,
+                DEFAULT_CONFIG.visualizer.maxRenderNodes
+            )
         },
         protocol: {
             minConfidence: value.protocol?.minConfidence ?? DEFAULT_CONFIG.protocol.minConfidence,
@@ -261,11 +353,28 @@ function normalizeScanCategories(value: TriadCategory[] | undefined) {
 }
 
 function normalizeScanMode(value: TriadScanMode | undefined) {
-    if (value === 'capability' || value === 'domain' || value === 'leaf') {
+    if (value === 'capability' || value === 'module' || value === 'domain' || value === 'leaf') {
         return value;
     }
 
     return DEFAULT_CONFIG.parser.scanMode;
+}
+
+function mergeGenericContractIgnoreList(value: string[] | undefined) {
+    return mergeStringList(value, DEFAULT_CONFIG.parser.genericContractIgnoreList);
+}
+
+function mergeStringList(value: string[] | undefined, fallback: string[]) {
+    const items = Array.isArray(value) ? value : [];
+    return Array.from(new Set([...items, ...fallback].filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim())));
+}
+
+function normalizePositiveInteger(value: number | undefined, fallback: number) {
+    if (Number.isFinite(value) && (value as number) > 0) {
+        return Math.floor(value as number);
+    }
+
+    return fallback;
 }
 
 function mergeCategoryPatterns(value: string[] | undefined, fallback: string[]) {
@@ -386,7 +495,7 @@ function detectProjectLanguage(projectRoot: string): TriadLanguage {
 
     walkProject(projectRoot, (filePath) => {
         const normalized = normalizePath(path.relative(projectRoot, filePath)).toLowerCase();
-        if (normalized.includes('node_modules') || normalized.includes('.triadmind') || normalized.includes('.git')) {
+        if (shouldSkipWalkPath(normalized)) {
             return;
         }
 
@@ -424,13 +533,59 @@ function walkProject(currentPath: string, visit: (filePath: string) => void) {
         return;
     }
 
-    const stat = fs.statSync(currentPath);
+    let stat: fs.Stats;
+    try {
+        stat = fs.statSync(currentPath);
+    } catch (error: any) {
+        if (isIgnorableFsError(error)) {
+            return;
+        }
+        throw error;
+    }
     if (stat.isFile()) {
-        visit(currentPath);
+        try {
+            visit(currentPath);
+        } catch (error: any) {
+            if (isIgnorableFsError(error)) {
+                return;
+            }
+            throw error;
+        }
         return;
     }
 
-    for (const entry of fs.readdirSync(currentPath)) {
+    if (shouldSkipWalkPath(path.basename(currentPath))) {
+        return;
+    }
+
+    let entries: string[];
+    try {
+        entries = fs.readdirSync(currentPath);
+    } catch (error: any) {
+        if (isIgnorableFsError(error)) {
+            return;
+        }
+        throw error;
+    }
+
+    for (const entry of entries) {
         walkProject(path.join(currentPath, entry), visit);
     }
+}
+
+export function shouldSkipWalkPath(value: string) {
+    const normalized = normalizeScopePath(value);
+    const segments = normalized.split('/').filter(Boolean);
+    const basename = segments[segments.length - 1] ?? normalized;
+    return (
+        segments.some((segment) => HARD_EXCLUDE_SEGMENTS.has(segment)) ||
+        basename === '.git' ||
+        basename === '.triadmind' ||
+        HARD_EXCLUDE_BASENAME_PATTERNS.some((pattern) => pattern.test(basename))
+    );
+}
+
+export function isIgnorableFsError(error: any) {
+    const code = String(error?.code ?? '').toUpperCase();
+    return code === 'EACCES' || code === 'EPERM' || code === 'ENOENT';
 }

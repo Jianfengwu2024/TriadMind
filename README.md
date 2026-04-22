@@ -247,3 +247,118 @@ TriadMind Core 现在的正确理解不是：
 ```text
 @triadmind converge
 ```
+
+---
+
+## 2026-04 RHEOS Hardening
+
+基于 `RHEOS` 项目的实测，TriadMind 现在新增了以下默认保护：
+
+- 扫描容错内置化：递归扫描默认跳过 `node_modules`、`.next`、`venv`、`.venv`、`__pycache__`、`.pytest_cache`、`logs`、`uploads`、`fastgpt_data`，并对 `EACCES` / `EPERM` / `ENOENT` 直接 `skip`。
+- 默认能力粒度：`parser.scanMode` 默认改为 `capability`，并补充支持 `module`。
+- 通用类型降噪：新增 `parser.genericContractIgnoreList`，默认忽略 `str`、`string`、`int`、`bool`、`dict`、`any`、`Dict[str,Any]`、`Optional[str]` 这类低语义契约边。
+- 可视化性能保护：新增 `visualizer.maxContractEdges`、`visualizer.fastMayaThreshold`、`visualizer.maxRenderNodes`，用于大图快速模式、契约边限流和 Maya fallback。
+- 配置先于扫描：`.triadmind/config.json` 的排除和降噪配置，现在会在语言探测、manifest 构建、parser walk、polyglot walk 中统一生效。
+
+推荐配置：
+
+```json
+{
+  "parser": {
+    "scanMode": "capability",
+    "ignoreGenericContracts": true,
+    "genericContractIgnoreList": [
+      "str",
+      "string",
+      "int",
+      "bool",
+      "boolean",
+      "dict",
+      "any",
+      "Dict[str,Any]",
+      "Optional[str]"
+    ]
+  },
+  "visualizer": {
+    "maxContractEdges": 1200,
+    "fastMayaThreshold": 10,
+    "maxRenderNodes": 400
+  }
+}
+```
+
+---
+
+## Capability Node Standard
+
+TriadMind now treats a capability node as:
+
+- a functional unit the system can call, evolve, test, monitor, retry, or replace
+- not a raw function node, not a pure type node, and not a generic container class
+
+Default scan policy:
+
+- default mode is `capability`
+- `leaf` is for local debugging only
+- `module` is a real file/module aggregation view
+- `domain` is a real bounded-context aggregation view
+
+Default promotion signals:
+
+- external entrypoints such as API handlers, CLI commands, RPC/message consumers
+- service / workflow / handler / controller / adapter / tool style containers
+- primary methods such as `execute`, `run`, `handle`, `process`, `dispatch`, `plan`, `apply`, `invoke`, `call`
+- candidates with meaningful non-generic contracts
+- candidates with observable ghost/external dependency access
+
+Default suppression signals:
+
+- helper-style names matched by `parser.excludeNodeNamePatterns`
+- tests and private helpers
+- pure generic contracts like `str`, `int`, `dict`, `Any`, `Optional[str]`
+
+The default configuration now exposes:
+
+```json
+{
+  "parser": {
+    "scanMode": "capability",
+    "capabilityThreshold": 4,
+    "entryMethodNames": [
+      "execute",
+      "run",
+      "handle",
+      "process",
+      "dispatch",
+      "plan",
+      "apply",
+      "invoke",
+      "call"
+    ],
+    "excludeNodeNamePatterns": [
+      "^test_",
+      "^_",
+      "^(get|set|build|parse|format|normalize|sanitize|validate)_"
+    ],
+    "excludePathPatterns": [
+      "tests",
+      "test",
+      "__pycache__",
+      "node_modules",
+      "venv",
+      ".venv",
+      ".next",
+      "dist",
+      "build"
+    ]
+  }
+}
+```
+
+Aggregation behavior:
+
+- `capability`: emits concrete capability nodes
+- `module`: first extracts capability nodes, then folds them into `Module.*` nodes by source file/module boundary
+- `domain`: first extracts capability nodes, then folds them into `Domain.*` nodes by category root + first bounded-context segment
+
+For very flat repositories with most code at project root, `domain` may intentionally collapse into a small number of high-level domains.

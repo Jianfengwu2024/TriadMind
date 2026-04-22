@@ -1,13 +1,17 @@
 ﻿
 import * as fs from 'fs';
+import * as path from 'path';
 import { readJsonFile, UpgradeProtocol } from './protocol';
 import {
+    AnalyzerOptions,
     calculateProducerConsumerEdges,
     generateMayaFeatureHash,
     generateMayaSequence,
     mapTopologyToYoungPartition,
     normalizeSubgraph
 } from './analyzer';
+import { loadTriadConfig } from './config';
+import { getWorkspacePaths } from './workspace';
 
 type NodeStatus = 'existing' | 'new' | 'modified' | 'reused' | 'protocol' | 'left_branch' | 'right_branch' | 'macro';
 type EdgeType = 'create_child' | 'reuse' | 'modify' | 'protocol_target' | 'triad_left' | 'triad_right' | 'renormalize_absorb' | 'renormalize_contract' | 'producer_consumer';
@@ -50,6 +54,16 @@ interface MayaPanelData {
     project: MayaFingerprint;
     byOwner: Record<string, MayaFingerprint>;
     byMacro: Record<string, MayaFingerprint>;
+    fastMode: boolean;
+}
+
+interface VisualizerOptions {
+    analyzer: AnalyzerOptions;
+    maxContractEdges: number;
+    fastMayaThreshold: number;
+    maxRenderNodes: number;
+    compressExistingBranches: boolean;
+    fastMode: boolean;
 }
 
 interface KnowledgeNode {
@@ -95,19 +109,20 @@ const COMMUNITY_COLORS: Record<string, string> = {
 };
 
 const MACRO_CLUSTER_PALETTE = ['#f43f5e', '#38bdf8', '#f59e0b', '#22c55e', '#a78bfa', '#14b8a6'];
-const VISUALIZER_STRICT_MAYA_LIMIT = 6;
-
 export function generateDashboard(mapPath: string, protocolPath: string, outputPath: string) {
     if (!fs.existsSync(mapPath) || !fs.existsSync(protocolPath)) {
         throw new Error(`Cannot find required TriadMind files. Map: ${mapPath}, Protocol: ${protocolPath}`);
     }
 
+    const projectRoot = resolveProjectRootFromMapPath(mapPath);
+    const config = loadTriadConfig(getWorkspacePaths(projectRoot));
     const originalMap = readJsonFile<TriadMapNode[]>(mapPath);
     const protocol = readJsonFile<UpgradeProtocol>(protocolPath);
     const renormalizeProtocol = readRenormalizeProtocol(mapPath, outputPath);
-    const graph = buildKnowledgeGraph(originalMap, protocol, renormalizeProtocol);
+    const options = buildVisualizerOptions(config, originalMap, protocol);
+    const graph = buildKnowledgeGraph(originalMap, protocol, renormalizeProtocol, options);
     const previewMap = buildPreviewTopology(originalMap, protocol);
-    const mayaData = buildMayaPanelData(previewMap, renormalizeProtocol);
+    const mayaData = buildMayaPanelData(previewMap, protocol, renormalizeProtocol, options);
     fs.writeFileSync(outputPath, buildHtml(graph, protocol, mayaData, renormalizeProtocol), 'utf-8');
 }
 
@@ -123,10 +138,16 @@ function readRenormalizeProtocol(mapPath: string, outputPath: string) {
     return undefined;
 }
 
-function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProtocol, renormalizeProtocol?: RenormalizeProtocol) {
+function buildKnowledgeGraph(
+    originalMap: TriadMapNode[],
+    protocol: UpgradeProtocol,
+    renormalizeProtocol: RenormalizeProtocol | undefined,
+    options: VisualizerOptions
+) {
     const nodeMap = new Map<string, KnowledgeNode>();
     const edges: KnowledgeEdge[] = [];
     const previewMap = buildPreviewTopology(originalMap, protocol);
+    const highlightedOwnerIds = collectHighlightedOwnerIds(protocol, renormalizeProtocol);
 
     nodeMap.set('__protocol__', {
         id: '__protocol__', label: 'Upgrade Protocol', status: 'protocol', kind: 'protocol', category: 'protocol',
@@ -135,29 +156,47 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
         branchTitle: 'Protocol vertex', absorbedNodes: [], rationale: protocol.userDemand ?? ''
     });
 
-    originalMap.forEach((node) => upsertTriadVertex(nodeMap, edges, node, 'existing'));
+    originalMap.forEach((node) =>
+        upsertTriadVertex(
+            nodeMap,
+            edges,
+            node,
+            'existing',
+            !options.compressExistingBranches || highlightedOwnerIds.has(node.nodeId)
+        )
+    );
 
     protocol.actions.forEach((action) => {
         if (action.op === 'reuse') {
-            const node = ensureNode(nodeMap, edges, { nodeId: action.nodeId, fission: { problem: action.reason ?? 'Reused by protocol', demand: [], answer: [] } });
+            const node = ensureNode(
+                nodeMap,
+                edges,
+                { nodeId: action.nodeId, fission: { problem: action.reason ?? 'Reused by protocol', demand: [], answer: [] } },
+                true
+            );
             node.status = node.status === 'existing' ? 'reused' : node.status;
             edges.push({ from: '__protocol__', to: action.nodeId, type: 'reuse', label: 'reuse', title: action.reason ?? 'reuse existing node', highlighted: false });
             return;
         }
         if (action.op === 'modify') {
-            const node = ensureNode(nodeMap, edges, { nodeId: action.nodeId, category: action.category, sourcePath: action.sourcePath, fission: action.fission });
+            const node = ensureNode(
+                nodeMap,
+                edges,
+                { nodeId: action.nodeId, category: action.category, sourcePath: action.sourcePath, fission: action.fission },
+                true
+            );
             node.status = 'modified';
             node.problem = action.fission.problem; node.demand = action.fission.demand; node.answer = action.fission.answer;
             edges.push({ from: '__protocol__', to: action.nodeId, type: 'modify', label: 'modify', title: action.reason ?? 'modify node contract', highlighted: false });
             (action.reuse ?? []).forEach((reuseTarget) => {
-                ensureNode(nodeMap, edges, { nodeId: reuseTarget });
+                ensureNode(nodeMap, edges, { nodeId: reuseTarget }, true);
                 edges.push({ from: action.nodeId, to: reuseTarget, type: 'reuse', label: 'reuse', title: `${action.nodeId} reuses ${reuseTarget}`, highlighted: false });
             });
             return;
         }
-        upsertTriadVertex(nodeMap, edges, action.node, 'new');
+        upsertTriadVertex(nodeMap, edges, action.node, 'new', true);
         edges.push({ from: '__protocol__', to: action.node.nodeId, type: 'protocol_target', label: 'new leaf', title: action.reason ?? 'new leaf node proposed by protocol', highlighted: true });
-        ensureNode(nodeMap, edges, { nodeId: action.parentNodeId });
+        ensureNode(nodeMap, edges, { nodeId: action.parentNodeId }, true);
         edges.push({ from: action.parentNodeId, to: action.node.nodeId, type: 'create_child', label: 'create_child', title: `${action.parentNodeId} -> ${action.node.nodeId}`, highlighted: true });
     });
 
@@ -170,7 +209,7 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
             branchTitle: 'Macro vertex: renormalized strongly connected component', absorbedNodes: action.absorbed_nodes ?? [], rationale: action.rationale ?? ''
         });
         (action.absorbed_nodes ?? []).forEach((nodeId) => {
-            ensureNode(nodeMap, edges, { nodeId });
+            ensureNode(nodeMap, edges, { nodeId }, true);
             addUniqueEdge(edges, { from: action.macro_node_id, to: nodeId, type: 'renormalize_absorb', label: 'absorbs', title: `${action.macro_node_id} absorbs ${nodeId}`, highlighted: true });
         });
         if ((action.new_demand ?? []).length > 0 || (action.new_answer ?? []).length > 0) {
@@ -178,22 +217,37 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
         }
     });
 
-    calculateProducerConsumerEdges(previewMap).forEach((edge) => {
-        const fromNode = nodeMap.get(edge.from);
-        const toNode = nodeMap.get(edge.to);
-        if (!fromNode || !toNode) return;
-        if (fromNode.kind !== 'vertex' && fromNode.kind !== 'macro') return;
-        if (toNode.kind !== 'vertex' && toNode.kind !== 'macro') return;
+    const contractEdges = calculateProducerConsumerEdges(previewMap, options.analyzer)
+        .reduce<KnowledgeEdge[]>((items, edge) => {
+            const fromNode = nodeMap.get(edge.from);
+            const toNode = nodeMap.get(edge.to);
+            if (!fromNode || !toNode) return items;
+            if (fromNode.kind !== 'vertex' && fromNode.kind !== 'macro') return items;
+            if (toNode.kind !== 'vertex' && toNode.kind !== 'macro') return items;
 
-        addUniqueEdge(edges, {
-            from: edge.from,
-            to: edge.to,
-            type: 'producer_consumer',
-            label: '',
-            title: `${edge.from} supplies ${edge.contract} to ${edge.to}`,
-            highlighted: fromNode.status === 'new' || fromNode.status === 'modified' || toNode.status === 'new' || toNode.status === 'modified'
-        });
-    });
+            items.push({
+                from: edge.from,
+                to: edge.to,
+                type: 'producer_consumer',
+                label: '',
+                title: `${edge.from} supplies ${edge.contract} to ${edge.to}`,
+                highlighted:
+                    fromNode.status === 'new' ||
+                    fromNode.status === 'modified' ||
+                    toNode.status === 'new' ||
+                    toNode.status === 'modified'
+            });
+            return items;
+        }, [])
+        .sort(
+            (left, right) =>
+                Number(right.highlighted) - Number(left.highlighted) ||
+                left.from.localeCompare(right.from) ||
+                left.to.localeCompare(right.to) ||
+                left.title.localeCompare(right.title)
+        );
+
+    contractEdges.slice(0, options.maxContractEdges).forEach((edge) => addUniqueEdge(edges, edge));
 
     const nodes = Array.from(nodeMap.values()).map((node) => ({ ...node, degree: edges.filter((edge) => edge.from === node.id || edge.to === node.id).length }));
     return {
@@ -208,7 +262,9 @@ function buildKnowledgeGraph(originalMap: TriadMapNode[], protocol: UpgradeProto
             branchNodes: nodes.filter((node) => node.kind === 'left_branch' || node.kind === 'right_branch').length,
             newNodes: nodes.filter((node) => node.status === 'new').length,
             modifiedNodes: nodes.filter((node) => node.status === 'modified').length,
-            reusedNodes: nodes.filter((node) => node.status === 'reused').length
+            reusedNodes: nodes.filter((node) => node.status === 'reused').length,
+            cappedContractEdges: Math.max(0, contractEdges.length - options.maxContractEdges),
+            branchCompression: options.compressExistingBranches
         }
     };
 }
@@ -223,22 +279,47 @@ function toKnowledgeNode(node: TriadMapNode, status: NodeStatus): KnowledgeNode 
     };
 }
 
-function ensureNode(nodeMap: Map<string, KnowledgeNode>, edges: KnowledgeEdge[], node: TriadMapNode) {
-    return nodeMap.get(node.nodeId) ?? upsertTriadVertex(nodeMap, edges, node, 'existing');
+function ensureNode(
+    nodeMap: Map<string, KnowledgeNode>,
+    edges: KnowledgeEdge[],
+    node: TriadMapNode,
+    includeBranches = true
+) {
+    return nodeMap.get(node.nodeId) ?? upsertTriadVertex(nodeMap, edges, node, 'existing', includeBranches);
 }
 
-function upsertTriadVertex(nodeMap: Map<string, KnowledgeNode>, edges: KnowledgeEdge[], node: TriadMapNode, status: NodeStatus) {
+function upsertTriadVertex(
+    nodeMap: Map<string, KnowledgeNode>,
+    edges: KnowledgeEdge[],
+    node: TriadMapNode,
+    status: NodeStatus,
+    includeBranches = true
+) {
     const vertex = toKnowledgeNode(node, status);
     const existing = nodeMap.get(vertex.id);
     if (existing) {
         if (status === 'new' || status === 'modified' || status === 'reused') existing.status = status;
         existing.category = vertex.category; existing.sourcePath = vertex.sourcePath; existing.problem = vertex.problem; existing.demand = vertex.demand; existing.answer = vertex.answer;
-        addTriadBranches(nodeMap, edges, existing);
+        syncTriadBranches(nodeMap, edges, existing, includeBranches);
         return existing;
     }
     nodeMap.set(vertex.id, vertex);
-    addTriadBranches(nodeMap, edges, vertex);
+    syncTriadBranches(nodeMap, edges, vertex, includeBranches);
     return vertex;
+}
+
+function syncTriadBranches(nodeMap: Map<string, KnowledgeNode>, edges: KnowledgeEdge[], vertex: KnowledgeNode, includeBranches: boolean) {
+    if (vertex.id === '__protocol__' || vertex.kind !== 'vertex') return;
+
+    const leftId = `${vertex.id}::__left`;
+    const rightId = `${vertex.id}::__right`;
+    if (!includeBranches) {
+        nodeMap.delete(leftId);
+        nodeMap.delete(rightId);
+        return;
+    }
+
+    addTriadBranches(nodeMap, edges, vertex);
 }
 
 function addTriadBranches(nodeMap: Map<string, KnowledgeNode>, edges: KnowledgeEdge[], vertex: KnowledgeNode) {
@@ -342,6 +423,13 @@ function buildHtml(
         `modified: ${graph.stats.modifiedNodes}`,
         `reused: ${graph.stats.reusedNodes}`
     ].join(' · ');
+    const performanceSummary = [
+        graph.stats.branchCompression ? 'fast-render: compressed branch nodes' : '',
+        graph.stats.cappedContractEdges > 0 ? `contract edges capped: +${graph.stats.cappedContractEdges} hidden` : '',
+        mayaData.fastMode ? 'maya: fast fallback enabled' : ''
+    ]
+        .filter(Boolean)
+        .join(' · ');
 
     const renormalizeSummary = (renormalizeProtocol?.summary ?? []).length
         ? (renormalizeProtocol?.summary ?? []).map((item) => `<div class="status-row">${escapeHtml(item)}</div>`).join('')
@@ -360,7 +448,7 @@ ${buildStyles()}
 <body>
 <div id="graph"></div>
 <aside id="sidebar">
-  <section id="hero"><div class="eyebrow">TriadMind Knowledge Graph</div><h1>拓扑升级知识图谱</h1><p>${escapeHtml(protocol.userDemand ?? 'No user demand provided')}</p><div class="stats">${graph.stats.nodes} nodes · ${graph.stats.edges} edges · ${statusSummary}</div></section>
+  <section id="hero"><div class="eyebrow">TriadMind Knowledge Graph</div><h1>拓扑升级知识图谱</h1><p>${escapeHtml(protocol.userDemand ?? 'No user demand provided')}</p><div class="stats">${graph.stats.nodes} nodes · ${graph.stats.edges} edges · ${statusSummary}</div>${performanceSummary ? `<div class="stats">${escapeHtml(performanceSummary)}</div>` : ''}</section>
   <section id="search-wrap"><input id="search" type="text" placeholder="Search nodes..." autocomplete="off"><div id="search-results"></div></section>
   <section id="status-legend">
     <h3>Status</h3>
@@ -484,24 +572,34 @@ function buildPreviewTopology(originalMap: TriadMapNode[], protocol: UpgradeProt
     return Array.from(preview.values());
 }
 
-function buildMayaPanelData(previewMap: TriadMapNode[], renormalizeProtocol?: RenormalizeProtocol): MayaPanelData {
+function buildMayaPanelData(
+    previewMap: TriadMapNode[],
+    protocol: UpgradeProtocol,
+    renormalizeProtocol: RenormalizeProtocol | undefined,
+    options: VisualizerOptions
+): MayaPanelData {
     const projectProjection = buildModuleProjection(previewMap);
     const project = createMayaFingerprint(
         'project::topology',
         'Whole project topology (module projection)',
         'project',
-        projectProjection
+        projectProjection,
+        options
     );
-    const { outgoing, incoming, nodeMap } = buildContractNeighborhood(previewMap);
+    const { outgoing, incoming, nodeMap } = buildContractNeighborhood(previewMap, options.analyzer);
     const byOwner: Record<string, MayaFingerprint> = {};
+    const focusOwnerIds = collectHighlightedOwnerIds(protocol, renormalizeProtocol);
+    const ownerIds =
+        options.fastMode && focusOwnerIds.size > 0
+            ? Array.from(focusOwnerIds).filter((nodeId) => nodeMap.has(nodeId))
+            : previewMap.map((node) => node.nodeId);
 
-    previewMap.forEach((node) => {
-        const ownerId = node.nodeId;
+    ownerIds.forEach((ownerId) => {
         const neighborIds = new Set<string>([ownerId, ...(outgoing.get(ownerId) ?? []), ...(incoming.get(ownerId) ?? [])]);
         const fragment = Array.from(neighborIds)
             .map((nodeId) => nodeMap.get(nodeId))
             .filter((item): item is TriadMapNode => Boolean(item));
-        byOwner[ownerId] = createMayaFingerprint(`feature::${ownerId}`, ownerId, 'feature', fragment);
+        byOwner[ownerId] = createMayaFingerprint(`feature::${ownerId}`, ownerId, 'feature', fragment, options);
     });
 
     const byMacro: Record<string, MayaFingerprint> = {};
@@ -513,19 +611,26 @@ function buildMayaPanelData(previewMap: TriadMapNode[], renormalizeProtocol?: Re
             `macro::${action.macro_node_id}`,
             `${action.macro_node_id} macro cluster`,
             'macro',
-            fragment
+            fragment,
+            options
         );
     });
 
-    return { project, byOwner, byMacro };
+    return { project, byOwner, byMacro, fastMode: options.fastMode };
 }
 
-function createMayaFingerprint(key: string, title: string, scope: 'project' | 'feature' | 'macro', nodes: TriadMapNode[]): MayaFingerprint {
+function createMayaFingerprint(
+    key: string,
+    title: string,
+    scope: 'project' | 'feature' | 'macro',
+    nodes: TriadMapNode[],
+    options: VisualizerOptions
+): MayaFingerprint {
     let normalized: TriadMapNode[];
     let partition: number[];
 
     try {
-        if (nodes.length > VISUALIZER_STRICT_MAYA_LIMIT) {
+        if (nodes.length > options.fastMayaThreshold) {
             throw new Error('Use stable fallback for larger visualizer fragments');
         }
         normalized = normalizeSubgraph(nodes) as TriadMapNode[];
@@ -535,7 +640,7 @@ function createMayaFingerprint(key: string, title: string, scope: 'project' | 'f
             .slice()
             .sort((left, right) => left.nodeId.localeCompare(right.nodeId))
             .map((node) => cloneNode(node));
-        partition = buildFallbackPartition(normalized);
+        partition = buildFallbackPartition(normalized, options.analyzer);
     }
 
     const sequence = generateMayaSequence(partition);
@@ -552,11 +657,11 @@ function createMayaFingerprint(key: string, title: string, scope: 'project' | 'f
     };
 }
 
-function buildFallbackPartition(nodes: TriadMapNode[]) {
+function buildFallbackPartition(nodes: TriadMapNode[], analyzerOptions: AnalyzerOptions) {
     return nodes
         .map((node) => {
-            const demandCount = (node.fission?.demand ?? []).filter((entry) => normalizeContractKey(entry, true)).length;
-            const answerCount = (node.fission?.answer ?? []).filter((entry) => normalizeContractKey(entry, false)).length;
+            const demandCount = (node.fission?.demand ?? []).filter((entry) => normalizeContractKey(entry, true, analyzerOptions)).length;
+            const answerCount = (node.fission?.answer ?? []).filter((entry) => normalizeContractKey(entry, false, analyzerOptions)).length;
             return 1 + demandCount + answerCount;
         })
         .filter((value) => value > 0)
@@ -596,7 +701,7 @@ function renderMayaStripMarkup(sequence: number[]) {
     return `<div class="maya-strip">${cells}</div><div class="maya-bitline">${bits}</div>`;
 }
 
-function buildContractNeighborhood(map: TriadMapNode[]) {
+function buildContractNeighborhood(map: TriadMapNode[], analyzerOptions: AnalyzerOptions) {
     const nodeMap = new Map<string, TriadMapNode>();
     const producersByContract = new Map<string, string[]>();
     const outgoing = new Map<string, Set<string>>();
@@ -608,7 +713,7 @@ function buildContractNeighborhood(map: TriadMapNode[]) {
         incoming.set(node.nodeId, new Set<string>());
 
         (node.fission?.answer ?? [])
-            .map((entry) => normalizeContractKey(entry, false))
+            .map((entry) => normalizeContractKey(entry, false, analyzerOptions))
             .filter((entry): entry is string => Boolean(entry))
             .forEach((contract) => {
                 const items = producersByContract.get(contract) ?? [];
@@ -619,7 +724,7 @@ function buildContractNeighborhood(map: TriadMapNode[]) {
 
     map.forEach((node) => {
         (node.fission?.demand ?? [])
-            .map((entry) => normalizeContractKey(entry, true))
+            .map((entry) => normalizeContractKey(entry, true, analyzerOptions))
             .filter((entry): entry is string => Boolean(entry))
             .forEach((contract) => {
                 (producersByContract.get(contract) ?? []).forEach((producerId) => {
@@ -633,7 +738,7 @@ function buildContractNeighborhood(map: TriadMapNode[]) {
     return { nodeMap, outgoing, incoming };
 }
 
-function normalizeContractKey(entry: string, isDemand: boolean) {
+function normalizeContractKey(entry: string, isDemand: boolean, analyzerOptions?: AnalyzerOptions) {
     const raw = String(entry ?? '').trim();
     if (!raw) return null;
     if (isDemand && /^\[Ghost/i.test(raw)) return null;
@@ -642,7 +747,76 @@ function normalizeContractKey(entry: string, isDemand: boolean) {
         .trim()
         .replace(/\s+/g, ' ')
         .replace(/\s*([<>{}()[\]|,:=&?])\s*/g, '$1');
-    return /^(none|void|null|undefined)$/i.test(value) ? null : value;
+    if (/^(none|void|null|undefined)$/i.test(value)) {
+        return null;
+    }
+
+    const compact = value.toLowerCase().replace(/\s+/g, '');
+    const ignoreGenericContracts = analyzerOptions?.ignoreGenericContracts !== false;
+    const genericIgnoreSet = new Set(
+        (analyzerOptions?.genericContractIgnoreList ?? [])
+            .map((item) => String(item ?? '').toLowerCase().replace(/\s+/g, ''))
+            .filter(Boolean)
+    );
+
+    if (
+        ignoreGenericContracts &&
+        (genericIgnoreSet.has(compact) ||
+            /^(str|string|int|bool|boolean|dict|list|any|unknown|object|optional\[str\]|dict\[(str|string),(any|object)\]|record<(str|string),(any|unknown|object)>|map<(str|string),(any|unknown|object)>)$/i.test(
+                compact
+            ))
+    ) {
+        return null;
+    }
+
+    return value;
+}
+
+function resolveProjectRootFromMapPath(mapPath: string) {
+    const parent = path.dirname(path.resolve(mapPath));
+    return path.basename(parent).toLowerCase() === '.triadmind' ? path.dirname(parent) : parent;
+}
+
+function buildVisualizerOptions(config: ReturnType<typeof loadTriadConfig>, originalMap: TriadMapNode[], protocol: UpgradeProtocol): VisualizerOptions {
+    const previewNodeCount = originalMap.length + protocol.actions.filter((action) => action.op === 'create_child').length;
+    return {
+        analyzer: {
+            ignoreGenericContracts: config.parser.ignoreGenericContracts,
+            genericContractIgnoreList: config.parser.genericContractIgnoreList
+        },
+        maxContractEdges: config.visualizer.maxContractEdges,
+        fastMayaThreshold: config.visualizer.fastMayaThreshold,
+        maxRenderNodes: config.visualizer.maxRenderNodes,
+        compressExistingBranches: previewNodeCount > config.visualizer.maxRenderNodes,
+        fastMode: previewNodeCount > config.visualizer.maxRenderNodes
+    };
+}
+
+function collectHighlightedOwnerIds(protocol: UpgradeProtocol, renormalizeProtocol?: RenormalizeProtocol) {
+    const ids = new Set<string>();
+
+    for (const action of protocol.actions) {
+        if (action.op === 'reuse') {
+            ids.add(action.nodeId);
+            continue;
+        }
+
+        if (action.op === 'modify') {
+            ids.add(action.nodeId);
+            (action.reuse ?? []).forEach((nodeId) => ids.add(nodeId));
+            continue;
+        }
+
+        ids.add(action.node.nodeId);
+        ids.add(action.parentNodeId);
+    }
+
+    for (const action of renormalizeProtocol?.actions ?? []) {
+        ids.add(action.macro_node_id);
+        (action.absorbed_nodes ?? []).forEach((nodeId) => ids.add(nodeId));
+    }
+
+    return ids;
 }
 
 function cloneNode(node: TriadMapNode): TriadMapNode {

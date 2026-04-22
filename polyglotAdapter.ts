@@ -3,8 +3,10 @@ import * as path from 'path';
 import {
     createSourcePathFilter,
     describeSourceScanScope,
+    isIgnorableFsError,
     loadTriadConfig,
     resolveCategoryFromConfig,
+    shouldSkipWalkPath,
     TriadConfig,
     TriadLanguage
 } from './config';
@@ -161,7 +163,15 @@ function runPolyglotParser(language: PolyglotLanguage, projectRoot: string, outp
         }
 
         const category = resolveCategoryFromConfig(sourcePath, config);
-        const content = fs.readFileSync(absolutePath, 'utf-8').replace(/^\uFEFF/, '');
+        let content: string;
+        try {
+            content = fs.readFileSync(absolutePath, 'utf-8').replace(/^\uFEFF/, '');
+        } catch (error: any) {
+            if (isIgnorableFsError(error)) {
+                return;
+            }
+            throw error;
+        }
         nodes.push(...parsePolyglotFile(language, content, sourcePath, category, config));
     });
 
@@ -267,18 +277,46 @@ function walkProject(currentPath: string, visit: (filePath: string) => void) {
         return;
     }
 
-    const stat = fs.statSync(currentPath);
+    let stat: fs.Stats;
+    try {
+        stat = fs.statSync(currentPath);
+    } catch (error: any) {
+        if (isIgnorableFsError(error)) {
+            return;
+        }
+        throw error;
+    }
     if (stat.isFile()) {
-        visit(currentPath);
+        try {
+            visit(currentPath);
+        } catch (error: any) {
+            if (isIgnorableFsError(error)) {
+                return;
+            }
+            throw error;
+        }
         return;
     }
 
-    const basename = path.basename(currentPath);
-    if (basename === '.git' || basename === '.triadmind' || basename === 'node_modules' || basename === 'target') {
+    if (
+        shouldSkipWalkPath(normalizePath(currentPath)) ||
+        shouldSkipWalkPath(path.basename(currentPath)) ||
+        path.basename(currentPath) === 'target'
+    ) {
         return;
     }
 
-    for (const entry of fs.readdirSync(currentPath)) {
+    let entries: string[];
+    try {
+        entries = fs.readdirSync(currentPath);
+    } catch (error: any) {
+        if (isIgnorableFsError(error)) {
+            return;
+        }
+        throw error;
+    }
+
+    for (const entry of entries) {
         walkProject(path.join(currentPath, entry), visit);
     }
 }

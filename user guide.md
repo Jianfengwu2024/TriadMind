@@ -239,3 +239,80 @@ TypeScript 会保留显式业务类型，例如 `GeoTarget`、`GeoResult`；Java
 @triadmind sync
 @triadmind renormalize
 ```
+---
+
+## 9. 最新默认行为（RHEOS 实测后）
+
+现在如果你不特别配置，TriadMind 会按下面的方式工作：
+
+- 默认只优先扫描功能代码，不把整仓库都塞进拓扑图。
+- 默认 `scanMode = capability`，优先把能力单元而不是碎方法提升成节点。
+- 默认强排除：`node_modules`、`.next`、`venv`、`.venv`、`__pycache__`、`.pytest_cache`、`logs`、`uploads`、`fastgpt_data`、`db`、`tests`、`scripts`、`env`、`vendor`。
+- 默认遇到 `EACCES` / `EPERM` / `ENOENT` 直接跳过，不再让 `@triadmind init` 或 `@triadmind sync` 因权限报错崩掉。
+- 默认忽略低语义契约连边，例如 `str`、`string`、`int`、`bool`、`dict`、`any`、`Dict[str,Any]`、`Optional[str]`。
+- 默认给可视化加性能护栏：大图时压缩旧节点分支、限制 contract edges、Maya 指纹自动走 fallback。
+
+推荐把 `.triadmind/config.json` 保持为：
+
+```json
+{
+  "parser": {
+    "scanMode": "capability",
+    "ignoreGenericContracts": true,
+    "genericContractIgnoreList": [
+      "str",
+      "string",
+      "int",
+      "bool",
+      "boolean",
+      "dict",
+      "any",
+      "Dict[str,Any]",
+      "Optional[str]"
+    ]
+  },
+  "visualizer": {
+    "maxContractEdges": 1200,
+    "fastMayaThreshold": 10,
+    "maxRenderNodes": 400
+  }
+}
+```
+
+### 什么时候改成别的模式？
+
+- `leaf`：你要看最细的方法级叶节点时用。
+- `capability`：默认推荐，日常开发最稳。
+- `module`：真正的模块聚合视图，会把 capability 节点折叠成 `Module.*`。
+- `domain`：真正的领域聚合视图，会把 capability 节点折叠成 `Domain.*`。
+
+---
+
+## 10. 能力节点标准
+
+TriadMind 现在默认遵循这个判断原则：
+
+- 能力节点代表“系统能做什么”
+- 不是“代码里有什么函数/类型/字段”
+
+优先提升为能力节点的对象：
+
+- API endpoint / CLI command / RPC handler / message consumer
+- service capability / workflow capability / domain capability
+- adapter / gateway / tool / worker / operator / agent execution unit
+- 主动作方法：`execute` / `run` / `handle` / `process` / `dispatch` / `plan` / `apply` / `invoke` / `call`
+
+默认不提升的对象：
+
+- DTO / Schema / Enum / TypeAlias
+- getter / setter / builder / parser / formatter / sanitizer / validator
+- `_helper` / `_internal` / `test_*`
+- 单纯的路径拼接、cache key、样板生命周期方法
+
+如果一个候选单元只是“实现碎片”，TriadMind 会尽量把它折叠进主能力节点，而不是单独画成拓扑顶点。
+
+### `module` / `domain` 现在怎么聚合？
+
+- `module`：按 `sourcePath` 的文件/模块边界聚合，隐藏模块内部 capability 细节，只保留对外契约。
+- `domain`：按 `category + 目录上下文` 聚合，隐藏领域内部 capability 细节，只保留跨领域契约。
+- 如果仓库非常扁平、目录层次很浅，`domain` 视图可能会故意收敛成很少几个节点。

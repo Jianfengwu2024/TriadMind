@@ -720,7 +720,11 @@ function assertNoTopologicalDegradation(
     previousMap: any[],
     lifecycle: 'init' | 'apply'
 ) {
-    const drift = detectTopologicalDrift(previousMap, readCurrentTriadMap(paths));
+    const config = loadTriadConfig(paths);
+    const drift = detectTopologicalDrift(previousMap, readCurrentTriadMap(paths), {
+        ignoreGenericContracts: config.parser.ignoreGenericContracts,
+        genericContractIgnoreList: config.parser.genericContractIgnoreList
+    });
     if (!drift.isDegraded) {
         return;
     }
@@ -734,6 +738,7 @@ function warnBlastRadiusIfNeeded(paths: ReturnType<typeof getWorkspacePaths>, pr
         return;
     }
 
+    const config = loadTriadConfig(paths);
     const currentNodeMap = new Map(currentMap.map((node) => [node.nodeId, node]));
     const impactedNodeIds = new Set<string>();
     const hotspots: string[] = [];
@@ -749,7 +754,10 @@ function warnBlastRadiusIfNeeded(paths: ReturnType<typeof getWorkspacePaths>, pr
         }
 
         const isContractChange = hasContractChange(currentNode, action.fission);
-        const impacted = calculateBlastRadius(currentMap, action.nodeId, isContractChange);
+        const impacted = calculateBlastRadius(currentMap, action.nodeId, isContractChange, {
+            ignoreGenericContracts: config.parser.ignoreGenericContracts,
+            genericContractIgnoreList: config.parser.genericContractIgnoreList
+        });
         impacted.forEach((nodeId) => impactedNodeIds.add(nodeId));
 
         if (isContractChange && impacted.length > 0) {

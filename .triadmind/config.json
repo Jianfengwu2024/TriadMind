@@ -1,4 +1,4 @@
-{
+﻿{
   "schemaVersion": "1.1",
   "architecture": {
     "language": "typescript",
@@ -42,18 +42,70 @@
       "node_modules",
       ".triadmind"
     ],
+    "excludePathPatterns": [
+      "tests",
+      "test",
+      "__pycache__",
+      "node_modules",
+      "venv",
+      ".venv",
+      ".next",
+      "dist",
+      "build"
+    ],
     "scanCategories": [
       "frontend",
       "backend"
     ],
-    "scanMode": "leaf",
+    "scanMode": "capability",
+    "capabilityThreshold": 4,
+    "entryMethodNames": [
+      "execute",
+      "run",
+      "handle",
+      "process",
+      "dispatch",
+      "plan",
+      "apply",
+      "invoke",
+      "call"
+    ],
+    "excludeNodeNamePatterns": [
+      "^test_",
+      "^_",
+      "^(get|set|build|parse|format|normalize|sanitize|validate)_"
+    ],
     "ignoreGenericContracts": true,
+    "genericContractIgnoreList": [
+      "str",
+      "string",
+      "int",
+      "number",
+      "bool",
+      "boolean",
+      "float",
+      "dict",
+      "object",
+      "list",
+      "array",
+      "any",
+      "unknown",
+      "void",
+      "none",
+      "dict[str,any]",
+      "optional[str]"
+    ],
     "includeUntaggedExports": true,
     "jsDocTags": {
       "triadNode": "TriadNode",
       "leftBranch": "LeftBranch",
       "rightBranch": "RightBranch"
     }
+  },
+  "visualizer": {
+    "maxContractEdges": 1200,
+    "fastMayaThreshold": 10,
+    "maxRenderNodes": 400
   },
   "protocol": {
     "minConfidence": 0.6,
@@ -66,3 +118,6 @@
     "snapshotStrategy": "manual"
   }
 }
+
+
+

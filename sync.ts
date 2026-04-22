@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { resolveAdapter } from './adapter';
-import { createSourcePathFilter, loadTriadConfig } from './config';
+import { createSourcePathFilter, isIgnorableFsError, loadTriadConfig, shouldSkipWalkPath } from './config';
 import { normalizePath, WorkspacePaths } from './workspace';
 
 interface SourceFileDigest {
@@ -15,6 +15,7 @@ interface SyncManifest {
     schemaVersion: '1.0';
     generatedAt: string;
     parserEngine: string;
+    configHash: string;
     files: SourceFileDigest[];
 }
 
@@ -92,14 +93,20 @@ export function watchTriadMap(paths: WorkspacePaths) {
 }
 
 function buildManifest(paths: WorkspacePaths): SyncManifest {
-    return {
-        schemaVersion: '1.0',
-        generatedAt: new Date().toISOString(),
-        parserEngine: loadTriadConfig(paths).architecture.parserEngine,
-        files: collectSourceFiles(paths).map((filePath) => ({
+    const config = loadTriadConfig(paths);
+    const files = collectSourceFiles(paths)
+        .map((filePath) => ({
             path: filePath,
             sha256: hashFile(path.join(paths.projectRoot, filePath))
         }))
+        .filter((file): file is SourceFileDigest => Boolean(file.sha256));
+
+    return {
+        schemaVersion: '1.0',
+        generatedAt: new Date().toISOString(),
+        parserEngine: config.architecture.parserEngine,
+        configHash: hashContent(JSON.stringify(config)),
+        files
     };
 }
 
@@ -125,13 +132,42 @@ function walk(currentPath: string, visit: (filePath: string) => void) {
         return;
     }
 
-    const stat = fs.statSync(currentPath);
+    let stat: fs.Stats;
+    try {
+        stat = fs.statSync(currentPath);
+    } catch (error: any) {
+        if (isIgnorableFsError(error)) {
+            return;
+        }
+        throw error;
+    }
     if (stat.isFile()) {
-        visit(currentPath);
+        try {
+            visit(currentPath);
+        } catch (error: any) {
+            if (isIgnorableFsError(error)) {
+                return;
+            }
+            throw error;
+        }
         return;
     }
 
-    for (const entry of fs.readdirSync(currentPath)) {
+    if (shouldSkipWalkPath(normalizePath(currentPath)) || shouldSkipWalkPath(path.basename(currentPath))) {
+        return;
+    }
+
+    let entries: string[];
+    try {
+        entries = fs.readdirSync(currentPath);
+    } catch (error: any) {
+        if (isIgnorableFsError(error)) {
+            return;
+        }
+        throw error;
+    }
+
+    for (const entry of entries) {
         walk(path.join(currentPath, entry), visit);
     }
 }
@@ -154,6 +190,10 @@ function isSameManifest(left: SyncManifest, right: SyncManifest) {
         return false;
     }
 
+    if ((left.configHash ?? '') !== (right.configHash ?? '')) {
+        return false;
+    }
+
     if (left.files.length !== right.files.length) {
         return false;
     }
@@ -162,7 +202,18 @@ function isSameManifest(left: SyncManifest, right: SyncManifest) {
 }
 
 function hashFile(filePath: string) {
-    return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+    try {
+        return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+    } catch (error: any) {
+        if (isIgnorableFsError(error)) {
+            return '';
+        }
+        throw error;
+    }
+}
+
+function hashContent(content: string) {
+    return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 function isSourceFile(filePath: string) {
