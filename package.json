@@ -29,6 +29,7 @@
     "protocol": "tsx cli.ts protocol",
     "finalize": "tsx cli.ts finalize",
     "legacy": "tsx cli.ts legacy",
+    "converge": "tsx cli.ts converge",
     "plan": "tsx cli.ts plan",
     "auto": "tsx cli.ts auto",
     "invoke": "tsx cli.ts invoke",

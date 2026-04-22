@@ -79,6 +79,8 @@
 | `@triadmind apply` | 正式执行协议并落盘 |
 | `@triadmind sync` | 重新扫描代码并刷新拓扑图 |
 | `@triadmind renormalize` | 对旧代码做重整化治理 |
+| `@triadmind renormalize --deep` | 生成递归重整化 TODO 任务书 |
+| `@triadmind converge` | `renormalize --deep` 的静默别名 |
 | `@triadmind heal` | 对运行时错误做拓扑修复 |
 | `@triadmind handoff` | 生成实现阶段交接文件 |
 
@@ -472,6 +474,39 @@ TriadMind 会自动帮你做“协议收口”。
 ```text
 @triadmind heal: TypeError: Cannot read properties of undefined ...
 ```
+
+---
+
+## 4.12A `@triadmind renormalize --deep` / `@triadmind converge`
+
+### 一句话作用
+
+预留“递归重整化收敛链”的正式入口，但当前阶段只生成治理任务书，不直接改代码。
+
+### 你什么时候用
+
+- 你已经确认普通 `renormalize` 不够
+- 你怀疑某个节点下游扇出过大，需要未来做左右分支重整
+- 你想先让 TriadMind 给出递归治理待办，而不是立刻重构
+
+### TriadMind 内部会做什么
+
+- 读取当前 `triad-map.json`
+- 识别下游连接数大于等于 3 的高扇出候选节点
+- 生成递归治理 TODO 任务书
+- 明确未来应该按“最外层 -> 最内层”逐层收敛
+
+### 最终会产出什么
+
+- `.triadmind/converge-task.md`
+
+### 当前要注意什么
+
+这两个命令已经可以调用，但它们目前是**正式占位入口**：
+
+- 会落盘任务书
+- 会扫描当前高扇出候选
+- **不会**自动执行递归左右分支重构
 
 ---
 

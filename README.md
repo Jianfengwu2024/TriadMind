@@ -224,6 +224,7 @@ TriadMind Core 现在的正确理解不是：
 
 - 当前已实现：环 / 强连通分量折叠为 macro node
 - 当前未实现：高扇出节点的左右分支重整
+- 当前占位入口：`@triadmind renormalize --deep` / `@triadmind converge` 会生成 `.triadmind/converge-task.md`
 - 目标形态：从最外层到最内层逐层收敛，而不是一次性激进拆分
 - 预期机制：每一轮只治理当前层级的过载节点，然后重新计算 `blast radius / cycles / drift`
 - 最终目标：把旧代码的高扇出拓扑收敛成稳定的三元左右分支树

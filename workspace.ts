@@ -38,6 +38,7 @@ export interface WorkspacePaths {
     renormalizeTaskFile: string;
     renormalizePreviewProtocolFile: string;
     renormalizeVisualizerFile: string;
+    convergeTaskFile: string;
     lastApplyFilesFile: string;
     demandFile: string;
 }
@@ -93,6 +94,7 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         renormalizeTaskFile: path.join(triadDir, 'renormalize-task.md'),
         renormalizePreviewProtocolFile: path.join(triadDir, 'renormalize-preview-protocol.json'),
         renormalizeVisualizerFile: path.join(triadDir, 'renormalize-visualizer.html'),
+        convergeTaskFile: path.join(triadDir, 'converge-task.md'),
         lastApplyFilesFile: path.join(triadDir, 'last-apply-files.json'),
         demandFile: path.join(triadDir, 'latest-demand.txt')
     };
