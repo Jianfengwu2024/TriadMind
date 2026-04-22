@@ -33,6 +33,11 @@ export interface WorkspacePaths {
     runtimeErrorFile: string;
     healingReportFile: string;
     healingPromptFile: string;
+    renormalizeProtocolFile: string;
+    renormalizeReportFile: string;
+    renormalizeTaskFile: string;
+    renormalizePreviewProtocolFile: string;
+    renormalizeVisualizerFile: string;
     lastApplyFilesFile: string;
     demandFile: string;
 }
@@ -83,6 +88,11 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         runtimeErrorFile: path.join(triadDir, 'runtime-error.log'),
         healingReportFile: path.join(triadDir, 'healing-report.json'),
         healingPromptFile: path.join(triadDir, 'healing-prompt.md'),
+        renormalizeProtocolFile: path.join(triadDir, 'renormalize-protocol.json'),
+        renormalizeReportFile: path.join(triadDir, 'renormalize-report.md'),
+        renormalizeTaskFile: path.join(triadDir, 'renormalize-task.md'),
+        renormalizePreviewProtocolFile: path.join(triadDir, 'renormalize-preview-protocol.json'),
+        renormalizeVisualizerFile: path.join(triadDir, 'renormalize-visualizer.html'),
         lastApplyFilesFile: path.join(triadDir, 'last-apply-files.json'),
         demandFile: path.join(triadDir, 'latest-demand.txt')
     };

@@ -32,6 +32,22 @@ interface ILanguageAdapter {
     applyProtocol(protocol: any, projectRoot: string): void;
 }
 
+type AssistantDirective =
+    | 'init'
+    | 'sync'
+    | 'macro'
+    | 'meso'
+    | 'micro'
+    | 'protocol'
+    | 'pipeline'
+    | 'finalize'
+    | 'plan'
+    | 'apply'
+    | 'handoff'
+    | 'heal'
+    | 'renormalize'
+    | 'legacy';
+
 type CliLanguageAdapter = ILanguageAdapter & {
     language: TriadLanguage;
     displayName: string;
@@ -153,6 +169,64 @@ program
     });
 
 program
+    .command('finalize [demand...]')
+    .description('Synchronize Macro / Meso / Micro artifacts into draft-protocol and optionally continue apply')
+    .option('-d, --demand <text>', 'Explicit demand text')
+    .option('--apply', 'If the draft protocol is complete, continue apply immediately')
+    .action(async (demandParts: string[], options: { demand?: string; apply?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        const demand = resolveDemand(demandParts, options.demand, paths);
+
+        ensureTriadSpec(paths);
+        if (!fs.existsSync(paths.mapFile)) {
+            syncProjectTopology(paths);
+        }
+
+        if (demand) {
+            prepareWorkspace(paths, demand);
+        } else if (!fs.existsSync(paths.draftFile)) {
+            createDraftTemplate(paths);
+        }
+
+        let rawDraft: Record<string, any>;
+        try {
+            rawDraft = fs.existsSync(paths.draftFile) ? readJsonFile<Record<string, any>>(paths.draftFile) : {};
+        } catch (error: any) {
+            console.log(chalk.red(`鉂?Failed to read draft protocol: ${error.message}`));
+            process.exitCode = 1;
+            return;
+        }
+
+        const hydratedDraft = hydrateDraftProtocol(paths, rawDraft);
+        if (hydratedDraft.changed) {
+            fs.writeFileSync(paths.draftFile, JSON.stringify(hydratedDraft.protocol, null, 2), 'utf-8');
+        }
+
+        console.log(chalk.green(`鉁?Draft protocol synchronized: ${paths.draftFile}`));
+
+        if (isIncompleteDraftProtocol(hydratedDraft.protocol)) {
+            refreshDraftPlanningContext(paths, hydratedDraft.protocol);
+            console.log(chalk.yellow('鉃★笍 Draft protocol is still in planning state; final actions are not ready yet.'));
+            console.log(chalk.yellow(`鉃★笍 Finish ${paths.protocolTaskFile} and save the final JSON back into ${paths.draftFile}.`));
+            console.log(chalk.yellow(`鉃★笍 For silent flow, continue from ${paths.implementationPromptFile}.`));
+            return;
+        }
+
+        try {
+            const protocol = validateDraftProtocol(paths);
+            console.log(chalk.green(`鉁?Draft protocol validated: ${protocol.actions.length} action(s).`));
+
+            if (options.apply) {
+                warnBlastRadiusIfNeeded(paths, protocol);
+                executeApply(paths.projectRoot);
+            }
+        } catch (error: any) {
+            console.log(chalk.red(`鉂?Finalize validation failed: ${error.message}`));
+            process.exitCode = 1;
+        }
+    });
+
+program
     .command('macro [demand...]')
     .description('生成并展示 Macro-Split 提示词')
     .option('-d, --demand <text>', '显式传入用户需求文本')
@@ -226,6 +300,57 @@ program
             console.log(chalk.yellow(`   ${index + 1}. ${cycle.join(' -> ')}`));
         });
         console.log(chalk.green(`✅ Renormalization protocol written: ${renormalizeProtocolFile}`));
+    });
+
+program
+    .command('legacy')
+    .description('Build a complete legacy-code renormalization package for cyclic old topology')
+    .option('--no-open', 'Generate the renormalization visualizer without opening it')
+    .action(async (options: { open?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+
+        ensureTriadSpec(paths);
+        if (!fs.existsSync(paths.mapFile)) {
+            syncProjectTopology(paths, true);
+        }
+
+        const map = readCurrentTriadMap(paths);
+        const cycles = detectCycles(map);
+
+        if (cycles.length === 0) {
+            console.log(chalk.green('No cyclic legacy topology found; renormalization package not required.'));
+            removeIfExists(paths.renormalizeProtocolFile);
+            removeIfExists(paths.renormalizeReportFile);
+            removeIfExists(paths.renormalizeTaskFile);
+            removeIfExists(paths.renormalizePreviewProtocolFile);
+            removeIfExists(paths.renormalizeVisualizerFile);
+            return;
+        }
+
+        const protocol = generateRenormalizeProtocol(map, cycles);
+        fs.writeFileSync(paths.renormalizeProtocolFile, JSON.stringify(protocol, null, 2), 'utf-8');
+        fs.writeFileSync(
+            paths.renormalizePreviewProtocolFile,
+            JSON.stringify(buildRenormalizePreviewProtocol(paths, protocol), null, 2),
+            'utf-8'
+        );
+        fs.writeFileSync(paths.renormalizeReportFile, buildRenormalizeReport(paths, cycles, protocol), 'utf-8');
+        fs.writeFileSync(paths.renormalizeTaskFile, buildRenormalizeTask(paths, protocol), 'utf-8');
+        generateDashboard(paths.mapFile, paths.renormalizePreviewProtocolFile, paths.renormalizeVisualizerFile);
+
+        console.log(chalk.yellow(`Detected ${cycles.length} cyclic legacy component(s).`));
+        console.log(chalk.green(`Legacy renormalization protocol: ${paths.renormalizeProtocolFile}`));
+        console.log(chalk.green(`Legacy renormalization report: ${paths.renormalizeReportFile}`));
+        console.log(chalk.green(`Legacy renormalization task: ${paths.renormalizeTaskFile}`));
+        console.log(chalk.green(`Legacy renormalization visualizer: ${paths.renormalizeVisualizerFile}`));
+
+        if (options.open !== false) {
+            try {
+                await openFile(paths.renormalizeVisualizerFile);
+            } catch (error: any) {
+                console.log(chalk.yellow(`Failed to open legacy renormalization visualizer: ${error.message}`));
+            }
+        }
     });
 
 program
@@ -322,10 +447,11 @@ program
     .description('供 AI 助手静默触发的一键入口；兼容 `@triadmind <需求>` 输入')
     .option('-d, --demand <text>', '显式传入用户需求文本')
     .option('--apply', '如果 `draft-protocol.json` 已完备，则直接静默执行 plan/apply')
-    .action((demandParts: string[], options: { demand?: string; apply?: boolean }) => {
+    .action(async (demandParts: string[], options: { demand?: string; apply?: boolean }) => {
         const paths = getWorkspacePaths(process.cwd());
         const rawDemand = resolveDemand(demandParts, options.demand, paths);
         const demand = normalizeInvokeDemand(rawDemand);
+        const directive = demand ? parseAssistantDirective(demand) : null;
 
         if (!demand) {
             console.log(chalk.red('❌ 请提供需求文本，例如：triadmind invoke "@triadmind 前端新增导出 CSV 按钮"'));
@@ -334,6 +460,16 @@ program
         }
 
         console.log(chalk.cyan('🤖 [TriadMind] 正在准备静默调用入口...'));
+        if (directive) {
+            try {
+                await executeAssistantDirective(paths, directive, options.apply);
+            } catch (error: any) {
+                console.log(chalk.red(`TriadMind directive failed: ${error.message}`));
+                process.exitCode = 1;
+            }
+            return;
+        }
+
         prepareWorkspace(paths, demand);
         installAlwaysOnRules(paths);
 
@@ -805,20 +941,44 @@ function collectManualSnapshotFiles(paths: ReturnType<typeof getWorkspacePaths>)
 
 function validateDraftProtocol(paths: ReturnType<typeof getWorkspacePaths>) {
     let protocol: UpgradeProtocol;
+    let rawDraft: Record<string, any>;
 
     try {
-        protocol = readJsonFile<UpgradeProtocol>(paths.draftFile);
+        rawDraft = readJsonFile<Record<string, any>>(paths.draftFile);
     } catch (error: any) {
         throw new Error(`Invalid JSON in ${paths.draftFile}: ${error.message}`);
     }
 
+    const hydratedDraft = hydrateDraftProtocol(paths, rawDraft);
+
+    if (hydratedDraft.changed) {
+        fs.writeFileSync(paths.draftFile, JSON.stringify(hydratedDraft.protocol, null, 2), 'utf-8');
+    }
+
+    if (isIncompleteDraftProtocol(hydratedDraft.protocol)) {
+        refreshDraftPlanningContext(paths, hydratedDraft.protocol);
+        throw buildIncompleteDraftProtocolError(paths);
+    }
+
     const existingNodes = readTriadMap(paths.mapFile);
     const config = loadTriadConfig(paths);
-    return assertProtocolShape(protocol, {
-        existingNodes,
-        minConfidence: config.protocol.minConfidence,
-        requireConfidence: config.protocol.requireConfidence
-    });
+
+    try {
+        protocol = assertProtocolShape(hydratedDraft.protocol as UpgradeProtocol, {
+            existingNodes,
+            minConfidence: config.protocol.minConfidence,
+            requireConfidence: config.protocol.requireConfidence
+        });
+    } catch (error: any) {
+        if (isIncompleteDraftProtocolError(error)) {
+            refreshDraftPlanningContext(paths, hydratedDraft.protocol);
+            throw buildIncompleteDraftProtocolError(paths);
+        }
+
+        throw error;
+    }
+
+    return protocol;
 }
 
 function prepareWorkspace(paths: ReturnType<typeof getWorkspacePaths>, demand: string) {
@@ -826,6 +986,285 @@ function prepareWorkspace(paths: ReturnType<typeof getWorkspacePaths>, demand: s
     syncProjectTopology(paths);
     createDraftTemplate(paths, demand);
     writePromptPacket(paths, demand);
+}
+
+function buildRenormalizePreviewProtocol(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    protocol: ReturnType<typeof generateRenormalizeProtocol>
+) {
+    return {
+        protocolVersion: '1.0',
+        project: normalizeForPrompt(paths.projectRoot),
+        mapSource: normalizeForPrompt(paths.mapFile),
+        userDemand: 'Legacy code renormalization',
+        upgradePolicy: {
+            allowedOps: ['create_macro_node'],
+            principle: 'collapse strongly connected legacy cycles into macro vertices'
+        },
+        macroSplit: {
+            anchorNodeId: '',
+            vertexGoal: 'Renormalize cyclic legacy topology',
+            leftBranch: protocol.actions.map((action) => `Absorb cycle into ${action.macro_node_id}`),
+            rightBranch: ['Preserve external contracts while collapsing internal cycles']
+        },
+        mesoSplit: {
+            classes: [],
+            pipelines: []
+        },
+        microSplit: {
+            classes: []
+        },
+        actions: []
+    };
+}
+
+function buildRenormalizeReport(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    cycles: string[][],
+    protocol: ReturnType<typeof generateRenormalizeProtocol>
+) {
+    const cycleSections = cycles
+        .map((cycle, index) => [`## Cycle ${index + 1}`, '', `- Nodes: ${cycle.join(' -> ')}`].join('\n'))
+        .join('\n\n');
+
+    const actionSections =
+        protocol.actions.length > 0
+            ? protocol.actions
+                  .map((action, index) =>
+                      [
+                          `## Macro Action ${index + 1}`,
+                          '',
+                          `- Macro Node: \`${action.macro_node_id}\``,
+                          `- Absorbed Nodes: ${action.absorbed_nodes.join(', ')}`,
+                          `- New Demand: ${action.new_demand.join(', ') || 'None'}`,
+                          `- New Answer: ${action.new_answer.join(', ') || 'None'}`,
+                          `- Rationale: ${action.rationale}`
+                      ].join('\n')
+                  )
+                  .join('\n\n')
+            : '## Macro Action\n\n- No renormalization action generated.';
+
+    return [
+        '# TriadMind Legacy Renormalization Report',
+        '',
+        `- Project: \`${normalizeForPrompt(paths.projectRoot)}\``,
+        `- Map: \`${normalizeForPrompt(paths.mapFile)}\``,
+        `- Cycles Detected: \`${cycles.length}\``,
+        '',
+        '## Summary',
+        '',
+        ...(protocol.summary ?? []).map((item) => `- ${item}`),
+        '',
+        cycleSections,
+        '',
+        actionSections,
+        '',
+        '## Next Step',
+        '',
+        `- Review \`${normalizeForPrompt(paths.renormalizeVisualizerFile)}\``,
+        `- Hand \`${normalizeForPrompt(paths.renormalizeTaskFile)}\` to your AI assistant`,
+        '- Convert macro-node renormalization intent into actual refactor work under TriadMind control'
+    ].join('\n');
+}
+
+function buildRenormalizeTask(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    protocol: ReturnType<typeof generateRenormalizeProtocol>
+) {
+    const mapJson = fs.existsSync(paths.mapFile) ? fs.readFileSync(paths.mapFile, 'utf-8').trim() : '[]';
+
+    return [
+        '[System]',
+        'You are a TriadMind legacy-code renormalization worker.',
+        'Your task is to turn cyclic old topology into clearer macro-structured architecture without breaking useful external contracts.',
+        '',
+        '[Project Root]',
+        normalizeForPrompt(paths.projectRoot),
+        '',
+        '[Triad Map JSON]',
+        '```json',
+        mapJson,
+        '```',
+        '',
+        '[Renormalization Protocol]',
+        '```json',
+        JSON.stringify(protocol, null, 2),
+        '```',
+        '',
+        '[Execution Rules]',
+        '1. Treat every create_macro_node action as a legacy refactor target.',
+        '2. Preserve external demand / answer contracts where possible.',
+        '3. Reduce internal cycles and make dependencies more directional.',
+        '4. Keep changes topology-first and minimal.',
+        '',
+        '[Expected Output]',
+        '- Explain the intended refactor for each macro node.',
+        '- Identify impacted files and nodes.',
+        '- Then implement the legacy refactor under TriadMind rules.'
+    ].join('\n');
+}
+
+function normalizeForPrompt(value: string) {
+    return value.replace(/\\/g, '/');
+}
+
+function removeIfExists(filePath: string) {
+    if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
+}
+
+function hydrateDraftProtocol(paths: ReturnType<typeof getWorkspacePaths>, rawDraft: Record<string, any>) {
+    const nextDraft = isPlainObject(rawDraft) ? { ...rawDraft } : {};
+    let changed = false;
+
+    const macroSplit = readOptionalJson(paths.macroSplitFile);
+    if (shouldHydrateMacroSplit(nextDraft.macroSplit, macroSplit)) {
+        nextDraft.macroSplit = macroSplit;
+        changed = true;
+    }
+
+    const mesoSplit = readOptionalJson(paths.mesoSplitFile);
+    if (shouldHydrateMesoSplit(nextDraft.mesoSplit, mesoSplit)) {
+        nextDraft.mesoSplit = mesoSplit;
+        changed = true;
+    }
+
+    const microSplit = readOptionalJson(paths.microSplitFile);
+    if (shouldHydrateMicroSplit(nextDraft.microSplit, microSplit)) {
+        nextDraft.microSplit = microSplit;
+        changed = true;
+    }
+
+    const latestDemand = fs.existsSync(paths.demandFile) ? fs.readFileSync(paths.demandFile, 'utf-8').trim() : '';
+    if (!hasText(nextDraft.userDemand) && latestDemand) {
+        nextDraft.userDemand = latestDemand;
+        changed = true;
+    }
+
+    if (!hasText(nextDraft.project)) {
+        nextDraft.project = paths.projectRoot.replace(/\\/g, '/');
+        changed = true;
+    }
+
+    if (!hasText(nextDraft.mapSource)) {
+        nextDraft.mapSource = paths.mapFile.replace(/\\/g, '/');
+        changed = true;
+    }
+
+    return {
+        protocol: nextDraft,
+        changed
+    };
+}
+
+function refreshDraftPlanningContext(paths: ReturnType<typeof getWorkspacePaths>, draft: Record<string, any>) {
+    const demand = hasText(draft.userDemand)
+        ? String(draft.userDemand).trim()
+        : fs.existsSync(paths.demandFile)
+          ? fs.readFileSync(paths.demandFile, 'utf-8').trim()
+          : '';
+
+    if (demand) {
+        writePromptPacket(paths, demand);
+        const refreshedDraft = hydrateDraftProtocol(paths, draft);
+        if (refreshedDraft.changed) {
+            fs.writeFileSync(paths.draftFile, JSON.stringify(refreshedDraft.protocol, null, 2), 'utf-8');
+        }
+    }
+}
+
+function buildIncompleteDraftProtocolError(paths: ReturnType<typeof getWorkspacePaths>) {
+    return new Error(
+        [
+            `draft-protocol is still in planning state: ${paths.draftFile}`,
+            `TriadMind has synced Macro/Meso/Micro context back into the draft file.`,
+            `Next step: ask your AI assistant to finish ${paths.protocolTaskFile} and save the final JSON into ${paths.draftFile}.`,
+            `If you want a manual bridge step, run triadmind finalize before retrying apply.`,
+            `If you want silent end-to-end flow, continue from ${paths.implementationPromptFile} and then rerun triadmind invoke --apply.`
+        ].join('\n')
+    );
+}
+
+function isIncompleteDraftProtocol(protocol: Record<string, any>) {
+    return !Array.isArray(protocol.actions) || protocol.actions.length === 0;
+}
+
+function isIncompleteDraftProtocolError(error: unknown) {
+    return error instanceof Error && /actions must contain at least one/i.test(error.message);
+}
+
+function readOptionalJson(filePath: string) {
+    if (!fs.existsSync(filePath)) {
+        return undefined;
+    }
+
+    try {
+        return readJsonFile<Record<string, any>>(filePath);
+    } catch {
+        return undefined;
+    }
+}
+
+function shouldHydrateMacroSplit(currentValue: any, seedValue: any) {
+    if (!isPlainObject(seedValue) || !isMeaningfulMacroSplit(seedValue)) {
+        return false;
+    }
+
+    return !isMeaningfulMacroSplit(currentValue);
+}
+
+function shouldHydrateMesoSplit(currentValue: any, seedValue: any) {
+    if (!isPlainObject(seedValue) || !isMeaningfulMesoSplit(seedValue)) {
+        return false;
+    }
+
+    return !isMeaningfulMesoSplit(currentValue);
+}
+
+function shouldHydrateMicroSplit(currentValue: any, seedValue: any) {
+    if (!isPlainObject(seedValue) || !isMeaningfulMicroSplit(seedValue)) {
+        return false;
+    }
+
+    return !isMeaningfulMicroSplit(currentValue);
+}
+
+function isMeaningfulMacroSplit(value: any) {
+    if (!isPlainObject(value)) {
+        return false;
+    }
+
+    return (
+        hasText(value.anchorNodeId) ||
+        hasText(value.vertexGoal) ||
+        (Array.isArray(value.leftBranch) && value.leftBranch.length > 0) ||
+        (Array.isArray(value.rightBranch) && value.rightBranch.length > 0)
+    );
+}
+
+function isMeaningfulMesoSplit(value: any) {
+    if (!isPlainObject(value)) {
+        return false;
+    }
+
+    return (Array.isArray(value.classes) && value.classes.length > 0) || (Array.isArray(value.pipelines) && value.pipelines.length > 0);
+}
+
+function isMeaningfulMicroSplit(value: any) {
+    if (!isPlainObject(value)) {
+        return false;
+    }
+
+    return Array.isArray(value.classes) && value.classes.length > 0;
+}
+
+function hasText(value: unknown) {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function writeHandoffPrompt(projectRoot: string, changedFiles?: string[], approvedProtocolJson?: string) {
@@ -879,8 +1318,171 @@ function resolveDemand(
     return '';
 }
 
+function parseAssistantDirective(input: string): { command: AssistantDirective; payload: string } | null {
+    const trimmed = input.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const match = trimmed.match(
+        /^(init|sync|macro|meso|micro|protocol|pipeline|finalize|plan|apply|handoff|heal|renormalize|legacy)\b(?:\s*[:：]\s*|\s+)?([\s\S]*)$/i
+    );
+    if (!match) {
+        return null;
+    }
+
+    return {
+        command: match[1].toLowerCase() as AssistantDirective,
+        payload: (match[2] ?? '').trim()
+    };
+}
+
+async function executeAssistantDirective(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    directive: { command: AssistantDirective; payload: string },
+    applyWhenPossible = false
+) {
+    switch (directive.command) {
+        case 'init':
+            ensureTriadSpec(paths);
+            syncProjectTopology(paths, true);
+            installAlwaysOnRules(paths);
+            writeMasterPrompt(paths);
+            console.log(chalk.green(`TriadMind initialized: ${paths.triadDir}`));
+            return;
+        case 'sync':
+            ensureTriadSpec(paths);
+            syncProjectTopology(paths, true);
+            console.log(chalk.green(`Triad map synchronized: ${paths.mapFile}`));
+            return;
+        case 'macro':
+        case 'meso':
+        case 'micro':
+            printPassPrompt(directive.command, directive.payload ? [directive.payload] : [], undefined);
+            return;
+        case 'protocol': {
+            const demand = directive.payload || resolveDemand([], undefined, paths);
+            if (!demand) {
+                throw new Error('Protocol routing requires a current demand.');
+            }
+            prepareWorkspace(paths, demand);
+            console.log(chalk.green(`Protocol task prepared: ${paths.protocolTaskFile}`));
+            return;
+        }
+        case 'pipeline': {
+            const demand = directive.payload || resolveDemand([], undefined, paths);
+            if (!demand) {
+                throw new Error('Pipeline routing requires a current demand.');
+            }
+            prepareWorkspace(paths, demand);
+            console.log(chalk.green(`Pipeline prompts prepared: ${paths.pipelinePromptFile}`));
+            return;
+        }
+        case 'finalize': {
+            const demand = directive.payload || resolveDemand([], undefined, paths);
+            if (demand) {
+                prepareWorkspace(paths, demand);
+            } else if (!fs.existsSync(paths.draftFile)) {
+                createDraftTemplate(paths);
+            }
+            const rawDraft = fs.existsSync(paths.draftFile) ? readJsonFile<Record<string, any>>(paths.draftFile) : {};
+            const hydratedDraft = hydrateDraftProtocol(paths, rawDraft);
+            if (hydratedDraft.changed) {
+                fs.writeFileSync(paths.draftFile, JSON.stringify(hydratedDraft.protocol, null, 2), 'utf-8');
+            }
+            console.log(chalk.green(`Draft protocol synchronized: ${paths.draftFile}`));
+            if (isIncompleteDraftProtocol(hydratedDraft.protocol)) {
+                refreshDraftPlanningContext(paths, hydratedDraft.protocol);
+                console.log(chalk.yellow(`Draft protocol is still incomplete. Continue from ${paths.protocolTaskFile}.`));
+                return;
+            }
+            const protocol = validateDraftProtocol(paths);
+            console.log(chalk.green(`Draft protocol validated: ${protocol.actions.length} action(s).`));
+            if (applyWhenPossible) {
+                executeApply(paths.projectRoot);
+            }
+            return;
+        }
+        case 'plan':
+            if (!fs.existsSync(paths.draftFile)) {
+                throw new Error(`Missing draft protocol: ${paths.draftFile}`);
+            }
+            validateDraftProtocol(paths);
+            generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile);
+            console.log(chalk.green(`Visualizer written: ${paths.visualizerFile}`));
+            return;
+        case 'apply':
+            executeApply(paths.projectRoot);
+            return;
+        case 'handoff':
+            writeHandoffPrompt(paths.projectRoot);
+            console.log(chalk.green(`Implementation handoff written: ${paths.handoffPromptFile}`));
+            return;
+        case 'heal': {
+            const errorText = directive.payload || resolveHealingInput(paths, undefined, undefined);
+            if (!errorText) {
+                throw new Error('Heal routing requires runtime error text or runtime-error.log.');
+            }
+            prepareHealingArtifacts(paths, errorText, 0);
+            console.log(chalk.green(`Healing prompt written: ${paths.healingPromptFile}`));
+            return;
+        }
+        case 'renormalize':
+        case 'legacy':
+            await executeLegacyPackage(paths, false);
+            return;
+        default:
+            return;
+    }
+}
+
 function normalizeInvokeDemand(value: string) {
     return value.trim().replace(/^@?triadmind(?:\s*[:：-]\s*|\s+)/i, '').trim();
+}
+
+async function executeLegacyPackage(paths: ReturnType<typeof getWorkspacePaths>, openVisualizer = true) {
+    ensureTriadSpec(paths);
+    if (!fs.existsSync(paths.mapFile)) {
+        syncProjectTopology(paths, true);
+    }
+
+    const map = readCurrentTriadMap(paths);
+    const cycles = detectCycles(map);
+
+    if (cycles.length === 0) {
+        console.log(chalk.green('No cyclic legacy topology found; renormalization package not required.'));
+        removeIfExists(paths.renormalizeProtocolFile);
+        removeIfExists(paths.renormalizeReportFile);
+        removeIfExists(paths.renormalizeTaskFile);
+        removeIfExists(paths.renormalizePreviewProtocolFile);
+        removeIfExists(paths.renormalizeVisualizerFile);
+        return;
+    }
+
+    const protocol = generateRenormalizeProtocol(map, cycles);
+    fs.writeFileSync(paths.renormalizeProtocolFile, JSON.stringify(protocol, null, 2), 'utf-8');
+    fs.writeFileSync(
+        paths.renormalizePreviewProtocolFile,
+        JSON.stringify(buildRenormalizePreviewProtocol(paths, protocol), null, 2),
+        'utf-8'
+    );
+    fs.writeFileSync(paths.renormalizeReportFile, buildRenormalizeReport(paths, cycles, protocol), 'utf-8');
+    fs.writeFileSync(paths.renormalizeTaskFile, buildRenormalizeTask(paths, protocol), 'utf-8');
+    generateDashboard(paths.mapFile, paths.renormalizePreviewProtocolFile, paths.renormalizeVisualizerFile);
+
+    console.log(chalk.yellow(`Detected ${cycles.length} cyclic legacy component(s).`));
+    console.log(chalk.green(`Legacy renormalization protocol: ${paths.renormalizeProtocolFile}`));
+    console.log(chalk.green(`Legacy renormalization report: ${paths.renormalizeReportFile}`));
+    console.log(chalk.green(`Legacy renormalization task: ${paths.renormalizeTaskFile}`));
+    console.log(chalk.green(`Legacy renormalization visualizer: ${paths.renormalizeVisualizerFile}`));
+
+    if (openVisualizer) {
+        try {
+            await openFile(paths.renormalizeVisualizerFile);
+        } catch (error: any) {
+            console.log(chalk.yellow(`Failed to open legacy renormalization visualizer: ${error.message}`));
+        }
+    }
 }
 
 async function openFile(filePath: string) {
