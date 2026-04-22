@@ -79,7 +79,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
   "schemaVersion": "1.1",
   "architecture": {
     "language": "typescript",
-    "parserEngine": "native",
+    "parserEngine": "tree-sitter",
     "adapter": "@triadmind/plugin-ts"
   },
   "categories": {
@@ -129,9 +129,10 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "执行 getAvailableAdapters 流程",
+      "problem": "execute getAvailableAdapters flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] Map (adapterRegistry)"
       ],
       "answer": [
         "LanguageAdapter[]"
@@ -143,9 +144,10 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "执行 registerAdapter 流程",
+      "problem": "execute registerAdapter flow",
       "demand": [
-        "LanguageAdapter (adapter)"
+        "LanguageAdapter (adapter)",
+        "[Ghost:Read] Map (adapterRegistry)"
       ],
       "answer": [
         "void"
@@ -157,12 +159,45 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "执行 resolveAdapter 流程",
+      "problem": "execute resolveAdapter flow",
       "demand": [
-        "WorkspacePaths | string (pathsOrProjectRoot)"
+        "WorkspacePaths | string (pathsOrProjectRoot)",
+        "[Ghost:Read] Map (adapterRegistry)"
       ],
       "answer": [
         "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.calculateBlastRadius",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute calculateBlastRadius flow",
+      "demand": [
+        "any[] (map)",
+        "string (targetNodeId)",
+        "boolean (isContractChange)"
+      ],
+      "answer": [
+        "string[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.detectTopologicalDrift",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute detectTopologicalDrift flow",
+      "demand": [
+        "any[] (oldMap)",
+        "any[] (newMap)",
+        "[Ghost:Read] getCycles (getCycles)"
+      ],
+      "answer": [
+        "DriftReport"
       ]
     }
   },
@@ -171,7 +206,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "执行 buildSelfBootstrapArchitecture 流程",
+      "problem": "execute buildSelfBootstrapArchitecture flow",
       "demand": [
         "WorkspacePaths (paths)"
       ],
@@ -185,9 +220,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "执行 buildSelfBootstrapProtocol 流程",
+      "problem": "execute buildSelfBootstrapProtocol flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] getSelfBootstrapNodeIds (getSelfBootstrapNodeIds)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] readTriadMap (readTriadMap)"
       ],
       "answer": [
         "UpgradeProtocol"
@@ -199,12 +237,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "执行 writeSelfBootstrapProtocol 流程",
+      "problem": "execute writeSelfBootstrapProtocol flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
-        "UpgradeProtocol"
+        "void"
       ]
     }
   },
@@ -213,12 +252,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "执行 writeSelfBootstrapReport 流程",
+      "problem": "execute writeSelfBootstrapReport flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] renderSelfBootstrapMarkdown (renderSelfBootstrapMarkdown)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -227,12 +268,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "执行 getBootstrapModuleRoles 流程",
+      "problem": "execute getBootstrapModuleRoles flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "{ readonly Adapter: { readonly role: \"语言适配器选择层，把协议执行委托给当前项目语言插件。\"; readonly staticRightBranch: readonly [\"adapter registry\", \"language\", \"parserEngine\", \"adapterPackage\"]; }; readonly Bootstrap: { readonly role: \"自举证明层，把 TriadMind 自己描述为顶点三元架构。\"; readonly staticRightBranch: readonly [\"self-bootstrap.md\", \"self-bootstrap-protocol.json\"]; }; readonly BootstrapRightBranch: { readonly role: \"自举右分支目录，集中保存模块职责目录、节点复用清单和自举文案模板。\"; readonly staticRightBranch: readonly [\"module roles\", \"self bootstrap node ids\", \"rendering text\"]; }; readonly Config: { readonly role: \"静态配置层，约束解析器、协议置信度、运行时自愈和目录分类。\"; readonly staticRightBranch: readonly [\"TriadConfig\", \"DEFAULT_CONFIG\", \".triadmind/config.json\"]; }; readonly Generator: { readonly role: \"骨架落地左分支，把已批准协议真正落地为 TypeScript 源码结构。\"; readonly staticRightBranch: readonly [\"apply pipeline\", \"node upsert execution\"]; }; readonly GeneratorRightBranch: { readonly role: \"骨架生成右分支目录，集中保存类型白名单、源码路径策略和结构模板。\"; readonly staticRightBranch: readonly [\"builtin type names\", \"source path strategy\", \"method/function templates\"]; }; readonly Healing: { readonly role: \"运行时自愈左分支，把错误栈映射回拓扑节点并生成修复提示词。\"; readonly staticRightBranch: readonly [\"diagnosis pipeline\", \"artifact writing\"]; }; readonly HealingRightBranch: { readonly role: \"运行时自愈右分支目录，集中保存错误分类规则、blast radius 策略和 healing prompt 固定规则。\"; readonly staticRightBranch: readonly [\"classification regexes\", \"blast radius strategy\", \"prompt output rules\"]; }; readonly Ir: { readonly role: \"跨语言中间表示层，把语言 AST 映射为 Triad-IR。\"; readonly staticRightBranch: readonly [\"TriadTopologyIR\", \"TriadIRNode\", \"TriadIREdge\"]; }; readonly Parser: { readonly role: \"源码拓扑抽取层，把 TypeScript 源码抽取为 triad-map 叶节点。\"; readonly staticRightBranch: readonly [\"tsconfig.json\", \"JSDoc tags\", \"sourcePath\"]; }; readonly Protocol: { readonly role: \"协议编译器左分支，用 Schema 与拓扑规则拦截非法演化。\"; readonly staticRightBranch: readonly [\"validation pipeline\", \"node parsing\", \"topology checks\"]; }; readonly ProtocolRightBranch: { readonly role: \"协议右分支目录，集中保存类型、Schema、操作枚举和类别映射。\"; readonly staticRightBranch: readonly [\"Triad types\", \"Zod schemas\", \"prefix category map\"]; }; readonly Rules: { readonly role: \"Always-on 规则层，把顶点三元约束写入 AI 助手默认上下文。\"; readonly staticRightBranch: readonly [\"AGENTS.md\", \".cursor/rules/triadmind.mdc\", \"agent-rules.md\"]; }; readonly Snapshot: { readonly role: \"安全快照层，为 apply 和自愈循环提供可回滚边界。\"; readonly staticRightBranch: readonly [\"snapshot index\", \"snapshot files\", \"restore manifest\"]; }; readonly Stage: { readonly role: \"阶段识别层，判断当前处于规划、审核、实现还是修复阶段。\"; readonly staticRightBranch: readonly [\"StageAnalysisInput\", \"StageAnalysisResult\"]; }; readonly Sync: { readonly role: \"增量同步层，基于文件哈希保持 triad-map 与源码同步。\"; readonly staticRightBranch: readonly [\"sync-manifest.json\", \"sha256 file digests\"]; }; readonly TreeSitterParser: { readonly role: \"Tree-sitter 解析层，为跨语言泛化提供统一 AST 路径。\"; readonly staticRightBranch: readonly [\"tree-sitter grammar\", \"query patterns\"]; }; readonly Visualizer: { readonly role: \"拓扑审核层，把协议和现有地图渲染为知识图谱。\"; readonly staticRightBranch: readonly [\"visualizer.html\", \"node status\", \"edge status\"]; }; readonly Workflow: { readonly role: \"多轮推演编排左分支，生成 Macro/Meso/Micro/Protocol/Handoff 提示词。\"; readonly staticRightBranch: readonly [\"workflow execution pipeline\"]; }; readonly WorkflowRightBranch: { readonly role: \"工作流右分支目录，集中保存协议模板、阶段规则和提示词固定结构。\"; readonly staticRightBranch: readonly [\"draft templates\", \"stage router rules\", \"prompt shapes\"]; }; readonly Workspace: { readonly role: \"工作区路径层，统一描述 .triadmind 文件系统边界。\"; readonly staticRightBranch: readonly [\"WorkspacePaths\", \"projectRoot\", \".triadmind paths\"]; }; }"
+        "void"
       ]
     }
   },
@@ -241,12 +282,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "执行 getSelfBootstrapLoopLines 流程",
+      "problem": "execute getSelfBootstrapLoopLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -255,12 +296,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "执行 getSelfBootstrapMicroRules 流程",
+      "problem": "execute getSelfBootstrapMicroRules flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -269,12 +310,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "执行 getSelfBootstrapNodeIds 流程",
+      "problem": "execute getSelfBootstrapNodeIds flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -283,12 +324,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "执行 getSelfBootstrapPreamble 流程",
+      "problem": "execute getSelfBootstrapPreamble flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -297,10 +338,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "执行 ensureTriadConfig 流程",
+      "problem": "execute ensureTriadConfig flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)"
+        "unknown (force)",
+        "[Ghost:Read] buildDefaultConfig (buildDefaultConfig)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -312,9 +355,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "执行 loadTriadConfig 流程",
+      "problem": "execute loadTriadConfig flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] TriadConfig (DEFAULT_CONFIG)",
+        "[Ghost:Read] ensureTriadConfig (ensureTriadConfig)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "TriadConfig"
@@ -326,10 +372,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "执行 resolveCategoryFromConfig 流程",
+      "problem": "execute resolveCategoryFromConfig flow",
       "demand": [
         "string (sourcePath)",
-        "TriadConfig (config)"
+        "TriadConfig (config)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] TriadCategory (TriadCategory)"
       ],
       "answer": [
         "TriadCategory"
@@ -341,13 +389,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "执行 shouldExcludeSourcePath 流程",
+      "problem": "execute shouldExcludeSourcePath flow",
       "demand": [
         "string (sourcePath)",
-        "TriadConfig (config)"
+        "TriadConfig (config)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "boolean"
+        "void"
       ]
     }
   },
@@ -356,10 +405,11 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generator.ts",
     "fission": {
-      "problem": "执行 applyProtocol 流程",
+      "problem": "execute applyProtocol flow",
       "demand": [
         "string (projectRoot)",
-        "string (protocolPath)"
+        "string (protocolPath)",
+        "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
         "{ changedFiles: string[] }"
@@ -371,7 +421,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 buildFunctionStructure 流程",
+      "problem": "execute buildFunctionStructure flow",
       "demand": [
         "ParsedNodeRef (ref)",
         "TriadNodeDefinition (node)",
@@ -389,13 +439,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 buildMethodStructure 流程",
+      "problem": "execute buildMethodStructure flow",
       "demand": [
         "ParsedNodeRef (ref)",
         "TriadNodeDefinition (node)",
         "OptionalKind<ParameterDeclarationStructure>[] (parameters)",
         "string (returnType)",
-        "boolean (includeTodo)"
+        "boolean (includeTodo)",
+        "[Ghost:Read] Scope (Scope)"
       ],
       "answer": [
         "OptionalKind<MethodDeclarationStructure>"
@@ -407,12 +458,15 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 buildParameters 流程",
+      "problem": "execute buildParameters flow",
       "demand": [
-        "string[] (demand)"
+        "string[] (demand)",
+        "[Ghost:Read] OptionalKind (OptionalKind)",
+        "[Ghost:Read] ParameterDeclarationStructure (ParameterDeclarationStructure)",
+        "[Ghost:Read] parseDemandEntry (parseDemandEntry)"
       ],
       "answer": [
-        "OptionalKind<ParameterDeclarationStructure>[]"
+        "void"
       ]
     }
   },
@@ -421,13 +475,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 buildTodoStatement 流程",
+      "problem": "execute buildTodoStatement flow",
       "demand": [
         "string (nodeId)",
         "string (responsibility)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -436,12 +490,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 buildTriadGeneratedDoc 流程",
+      "problem": "execute buildTriadGeneratedDoc flow",
       "demand": [
         "string (responsibility)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -450,12 +504,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 collectTypeTokens 流程",
+      "problem": "execute collectTypeTokens flow",
       "demand": [
-        "string (typeText)"
+        "string (typeText)",
+        "[Ghost:Read] getBuiltinTypeNames (getBuiltinTypeNames)"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -464,12 +519,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 getBuiltinTypeNames 流程",
+      "problem": "execute getBuiltinTypeNames flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] Set (BUILTIN_TYPE_NAMES)"
       ],
       "answer": [
-        "Set<string>"
+        "void"
       ]
     }
   },
@@ -478,12 +534,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 normalizeToken 流程",
+      "problem": "execute normalizeToken flow",
       "demand": [
         "string (value)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -492,15 +548,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 resolveSourceFilePath 流程",
+      "problem": "execute resolveSourceFilePath flow",
       "demand": [
         "string (projectRoot)",
         "ParsedNodeRef (ref)",
         "TriadNodeDefinition (node)",
-        "NodeLocationMap (nodeLocations)"
+        "NodeLocationMap (nodeLocations)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -509,13 +566,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 resolveTypesModuleSpecifier 流程",
+      "problem": "execute resolveTypesModuleSpecifier flow",
       "demand": [
         "string (projectRoot)",
-        "SourceFile (sourceFile)"
+        "SourceFile (sourceFile)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -524,14 +582,15 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "执行 shouldUseTopLevelFunction 流程",
+      "problem": "execute shouldUseTopLevelFunction flow",
       "demand": [
         "SourceFile (sourceFile)",
         "ParsedNodeRef (ref)",
-        "string (sourcePath)"
+        "string (sourcePath)",
+        "[Ghost:Read] normalizeToken (normalizeToken)"
       ],
       "answer": [
-        "boolean"
+        "void"
       ]
     }
   },
@@ -540,14 +599,17 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "执行 buildHealingPrompt 流程",
+      "problem": "execute buildHealingPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (errorText)",
-        "HealingDiagnosis (diagnosis)"
+        "HealingDiagnosis (diagnosis)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getHealingOutputRuleLines (getHealingOutputRuleLines)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -556,12 +618,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "执行 diagnoseRuntimeFailure 流程",
+      "problem": "execute diagnoseRuntimeFailure flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (errorText)",
         "number (retryCount)",
-        "TriadNodeDefinition[] (nodes)"
+        "TriadNodeDefinition[] (nodes)",
+        "[Ghost:Read] buildSummary (buildSummary)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "HealingDiagnosis"
@@ -573,14 +637,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "执行 prepareHealingArtifacts 流程",
+      "problem": "execute prepareHealingArtifacts flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (errorText)",
-        "unknown (retryCount)"
+        "unknown (retryCount)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] HealingDiagnosis (HealingDiagnosis)"
       ],
       "answer": [
-        "{ diagnosis: HealingDiagnosis; prompt: string; }"
+        "void"
       ]
     }
   },
@@ -589,7 +655,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 buildEvidence 流程",
+      "problem": "execute buildEvidence flow",
       "demand": [
         "string (errorText)",
         "RuntimeTraceFrame[] (traceFrames)",
@@ -598,7 +664,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
         "BlastRadius (blastRadius)"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -607,7 +673,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 buildSummary 流程",
+      "problem": "execute buildSummary flow",
       "demand": [
         "TriadNodeDefinition | null (matchedNode)",
         "HealingBranchKind (diagnosis)",
@@ -615,7 +681,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
         "BlastRadius (blastRadius)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -624,7 +690,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 chooseSuggestedAction 流程",
+      "problem": "execute chooseSuggestedAction flow",
       "demand": [
         "HealingBranchKind (diagnosis)",
         "number (retryCount)",
@@ -640,7 +706,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 classifyDiagnosis 流程",
+      "problem": "execute classifyDiagnosis flow",
       "demand": [
         "string (errorText)"
       ],
@@ -654,10 +720,11 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 estimateBlastRadius 流程",
+      "problem": "execute estimateBlastRadius flow",
       "demand": [
         "TriadNodeDefinition | null (rootNode)",
-        "TriadNodeDefinition[] (nodes)"
+        "TriadNodeDefinition[] (nodes)",
+        "boolean (isContractChange)"
       ],
       "answer": [
         "BlastRadius"
@@ -669,12 +736,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 getContractGuardLine 流程",
+      "problem": "execute getContractGuardLine flow",
       "demand": [
         "boolean (requireHumanApprovalForContractChanges)"
       ],
       "answer": [
-        "\"如果判断为 Demand / Answer 契约变更，请只输出待审阅协议，不要假定可直接自动落盘。\" | \"契约变更允许自动生成待执行协议。\""
+        "void"
       ]
     }
   },
@@ -683,12 +750,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 getHealingOutputRuleLines 流程",
+      "problem": "execute getHealingOutputRuleLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -697,14 +764,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 parseTraceLine 流程",
+      "problem": "execute parseTraceLine flow",
       "demand": [
         "string (line)",
         "string (projectRootNormalized)",
-        "string (projectRoot)"
+        "string (projectRoot)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
-        "{ raw: string; sourcePath: string; line: number; column: number; symbol: string | undefined; } | null"
+        "void"
       ]
     }
   },
@@ -713,13 +782,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "执行 scoreNodeMatch 流程",
+      "problem": "execute scoreNodeMatch flow",
       "demand": [
         "RuntimeTraceFrame (frame)",
-        "TriadNodeDefinition (node)"
+        "TriadNodeDefinition (node)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "number"
+        "void"
       ]
     }
   },
@@ -728,7 +798,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "ir.ts",
     "fission": {
-      "problem": "执行 buildTopologyIR 流程",
+      "problem": "execute buildTopologyIR flow",
       "demand": [
         "TriadNodeDefinition[] (nodes)",
         "TriadLanguage (language)"
@@ -743,13 +813,110 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "parser.ts",
     "fission": {
-      "problem": "执行 runParser 流程",
+      "problem": "execute runParser flow",
       "demand": [
         "string (targetDir)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
         "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "PolyglotAdapter.createCppAdapter",
+    "category": "core",
+    "sourcePath": "polyglotAdapter.ts",
+    "fission": {
+      "problem": "execute createCppAdapter flow",
+      "demand": [
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
+      ],
+      "answer": [
+        "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "PolyglotAdapter.createGoAdapter",
+    "category": "core",
+    "sourcePath": "polyglotAdapter.ts",
+    "fission": {
+      "problem": "execute createGoAdapter flow",
+      "demand": [
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
+      ],
+      "answer": [
+        "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "PolyglotAdapter.createJavaAdapter",
+    "category": "core",
+    "sourcePath": "polyglotAdapter.ts",
+    "fission": {
+      "problem": "execute createJavaAdapter flow",
+      "demand": [
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
+      ],
+      "answer": [
+        "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "PolyglotAdapter.createJavaScriptAdapter",
+    "category": "core",
+    "sourcePath": "polyglotAdapter.ts",
+    "fission": {
+      "problem": "execute createJavaScriptAdapter flow",
+      "demand": [
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
+      ],
+      "answer": [
+        "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "PolyglotAdapter.createPythonAdapter",
+    "category": "core",
+    "sourcePath": "polyglotAdapter.ts",
+    "fission": {
+      "problem": "execute createPythonAdapter flow",
+      "demand": [
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
+      ],
+      "answer": [
+        "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "PolyglotAdapter.createRustAdapter",
+    "category": "core",
+    "sourcePath": "polyglotAdapter.ts",
+    "fission": {
+      "problem": "execute createRustAdapter flow",
+      "demand": [
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
+      ],
+      "answer": [
+        "LanguageAdapter"
       ]
     }
   },
@@ -758,13 +925,17 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "执行 assertProtocolShape 流程",
+      "problem": "execute assertProtocolShape flow",
       "demand": [
         "UpgradeProtocol (protocol)",
-        "ProtocolValidationContext (context)"
+        "ProtocolValidationContext (context)",
+        "[Ghost:Read] getUpgradeProtocolSchema (getUpgradeProtocolSchema)",
+        "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)",
+        "[Ghost:Read] validateConfidenceRules (validateConfidenceRules)",
+        "[Ghost:Read] validateTopologyRules (validateTopologyRules)"
       ],
       "answer": [
-        "UpgradeProtocol"
+        "void"
       ]
     }
   },
@@ -773,10 +944,11 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "执行 normalizeCategory 流程",
+      "problem": "execute normalizeCategory flow",
       "demand": [
         "string (category)",
-        "TriadCategory (fallback)"
+        "TriadCategory (fallback)",
+        "[Ghost:Read] getPrefixCategoryMap (getPrefixCategoryMap)"
       ],
       "answer": [
         "TriadCategory"
@@ -788,7 +960,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "执行 parseDemandEntry 流程",
+      "problem": "execute parseDemandEntry flow",
       "demand": [
         "string (entry)",
         "number (index)"
@@ -803,7 +975,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "执行 parseNodeRef 流程",
+      "problem": "execute parseNodeRef flow",
       "demand": [
         "string (nodeId)",
         "string (category)"
@@ -818,12 +990,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "执行 parseReturnType 流程",
+      "problem": "execute parseReturnType flow",
       "demand": [
         "string (answer)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -832,9 +1004,10 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "执行 readJsonFile 流程",
+      "problem": "execute readJsonFile flow",
       "demand": [
-        "string (filePath)"
+        "string (filePath)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "T"
@@ -846,12 +1019,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "执行 readTriadMap 流程",
+      "problem": "execute readTriadMap flow",
       "demand": [
-        "string (mapPath)"
+        "string (mapPath)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getTriadNodeDefinitionSchema (getTriadNodeDefinitionSchema)",
+        "[Ghost:Read] readJsonFile (readJsonFile)",
+        "[Ghost:Read] TriadNodeDefinition (TriadNodeDefinition)"
       ],
       "answer": [
-        "TriadNodeDefinition[]"
+        "void"
       ]
     }
   },
@@ -860,12 +1037,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocolRightBranch.ts",
     "fission": {
-      "problem": "执行 getPrefixCategoryMap 流程",
+      "problem": "execute getPrefixCategoryMap flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] Record<string, TriadCategory> (PREFIX_CATEGORY_MAP)"
       ],
       "answer": [
-        "Record<string, TriadCategory>"
+        "void"
       ]
     }
   },
@@ -874,12 +1052,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocolRightBranch.ts",
     "fission": {
-      "problem": "执行 getTriadNodeDefinitionSchema 流程",
+      "problem": "execute getTriadNodeDefinitionSchema flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] object (triadNodeDefinitionSchema)"
       ],
       "answer": [
-        "z.ZodObject<{ nodeId: z.ZodString; category: z.ZodOptional<z.ZodEnum<{ frontend: \"frontend\"; backend: \"backend\"; core: \"core\"; }>>; sourcePath: z.ZodOptional<z.ZodString>; fission: z.ZodObject<{ problem: z.ZodString; demand: z.ZodArray<z.ZodString>; answer: z.ZodArray<z.ZodString>; }, z.core.$strip>; }, z.core.$strip>"
+        "void"
       ]
     }
   },
@@ -888,12 +1067,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "protocolRightBranch.ts",
     "fission": {
-      "problem": "执行 getUpgradeProtocolSchema 流程",
+      "problem": "execute getUpgradeProtocolSchema flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] object (upgradeProtocolSchema)"
       ],
       "answer": [
-        "z.ZodObject<{ protocolVersion: z.ZodOptional<z.ZodString>; project: z.ZodOptional<z.ZodString>; mapSource: z.ZodOptional<z.ZodString>; userDemand: z.ZodOptional<z.ZodString>; upgradePolicy: z.ZodOptional<z.ZodObject<{ allowedOps: z.ZodOptional<z.ZodArray<z.ZodEnum<{ modify: \"modify\"; create_child: \"create_child\"; reuse: \"reuse\"; }>>>; principle: z.ZodOptional<z.ZodString>; }, z.core.$strip>>; macroSplit: z.ZodOptional<z.ZodObject<{ anchorNodeId: z.ZodString; vertexGoal: z.ZodString; leftBranch: z.ZodArray<z.ZodString>; rightBranch: z.ZodArray<z.ZodString>; }, z.core.$strip>>; mesoSplit: z.ZodOptional<z.ZodObject<{ classes: z.ZodArray<z.ZodObject<{ className: z.ZodString; category: z.ZodString; responsibility: z.ZodString; upstreams: z.ZodArray<z.ZodString>; downstreams: z.ZodArray<z.ZodString>; }, z.core.$strip>>; pipelines: z.ZodArray<z.ZodObject<{ pipelineId: z.ZodString; purpose: z.ZodString; steps: z.ZodArray<z.ZodString>; }, z.core.$strip>>; }, z.core.$strip>>; microSplit: z.ZodOptional<z.ZodObject<{ classes: z.ZodArray<z.ZodObject<{ className: z.ZodString; staticRightBranch: z.ZodArray<z.ZodObject<{ name: z.ZodString; type: z.ZodString; role: z.ZodString; }, z.core.$strip>>; dynamicLeftBranch: z.ZodArray<z.ZodObject<{ name: z.ZodString; demand: z.ZodArray<z.ZodString>; answer: z.ZodArray<z.ZodString>; responsibility: z.ZodString; }, z.core.$strip>>; }, z.core.$strip>>; }, z.core.$strip>>; actions: z.ZodArray<z.ZodDiscriminatedUnion<[z.ZodObject<{ op: z.ZodLiteral<\"reuse\">; nodeId: z.ZodString; reason: z.ZodOptional<z.ZodString>; confidence: z.ZodOptional<z.ZodNumber>; }, z.core.$strip>, z.ZodObject<{ op: z.ZodLiteral<\"modify\">; nodeId: z.ZodString; category: z.ZodOptional<z.ZodEnum<{ frontend: \"frontend\"; backend: \"backend\"; core: \"core\"; }>>; sourcePath: z.ZodOptional<z.ZodString>; fission: z.ZodObject<{ problem: z.ZodString; demand: z.ZodArray<z.ZodString>; answer: z.ZodArray<z.ZodString>; }, z.core.$strip>; reason: z.ZodOptional<z.ZodString>; reuse: z.ZodOptional<z.ZodArray<z.ZodString>>; confidence: z.ZodOptional<z.ZodNumber>; }, z.core.$strip>, z.ZodObject<{ op: z.ZodLiteral<\"create_child\">; parentNodeId: z.ZodString; node: z.ZodObject<{ nodeId: z.ZodString; category: z.ZodOptional<z.ZodEnum<{ frontend: \"frontend\"; backend: \"backend\"; core: \"core\"; }>>; sourcePath: z.ZodOptional<z.ZodString>; fission: z.ZodObject<{ problem: z.ZodString; demand: z.ZodArray<z.ZodString>; answer: z.ZodArray<z.ZodString>; }, z.core.$strip>; }, z.core.$strip>; reason: z.ZodOptional<z.ZodString>; reuse: z.ZodOptional<z.ZodArray<z.ZodString>>; confidence: z.ZodOptional<z.ZodNumber>; }, z.core.$strip>], \"op\">>; resultTopology: z.ZodOptional<z.ZodArray<z.ZodObject<{ nodeId: z.ZodString; category: z.ZodOptional<z.ZodEnum<{ frontend: \"frontend\"; backend: \"backend\"; core: \"core\"; }>>; sourcePath: z.ZodOptional<z.ZodString>; fission: z.ZodObject<{ problem: z.ZodString; demand: z.ZodArray<z.ZodString>; answer: z.ZodArray<z.ZodString>; }, z.core.$strip>; }, z.core.$strip>>>; }, z.core.$strip>"
+        "void"
       ]
     }
   },
@@ -902,9 +1082,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "rules.ts",
     "fission": {
-      "problem": "执行 installAlwaysOnRules 流程",
+      "problem": "execute installAlwaysOnRules flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] buildCursorRule (buildCursorRule)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] upsertAgentsMd (upsertAgentsMd)"
       ],
       "answer": [
         "void"
@@ -916,13 +1100,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "执行 collectProtocolSnapshotFiles 流程",
+      "problem": "execute collectProtocolSnapshotFiles flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "UpgradeProtocol (protocol)"
+        "UpgradeProtocol (protocol)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -931,14 +1116,17 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "执行 createSnapshot 流程",
+      "problem": "execute createSnapshot flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (label)",
-        "string[] (filePaths)"
+        "string[] (filePaths)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] updateSnapshotIndex (updateSnapshotIndex)"
       ],
       "answer": [
-        "TriadSnapshot"
+        "void"
       ]
     }
   },
@@ -947,12 +1135,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "执行 listSnapshots 流程",
+      "problem": "execute listSnapshots flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
-        "Pick<TriadSnapshot, \"id\" | \"label\" | \"createdAt\">[]"
+        "void"
       ]
     }
   },
@@ -961,13 +1150,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "执行 restoreSnapshot 流程",
+      "problem": "execute restoreSnapshot flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (snapshotId)"
+        "string (snapshotId)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] listSnapshots (listSnapshots)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
-        "TriadSnapshot"
+        "void"
       ]
     }
   },
@@ -976,7 +1168,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "stage.ts",
     "fission": {
-      "problem": "执行 analyzeWorkspaceStage 流程",
+      "problem": "execute analyzeWorkspaceStage flow",
       "demand": [
         "StageAnalysisInput (input)"
       ],
@@ -990,13 +1182,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "执行 syncTriadMap 流程",
+      "problem": "execute syncTriadMap flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)"
+        "unknown (force)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
-        "{ changed: boolean; fileCount: number; }"
+        "void"
       ]
     }
   },
@@ -1005,9 +1200,59 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "执行 watchTriadMap 流程",
+      "problem": "execute watchTriadMap flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] module (fs)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "TreeSitterGhostScanner.scanTreeSitterGhostReferences",
+    "category": "core",
+    "sourcePath": "treeSitterGhostScanner.ts",
+    "fission": {
+      "problem": "execute scanTreeSitterGhostReferences flow",
+      "demand": [
+        "Parser.SyntaxNode (executableNode)",
+        "TreeSitterGhostScanOptions (options)",
+        "[Ghost:Read] collectLocalNames (collectLocalNames)",
+        "[Ghost:Read] getGhostAccessMode (getGhostAccessMode)",
+        "[Ghost:Read] isDeclarationName (isDeclarationName)",
+        "[Ghost:Read] isIdentifierNode (isIdentifierNode)",
+        "[Ghost:Read] isMemberExpression (isMemberExpression)",
+        "[Ghost:Read] isMemberPropertyName (isMemberPropertyName)",
+        "[Ghost:Read] isMemberRootIdentifier (isMemberRootIdentifier)",
+        "[Ghost:Read] isOutermostMemberExpression (isOutermostMemberExpression)",
+        "[Ghost:Read] mergeReference (mergeReference)",
+        "[Ghost:Read] walkNodes (walkNodes)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "TreeSitterParser.runTreeSitterParser",
+    "category": "core",
+    "sourcePath": "treeSitterParser.ts",
+    "fission": {
+      "problem": "execute runTreeSitterParser flow",
+      "demand": [
+        "TriadLanguage (language)",
+        "string (targetDir)",
+        "string (outputPath)",
+        "TriadConfig (config)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] collectLanguageNodes (collectLanguageNodes)",
+        "[Ghost:Read] dedupeNodes (dedupeNodes)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] Record<TriadLanguage, any> (TREE_SITTER_LANGUAGES)"
       ],
       "answer": [
         "void"
@@ -1019,11 +1264,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "treeSitterParser.ts",
     "fission": {
-      "problem": "执行 runTreeSitterTypeScriptParser 流程",
+      "problem": "execute runTreeSitterTypeScriptParser flow",
       "demand": [
         "string (targetDir)",
         "string (outputPath)",
-        "TriadConfig (config)"
+        "TriadConfig (config)",
+        "[Ghost:Read] runTreeSitterParser (runTreeSitterParser)"
       ],
       "answer": [
         "void"
@@ -1035,10 +1281,11 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "执行 applyUpgradeProtocol 流程",
+      "problem": "execute applyUpgradeProtocol flow",
       "demand": [
         "string (projectRoot)",
-        "string (protocolPath)"
+        "string (protocolPath)",
+        "[Ghost:Read] applyTypeScriptProtocol (applyTypeScriptProtocol)"
       ],
       "answer": [
         "{ changedFiles: string[] }"
@@ -1050,9 +1297,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "执行 createTypeScriptAdapter 流程",
+      "problem": "execute createTypeScriptAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] applyUpgradeProtocol (applyUpgradeProtocol)",
+        "[Ghost:Read] parseTopology (parseTopology)",
+        "[Ghost:Read] readTopologyIR (readTopologyIR)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -1064,10 +1314,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "执行 parseTopology 流程",
+      "problem": "execute parseTopology flow",
       "demand": [
         "string (projectRoot)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] runTreeSitterParser (runTreeSitterParser)",
+        "[Ghost:Read] runTypeScriptParser (runTypeScriptParser)"
       ],
       "answer": [
         "void"
@@ -1079,9 +1331,11 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "执行 readTopologyIR 流程",
+      "problem": "execute readTopologyIR flow",
       "demand": [
-        "string (projectRoot)"
+        "string (projectRoot)",
+        "[Ghost:Read] buildTopologyIR (buildTopologyIR)",
+        "[Ghost:Read] readTriadMap (readTriadMap)"
       ],
       "answer": [
         "TriadTopologyIR"
@@ -1093,10 +1347,15 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "typescriptGenerator.ts",
     "fission": {
-      "problem": "执行 applyTypeScriptProtocol 流程",
+      "problem": "execute applyTypeScriptProtocol flow",
       "demand": [
         "string (projectRoot)",
-        "string (protocolPath)"
+        "string (protocolPath)",
+        "[Ghost:Read] assertProtocolShape (assertProtocolShape)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)",
+        "[Ghost:Read] upsertNode (upsertNode)"
       ],
       "answer": [
         "{ changedFiles: string[] }"
@@ -1108,10 +1367,15 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "typescriptParser.ts",
     "fission": {
-      "problem": "执行 runTypeScriptParser 流程",
+      "problem": "execute runTypeScriptParser flow",
       "demand": [
         "string (targetDir)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] collectClassMethodNodes (collectClassMethodNodes)",
+        "[Ghost:Read] collectExportedFunctionNodes (collectExportedFunctionNodes)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -1123,11 +1387,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "visualizer.ts",
     "fission": {
-      "problem": "执行 generateDashboard 流程",
+      "problem": "execute generateDashboard flow",
       "demand": [
         "string (mapPath)",
         "string (protocolPath)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)"
       ],
       "answer": [
         "void"
@@ -1139,14 +1405,17 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildImplementationHandoffPrompt 流程",
+      "problem": "execute buildImplementationHandoffPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (triadSpec)",
-        "ImplementationHandoffInput (input)"
+        "ImplementationHandoffInput (input)",
+        "[Ghost:Read] getImplementationHandoffRuleLines (getImplementationHandoffRuleLines)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1155,13 +1424,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildImplementationPrompt 流程",
+      "problem": "execute buildImplementationPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getImplementationExecutionWorkflowLines (getImplementationExecutionWorkflowLines)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1170,13 +1442,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildMacroPrompt 流程",
+      "problem": "execute buildMacroPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] buildMacroPromptShape (buildMacroPromptShape)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1185,12 +1458,19 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildMasterPrompt 流程",
+      "problem": "execute buildMasterPrompt flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getMasterPromptExpectedBehaviorLines (getMasterPromptExpectedBehaviorLines)",
+        "[Ghost:Read] getMasterPromptImplementationPhaseLines (getMasterPromptImplementationPhaseLines)",
+        "[Ghost:Read] getMasterPromptProtocolPhaseLines (getMasterPromptProtocolPhaseLines)",
+        "[Ghost:Read] getMasterPromptStageRouterLines (getMasterPromptStageRouterLines)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1199,13 +1479,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildMesoPrompt 流程",
+      "problem": "execute buildMesoPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] buildMesoPromptShape (buildMesoPromptShape)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1214,13 +1495,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildMicroPrompt 流程",
+      "problem": "execute buildMicroPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] buildMicroPromptShape (buildMicroPromptShape)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1229,13 +1511,15 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildPipelinePrompt 流程",
+      "problem": "execute buildPipelinePrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1244,13 +1528,16 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 buildProtocolPrompt 流程",
+      "problem": "execute buildProtocolPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getProtocolOutputContractLines (getProtocolOutputContractLines)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1259,10 +1546,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 createDraftTemplate 流程",
+      "problem": "execute createDraftTemplate flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (userDemand)"
+        "unknown (userDemand)",
+        "unknown (force)",
+        "[Ghost:Read] createDraftProtocolTemplate (createDraftProtocolTemplate)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1274,11 +1564,17 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 ensureMultiPassTemplates 流程",
+      "problem": "execute ensureMultiPassTemplates flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (userDemand)",
-        "{ resetArtifacts?: boolean } (options)"
+        "{ resetArtifacts?: boolean } (options)",
+        "[Ghost:Read] buildMacroPrompt (buildMacroPrompt)",
+        "[Ghost:Read] buildMesoPrompt (buildMesoPrompt)",
+        "[Ghost:Read] buildMicroPrompt (buildMicroPrompt)",
+        "[Ghost:Read] ensurePipelineArtifactSeeds (ensurePipelineArtifactSeeds)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] resetPipelineArtifacts (resetPipelineArtifacts)"
       ],
       "answer": [
         "void"
@@ -1290,10 +1586,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 ensurePipelineArtifactSeeds 流程",
+      "problem": "execute ensurePipelineArtifactSeeds flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] createMacroSplitSeed (createMacroSplitSeed)",
+        "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
+        "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
+        "[Ghost:Read] writeJsonSeedIfMissing (writeJsonSeedIfMissing)"
       ],
       "answer": [
         "void"
@@ -1305,10 +1605,13 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 ensureTriadSpec 流程",
+      "problem": "execute ensureTriadSpec flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)"
+        "unknown (force)",
+        "[Ghost:Read] buildTriadSpec (buildTriadSpec)",
+        "[Ghost:Read] ensureTriadConfig (ensureTriadConfig)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1320,10 +1623,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 resetPipelineArtifacts 流程",
+      "problem": "execute resetPipelineArtifacts flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] createMacroSplitSeed (createMacroSplitSeed)",
+        "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
+        "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1335,10 +1642,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 writeImplementationHandoff 流程",
+      "problem": "execute writeImplementationHandoff flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "ImplementationHandoffInput (input)"
+        "ImplementationHandoffInput (input)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] writeMasterPrompt (writeMasterPrompt)"
       ],
       "answer": [
         "void"
@@ -1350,9 +1659,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 writeMasterPrompt 流程",
+      "problem": "execute writeMasterPrompt flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] buildMasterPrompt (buildMasterPrompt)",
+        "[Ghost:Read] ensureTriadSpec (ensureTriadSpec)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1364,10 +1676,15 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "执行 writePromptPacket 流程",
+      "problem": "execute writePromptPacket flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] createDraftTemplate (createDraftTemplate)",
+        "[Ghost:Read] ensureMultiPassTemplates (ensureMultiPassTemplates)",
+        "[Ghost:Read] ensureTriadSpec (ensureTriadSpec)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] writeMasterPrompt (writeMasterPrompt)"
       ],
       "answer": [
         "void"
@@ -1379,13 +1696,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 buildMacroPromptShape 流程",
+      "problem": "execute buildMacroPromptShape flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1394,13 +1712,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 buildMesoPromptShape 流程",
+      "problem": "execute buildMesoPromptShape flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1409,13 +1728,14 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 buildMicroPromptShape 流程",
+      "problem": "execute buildMicroPromptShape flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1424,12 +1744,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 buildTriadSpecDocument 流程",
+      "problem": "execute buildTriadSpecDocument flow",
       "demand": [
         "string (projectName)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   },
@@ -1438,14 +1758,15 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 createDraftProtocolTemplate 流程",
+      "problem": "execute createDraftProtocolTemplate flow",
       "demand": [
         "string (projectRoot)",
         "string (mapFile)",
-        "unknown (userDemand)"
+        "unknown (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
-        "{ protocolVersion: string; project: string; mapSource: string; userDemand: string; upgradePolicy: { allowedOps: string[]; principle: string; }; macroSplit: { anchorNodeId: string; vertexGoal: string; leftBranch: never[]; rightBranch: never[]; }; mesoSplit: { classes: never[]; pipelines: never[]; }; microSplit: { classes: never[]; }; actions: never[]; }"
+        "void"
       ]
     }
   },
@@ -1454,12 +1775,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 createMacroSplitSeed 流程",
+      "problem": "execute createMacroSplitSeed flow",
       "demand": [
         "string (userDemand)"
       ],
       "answer": [
-        "{ anchorNodeId: string; vertexGoal: string; leftBranch: never[]; rightBranch: never[]; }"
+        "void"
       ]
     }
   },
@@ -1468,12 +1789,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 createMesoSplitSeed 流程",
+      "problem": "execute createMesoSplitSeed flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "{ classes: never[]; pipelines: never[]; }"
+        "void"
       ]
     }
   },
@@ -1482,12 +1803,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 createMicroSplitSeed 流程",
+      "problem": "execute createMicroSplitSeed flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "{ classes: never[]; }"
+        "void"
       ]
     }
   },
@@ -1496,12 +1817,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 getImplementationExecutionWorkflowLines 流程",
+      "problem": "execute getImplementationExecutionWorkflowLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -1510,12 +1831,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 getImplementationHandoffRuleLines 流程",
+      "problem": "execute getImplementationHandoffRuleLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -1524,12 +1845,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 getMasterPromptExpectedBehaviorLines 流程",
+      "problem": "execute getMasterPromptExpectedBehaviorLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -1538,12 +1859,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 getMasterPromptImplementationPhaseLines 流程",
+      "problem": "execute getMasterPromptImplementationPhaseLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -1552,12 +1873,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 getMasterPromptProtocolPhaseLines 流程",
+      "problem": "execute getMasterPromptProtocolPhaseLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -1566,12 +1887,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 getMasterPromptStageRouterLines 流程",
+      "problem": "execute getMasterPromptStageRouterLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -1580,12 +1901,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "执行 getProtocolOutputContractLines 流程",
+      "problem": "execute getProtocolOutputContractLines flow",
       "demand": [
         "None"
       ],
       "answer": [
-        "string[]"
+        "void"
       ]
     }
   },
@@ -1594,9 +1915,10 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workspace.ts",
     "fission": {
-      "problem": "执行 getWorkspacePaths 流程",
+      "problem": "execute getWorkspacePaths flow",
       "demand": [
-        "string (projectRoot)"
+        "string (projectRoot)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "WorkspacePaths"
@@ -1608,12 +1930,12 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
     "category": "core",
     "sourcePath": "workspace.ts",
     "fission": {
-      "problem": "执行 normalizePath 流程",
+      "problem": "execute normalizePath flow",
       "demand": [
         "string (input)"
       ],
       "answer": [
-        "string"
+        "void"
       ]
     }
   }
@@ -1621,7 +1943,7 @@ D:/TraidMind/triadmind-core/.triadmind/triad-map.json
 ```
 
 [User Demand]
-"重构核心的 AST 解析与代码生成模块，引入"
+"角色与背景：你现在是底层架构师。我们要重构 cli.ts 的 triadmind plan 和 apply 流程，支持基于 Tree-sitter 的多语言生成分发。任务 1 (构建 Adapter 调度器)：在 cli.ts 中实现一个语言嗅探与调度逻辑：检查当前目标项目目录，若存在 tsconfig.json 则判定为 TypeScript；若存在 requirements.txt / pyproject.toml 则判定为 Python；若存在 go.mod 则判定为 Go。声明一个接口 interface ILanguageAdapter { applyProtocol(protocol: any, projectRoot: string): void }。任务 2 (组装拦截生命周期)：在 Init/Apply 之后：调用我们写好的 detectTopologicalDrift。若 isDegraded === true，拦截报错，拒绝执行。在 Plan 接收到 LLM 草案后：调用 calculateBlastRadius。若波及过多节点，发出警告。在最终 Apply 执行时：不再直接调用写死的 generator.ts，而是根据嗅探到的语言，将协议 JSON 传递给对应的 ILanguageAdapter 实例去执行代码生成。要求：请写出这个具有 Adapter 模式与多生命周期拦截机制的 cli.ts 核心控制流代码。"
 
 [Execution Workflow]
 1. 先执行 Macro-Split：寻找挂载点，并把功能拆成左分支=子功能、右分支=编排 / 配置。

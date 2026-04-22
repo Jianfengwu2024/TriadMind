@@ -1,78 +1,60 @@
-# TriadMind Core
+﻿# TriadMind Core
 
-TriadMind Core 是把“顶点三元法”落地为工程工具链的核心引擎。
-
-它不要求模型直接写代码，而是强制先完成：
+TriadMind Core 鏄妸鈥滈《鐐逛笁鍏冩硶鈥濊惤鍦颁负宸ョ▼宸ュ叿閾剧殑鏍稿績寮曟搸銆?
+瀹冧笉瑕佹眰妯″瀷鐩存帴鍐欎唬鐮侊紝鑰屾槸寮哄埗鍏堝畬鎴愶細
 
 ```text
-需求
--> Macro-Split（挂载点 + 左右分支）
--> Meso-Split（子功能 / 类 / 数据管道）
--> Micro-Split（属性 / 状态 / 方法 / 契约）
--> draft-protocol.json
--> visualizer.html 审核
--> apply 骨架落地
--> implementation-handoff.md 二阶段实现
-```
+闇€姹?-> Macro-Split锛堟寕杞界偣 + 宸﹀彸鍒嗘敮锛?-> Meso-Split锛堝瓙鍔熻兘 / 绫?/ 鏁版嵁绠￠亾锛?-> Micro-Split锛堝睘鎬?/ 鐘舵€?/ 鏂规硶 / 濂戠害锛?-> draft-protocol.json
+-> visualizer.html 瀹℃牳
+-> apply 楠ㄦ灦钀藉湴
+-> implementation-handoff.md 浜岄樁娈靛疄鐜?```
 
 ## Core Principles
 
-- `顶点`：一个可用功能，是左右分支的逻辑封装
-- `左分支`：动态演化，动作、方法、流程、子功能执行
-- `右分支`：静态稳定，属性、状态、配置、契约、编排
-- `reuse -> modify -> create_child`：永远先复用，再最小修改，最后才裂变新叶节点
+- `椤剁偣`锛氫竴涓彲鐢ㄥ姛鑳斤紝鏄乏鍙冲垎鏀殑閫昏緫灏佽
+- `宸﹀垎鏀痐锛氬姩鎬佹紨鍖栵紝鍔ㄤ綔銆佹柟娉曘€佹祦绋嬨€佸瓙鍔熻兘鎵ц
+- `鍙冲垎鏀痐锛氶潤鎬佺ǔ瀹氾紝灞炴€с€佺姸鎬併€侀厤缃€佸绾︺€佺紪鎺?- `reuse -> modify -> create_child`锛氭案杩滃厛澶嶇敤锛屽啀鏈€灏忎慨鏀癸紝鏈€鍚庢墠瑁傚彉鏂板彾鑺傜偣
 
 ## Current Capabilities
 
-- 严格协议校验：基于 `zod` 校验 `draft-protocol.json`
-- 置信度守卫：支持 `protocol.minConfidence` / `protocol.requireConfidence`
-- 图谱式审核：`visualizer.html` 已改为知识图谱风格，突出新叶节点和新增连线
-- 增量同步：基于文件哈希缓存，只在源码变化时重建 `triad-map.json`
-- 持续监听：`watch` 模式持续同步拓扑
-- Always-on 规则：自动写入 `.triadmind/agent-rules.md`、`AGENTS.md`、`.cursor/rules/triadmind.mdc`
-- 运行时自愈脚手架：运行错误 -> 节点映射 -> 三元诊断 -> 修复协议提示词
-- 安全快照：`apply` 前后可做本地回滚保护
-- 适配器架构：`adapterRegistry + LanguageAdapter + polyglotAdapter` 已稳定接入 `javascript / python / go / rust / cpp / java`
-- 统一 Tree-sitter 路径：`typescript / javascript / python / go / rust / cpp / java` 均默认走同一套 Tree-sitter AST 抽取链路
-- 兼容回退：`native` 解析器仅作为显式配置的兼容路径保留，不再作为默认工业路径
-- Ghost State Scanner：`typescriptParser.ts` 与 `treeSitterParser.ts` 会扫描 TypeScript / JavaScript / Python / Go / Rust / C++ / Java 的方法体与函数体，把未通过入参传入的隐式依赖追加到 `fission.demand`
-- 通用 Ghost 内核：`treeSitterGhostScanner.ts` 提供跨语言 Tree-sitter `Node.type / Node.text / Cursor` 扫描核心，解析器只负责把 Ghost 引用映射成语言级类型
-- 本地 import 解析升级：Tree-sitter 路径现在会优先解析工作区内可落地的本地导入，再把导入符号映射到真实类型，而不是只靠名称猜测
-- 可调用类型推断升级：解析器会为顶层函数 / 方法记录返回类型元信息，用于变量初始化、调用表达式和跨文件绑定的二次推断
-- Ghost 标签分级：会输出 `[Ghost:Read]`、`[Ghost:Write]`、`[Ghost:ReadWrite]`，覆盖 `this.xxx` / `self.xxx` / Go receiver 字段 / C++-Java 类字段、导入单例与模块级外部变量
-- 默认路径生效：即使项目保持 `tree-sitter` 作为默认解析器，也会提取 TypeScript / JavaScript / Python 的隐式状态依赖
-
+- 涓ユ牸鍗忚鏍￠獙锛氬熀浜?`zod` 鏍￠獙 `draft-protocol.json`
+- 缃俊搴﹀畧鍗細鏀寔 `protocol.minConfidence` / `protocol.requireConfidence`
+- 鍥捐氨寮忓鏍革細`visualizer.html` 宸叉敼涓虹煡璇嗗浘璋遍鏍硷紝绐佸嚭鏂板彾鑺傜偣鍜屾柊澧炶繛绾?- 澧為噺鍚屾锛氬熀浜庢枃浠跺搱甯岀紦瀛橈紝鍙湪婧愮爜鍙樺寲鏃堕噸寤?`triad-map.json`
+- 鎸佺画鐩戝惉锛歚watch` 妯″紡鎸佺画鍚屾鎷撴墤
+- Always-on 瑙勫垯锛氳嚜鍔ㄥ啓鍏?`.triadmind/agent-rules.md`銆乣AGENTS.md`銆乣.cursor/rules/triadmind.mdc`
+- 杩愯鏃惰嚜鎰堣剼鎵嬫灦锛氳繍琛岄敊璇?-> 鑺傜偣鏄犲皠 -> 涓夊厓璇婃柇 -> 淇鍗忚鎻愮ず璇?- 瀹夊叏蹇収锛歚apply` 鍓嶅悗鍙仛鏈湴鍥炴粴淇濇姢
+- 閫傞厤鍣ㄦ灦鏋勶細`adapterRegistry + LanguageAdapter + polyglotAdapter` 宸茬ǔ瀹氭帴鍏?`javascript / python / go / rust / cpp / java`
+- 缁熶竴 Tree-sitter 璺緞锛歚typescript / javascript / python / go / rust / cpp / java` 鍧囬粯璁よ蛋鍚屼竴濂?Tree-sitter AST 鎶藉彇閾捐矾
+- 鍏煎鍥為€€锛歚native` 瑙ｆ瀽鍣ㄤ粎浣滀负鏄惧紡閰嶇疆鐨勫吋瀹硅矾寰勪繚鐣欙紝涓嶅啀浣滀负榛樿宸ヤ笟璺緞
+- Ghost State Scanner锛歚typescriptParser.ts` 涓?`treeSitterParser.ts` 浼氭壂鎻?TypeScript / JavaScript / Python / Go / Rust / C++ / Java 鐨勬柟娉曚綋涓庡嚱鏁颁綋锛屾妸鏈€氳繃鍏ュ弬浼犲叆鐨勯殣寮忎緷璧栬拷鍔犲埌 `fission.demand`
+- 閫氱敤 Ghost 鍐呮牳锛歚treeSitterGhostScanner.ts` 鎻愪緵璺ㄨ瑷€ Tree-sitter `Node.type / Node.text / Cursor` 鎵弿鏍稿績锛岃В鏋愬櫒鍙礋璐ｆ妸 Ghost 寮曠敤鏄犲皠鎴愯瑷€绾х被鍨?- 鏈湴 import 瑙ｆ瀽鍗囩骇锛歍ree-sitter 璺緞鐜板湪浼氫紭鍏堣В鏋愬伐浣滃尯鍐呭彲钀藉湴鐨勬湰鍦板鍏ワ紝鍐嶆妸瀵煎叆绗﹀彿鏄犲皠鍒扮湡瀹炵被鍨嬶紝鑰屼笉鏄彧闈犲悕绉扮寽娴?- 鍙皟鐢ㄧ被鍨嬫帹鏂崌绾э細瑙ｆ瀽鍣ㄤ細涓洪《灞傚嚱鏁?/ 鏂规硶璁板綍杩斿洖绫诲瀷鍏冧俊鎭紝鐢ㄤ簬鍙橀噺鍒濆鍖栥€佽皟鐢ㄨ〃杈惧紡鍜岃法鏂囦欢缁戝畾鐨勪簩娆℃帹鏂?- Ghost 鏍囩鍒嗙骇锛氫細杈撳嚭 `[Ghost:Read]`銆乣[Ghost:Write]`銆乣[Ghost:ReadWrite]`锛岃鐩?`this.xxx` / `self.xxx` / Go receiver 瀛楁 / C++-Java 绫诲瓧娈点€佸鍏ュ崟渚嬩笌妯″潡绾у閮ㄥ彉閲?- 榛樿璺緞鐢熸晥锛氬嵆浣块」鐩繚鎸?`tree-sitter` 浣滀负榛樿瑙ｆ瀽鍣紝涔熶細鎻愬彇 TypeScript / JavaScript / Python 鐨勯殣寮忕姸鎬佷緷璧?
 ## Minimal Workflow
 
-在目标项目根目录执行：
-
+鍦ㄧ洰鏍囬」鐩牴鐩綍鎵ц锛?
 ```bash
 npm run triad:init
-npm run triad:pipeline -- "你的需求"
+npm run triad:pipeline -- "浣犵殑闇€姹?
 npm run triad:plan
 npm run triad:apply
 npm run triad:handoff
 ```
 
-推荐把 `.triadmind/master-prompt.md` 发给当前对话中的大模型，让它先完成协议规划，再进入实现。
-
+鎺ㄨ崘鎶?`.triadmind/master-prompt.md` 鍙戠粰褰撳墠瀵硅瘽涓殑澶фā鍨嬶紝璁╁畠鍏堝畬鎴愬崗璁鍒掞紝鍐嶈繘鍏ュ疄鐜般€?
 ## Install As CLI
 
-发布到 npm 后，目标项目可以这样安装：
-
+鍙戝竷鍒?npm 鍚庯紝鐩爣椤圭洰鍙互杩欐牱瀹夎锛?
 ```bash
 npm install -D triadmind-core
 ```
 
-安装后可直接使用：
-
+瀹夎鍚庡彲鐩存帴浣跨敤锛?
 ```bash
 npx triadmind init
-npx triadmind invoke -d "@triadmind 你的需求"
+npx triadmind invoke -d "@triadmind 浣犵殑闇€姹?
 npx triadmind invoke --apply
 ```
 
-也可以在目标项目 `package.json` 中配置脚本：
+涔熷彲浠ュ湪鐩爣椤圭洰 `package.json` 涓厤缃剼鏈細
 
 ```json
 {
@@ -86,7 +68,7 @@ npx triadmind invoke --apply
 }
 ```
 
-本仓库发布前检查：
+鏈粨搴撳彂甯冨墠妫€鏌ワ細
 
 ```bash
 npm run typecheck
@@ -94,8 +76,7 @@ npm run build
 npm pack --dry-run
 ```
 
-正式发布：
-
+姝ｅ紡鍙戝竷锛?
 ```bash
 npm login
 npm publish --access public
@@ -103,33 +84,29 @@ npm publish --access public
 
 ## Generated Files
 
-TriadMind 会在目标项目生成 `.triadmind/` 工作区：
+TriadMind 浼氬湪鐩爣椤圭洰鐢熸垚 `.triadmind/` 宸ヤ綔鍖猴細
 
-- `triad.md`：顶点三元法规范
-- `config.json`：架构、解析器、协议、运行时自愈配置
-- `triad-map.json`：当前项目拓扑图
-- `draft-protocol.json`：待审核拓扑升级协议
-- `visualizer.html`：知识图谱式审核页面
-- `master-prompt.md`：统一总提示词
-- `protocol-task.md`：协议子任务提示词
-- `multi-pass-pipeline.md`：多轮推演提示词
-- `implementation-prompt.md`：实现前总提示词
-- `implementation-handoff.md`：骨架落地后的实现提示词
-- `healing-report.json`：运行时错误诊断报告
-- `healing-prompt.md`：运行时自愈提示词
-- `cache/sync-manifest.json`：增量同步缓存
-- `snapshots/`：安全快照
-
+- `triad.md`锛氶《鐐逛笁鍏冩硶瑙勮寖
+- `config.json`锛氭灦鏋勩€佽В鏋愬櫒銆佸崗璁€佽繍琛屾椂鑷剤閰嶇疆
+- `triad-map.json`锛氬綋鍓嶉」鐩嫇鎵戝浘
+- `draft-protocol.json`锛氬緟瀹℃牳鎷撴墤鍗囩骇鍗忚
+- `visualizer.html`锛氱煡璇嗗浘璋卞紡瀹℃牳椤甸潰
+- `master-prompt.md`锛氱粺涓€鎬绘彁绀鸿瘝
+- `protocol-task.md`锛氬崗璁瓙浠诲姟鎻愮ず璇?- `multi-pass-pipeline.md`锛氬杞帹婕旀彁绀鸿瘝
+- `implementation-prompt.md`锛氬疄鐜板墠鎬绘彁绀鸿瘝
+- `implementation-handoff.md`锛氶鏋惰惤鍦板悗鐨勫疄鐜版彁绀鸿瘝
+- `healing-report.json`锛氳繍琛屾椂閿欒璇婃柇鎶ュ憡
+- `healing-prompt.md`锛氳繍琛屾椂鑷剤鎻愮ず璇?- `cache/sync-manifest.json`锛氬閲忓悓姝ョ紦瀛?- `snapshots/`锛氬畨鍏ㄥ揩鐓?
 ## Commands
 
-在 `triadmind-core` 仓库中：
+鍦?`triadmind-core` 浠撳簱涓細
 
 ```bash
 npm run init
-npm run invoke -- -d "@triadmind 你的需求"
-npm run pipeline -- "你的需求"
-npm run protocol -- "你的需求"
-npm run auto -- "你的需求"
+npm run invoke -- -d "@triadmind 浣犵殑闇€姹?
+npm run pipeline -- "浣犵殑闇€姹?
+npm run protocol -- "浣犵殑闇€姹?
+npm run auto -- "浣犵殑闇€姹?
 npm run plan
 npm run apply
 npm run handoff
@@ -146,34 +123,31 @@ npm run rollback -- "<snapshot-id>"
 
 ## Silent Invoke
 
-如果你希望 AI 助手在看到 `@triadmind` 后静默调用 TriadMind，可统一使用：
-
+濡傛灉浣犲笇鏈?AI 鍔╂墜鍦ㄧ湅鍒?`@triadmind` 鍚庨潤榛樿皟鐢?TriadMind锛屽彲缁熶竴浣跨敤锛?
 ```bash
-npm run invoke -- -d "@triadmind 你的需求"
+npm run invoke -- -d "@triadmind 浣犵殑闇€姹?
 ```
 
-该命令会自动：
+璇ュ懡浠や細鑷姩锛?
+- 鍒锋柊 `.triadmind/triad.md`銆乣master-prompt.md`銆乣implementation-prompt.md`
+- 鍐欏叆鏈€鏂伴渶姹傚埌 `.triadmind/latest-demand.txt`
+- 鍑嗗 Macro / Meso / Micro / Protocol 鎵€闇€鏂囦欢
+- 璁?AI 鍔╂墜鍥寸粫 `.triadmind/implementation-prompt.md` 闈欓粯瀹屾垚鍗忚瑙勫垝
 
-- 刷新 `.triadmind/triad.md`、`master-prompt.md`、`implementation-prompt.md`
-- 写入最新需求到 `.triadmind/latest-demand.txt`
-- 准备 Macro / Meso / Micro / Protocol 所需文件
-- 让 AI 助手围绕 `.triadmind/implementation-prompt.md` 静默完成协议规划
-
-当 AI 已将完整协议落盘到 `.triadmind/draft-protocol.json` 后，再执行：
+褰?AI 宸插皢瀹屾暣鍗忚钀界洏鍒?`.triadmind/draft-protocol.json` 鍚庯紝鍐嶆墽琛岋細
 
 ```bash
 npm run invoke -- --apply
 ```
 
-它会静默完成：
+瀹冧細闈欓粯瀹屾垚锛?
+- 鏍￠獙 `draft-protocol.json`
+- 鐢熸垚 `.triadmind/visualizer.html`
+- 鎵ц `apply`
+- 鍒锋柊 `triad-map.json`
+- 鐢熸垚 `.triadmind/implementation-handoff.md`
 
-- 校验 `draft-protocol.json`
-- 生成 `.triadmind/visualizer.html`
-- 执行 `apply`
-- 刷新 `triad-map.json`
-- 生成 `.triadmind/implementation-handoff.md`
-
-在接入项目中，命令通常带 `triad:` 前缀，例如：
+鍦ㄦ帴鍏ラ」鐩腑锛屽懡浠ら€氬父甯?`triad:` 鍓嶇紑锛屼緥濡傦細
 
 ```bash
 npm run triad:init
@@ -185,22 +159,15 @@ npm run triad:heal -- --message "TypeError: ..."
 
 ## Protocol Hard Constraints
 
-TriadMind 会在 `plan` / `apply` 前拦截非法协议：
+TriadMind 浼氬湪 `plan` / `apply` 鍓嶆嫤鎴潪娉曞崗璁細
 
-- `actions` 不能为空
-- 只允许 `reuse` / `modify` / `create_child`
-- `reuse.nodeId` 必须已存在
-- `modify.nodeId` 必须已存在
-- `modify` 只能升级 `demand` / `answer`，不能篡改节点核心职责
-- `create_child.parentNodeId` 必须已存在
-- `create_child.node.nodeId` 必须是全新节点
-- 重复目标节点或重复动作会被拦截
-- 如启用置信度守卫，低于阈值的动作会被拒绝
+- `actions` 涓嶈兘涓虹┖
+- 鍙厑璁?`reuse` / `modify` / `create_child`
+- `reuse.nodeId` 蹇呴』宸插瓨鍦?- `modify.nodeId` 蹇呴』宸插瓨鍦?- `modify` 鍙兘鍗囩骇 `demand` / `answer`锛屼笉鑳界鏀硅妭鐐规牳蹇冭亴璐?- `create_child.parentNodeId` 蹇呴』宸插瓨鍦?- `create_child.node.nodeId` 蹇呴』鏄叏鏂拌妭鐐?- 閲嶅鐩爣鑺傜偣鎴栭噸澶嶅姩浣滀細琚嫤鎴?- 濡傚惎鐢ㄧ疆淇″害瀹堝崼锛屼綆浜庨槇鍊肩殑鍔ㄤ綔浼氳鎷掔粷
 
 ## Config Example
 
-`.triadmind/config.json`：
-
+`.triadmind/config.json`锛?
 ```json
 {
   "schemaVersion": "1.1",
@@ -233,8 +200,7 @@ TriadMind 会在 `plan` / `apply` 前拦截非法协议：
 
 ## Cross-Language Direction
 
-当前稳定适配器全部默认走统一 Tree-sitter AST 路径：
-
+褰撳墠绋冲畾閫傞厤鍣ㄥ叏閮ㄩ粯璁よ蛋缁熶竴 Tree-sitter AST 璺緞锛?
 - `typescript` + `tree-sitter`
 - `javascript` + `tree-sitter`
 - `python` + `tree-sitter`
@@ -243,91 +209,87 @@ TriadMind 会在 `plan` / `apply` 前拦截非法协议：
 - `cpp` + `tree-sitter`
 - `java` + `tree-sitter`
 
-当前代码边界：
+褰撳墠浠ｇ爜杈圭晫锛?
+- `languageAdapter.ts`锛氬畾涔夎法璇█ `LanguageAdapter` 濂戠害
+- `adapterRegistry.ts`锛氱淮鎶ら€傞厤鍣ㄦ敞鍐岃〃锛屽苟鎸?`.triadmind/config.json` 鍔ㄦ€佽矾鐢?- `typescriptAdapter.ts`锛氬皝瑁?TypeScript 鐨勬嫇鎵戣В鏋愪笌鍗忚钀藉湴鑳藉姏
+- `polyglotAdapter.ts`锛氬皝瑁?JavaScript / Python / Go / Rust / C++ / Java 鐨勬嫇鎵戣В鏋愪笌鍗忚钀藉湴鑳藉姏
+- `treeSitterParser.ts`锛氱粺涓€ Tree-sitter AST 鍏ュ彛锛岃礋璐ｅ璇█鍑芥暟銆佺被鏂规硶銆佸弬鏁般€佽繑鍥炲€兼娊鍙栵紝骞朵负 TypeScript / JavaScript / Python / Go / Rust / C++ / Java 琛ュ厖 Ghost State Scanner
+- `treeSitterGhostScanner.ts`锛氳瑷€鏃犲叧 Ghost State Scanner锛岀粺涓€鏀堕泦鍙傛暟銆佸眬閮ㄥ彉閲忋€佹爣璇嗙寮曠敤鍜?`this/self` 鐘舵€佽闂?- `typescriptParser.ts`锛歍ypeScript 鍘熺敓 AST 鎷撴墤鎶藉彇瀹炵幇锛屽寘鍚?Ghost State Scanner 闅愬紡渚濊禆鎵弿
+- `typescriptGenerator.ts`锛歍ypeScript 楠ㄦ灦浠ｇ爜鐢熸垚瀹炵幇
+- `analyzer.ts`锛氱函 JSON 鎷撴墤鍒嗘瀽鍐呮牳锛岃礋璐?blast radius銆乧ycle detection銆乼opological drift 涓?renormalization protocol 鐢熸垚锛屼笉渚濊禆浠讳綍 AST 瑙ｆ瀽鍣?- `parser.ts` / `generator.ts`锛氱函璋冨害鍣紝涓嶅啀鐩存帴缁戝畾 `ts-morph`
 
-- `languageAdapter.ts`：定义跨语言 `LanguageAdapter` 契约
-- `adapterRegistry.ts`：维护适配器注册表，并按 `.triadmind/config.json` 动态路由
-- `typescriptAdapter.ts`：封装 TypeScript 的拓扑解析与协议落地能力
-- `polyglotAdapter.ts`：封装 JavaScript / Python / Go / Rust / C++ / Java 的拓扑解析与协议落地能力
-- `treeSitterParser.ts`：统一 Tree-sitter AST 入口，负责多语言函数、类方法、参数、返回值抽取，并为 TypeScript / JavaScript / Python / Go / Rust / C++ / Java 补充 Ghost State Scanner
-- `treeSitterGhostScanner.ts`：语言无关 Ghost State Scanner，统一收集参数、局部变量、标识符引用和 `this/self` 状态访问
-- `typescriptParser.ts`：TypeScript 原生 AST 拓扑抽取实现，包含 Ghost State Scanner 隐式依赖扫描
-- `typescriptGenerator.ts`：TypeScript 骨架代码生成实现
-- `parser.ts` / `generator.ts`：纯调度器，不再直接绑定 `ts-morph`
+### CLI lifecycle guard
 
-多语言泛化的思路是：
+- `triadmind plan` now computes contract-graph blast radius warnings before review
+- `triadmind apply` now dispatches by detected project language instead of hard-wiring a single generator path
+- `triadmind init` / `triadmind apply` now run `detectTopologicalDrift` after topology refresh and fail fast on degraded results
+- `triadmind renormalize` now detects strongly connected components and writes `.triadmind/renormalize-protocol.json` for language-agnostic macro-node refactoring
+- `visualizer.html` now auto-loads `.triadmind/renormalize-protocol.json` and overlays macro nodes, absorb edges, and renormalization summaries
+
+澶氳瑷€娉涘寲鐨勬€濊矾鏄細
 
 ```text
-语言代码 -> Tree-sitter AST -> Triad-IR -> protocol -> adapter -> 骨架
+璇█浠ｇ爜 -> Tree-sitter AST -> Triad-IR -> protocol -> adapter -> 楠ㄦ灦
 ```
 
-当前工程边界：
-
-- 所有支持语言的 `init / sync / invoke --apply / apply` 均已统一到 Tree-sitter 拓扑解析路径
-- `native` 仅用于兼容旧项目或调试，不建议作为新项目默认配置
-- 代码生成仍由各语言 adapter 负责，解析侧已从语言专属扫描升级为统一 AST 语义抽取
-- TypeScript 在 `native` 与 `tree-sitter` 两条解析路径下都会启用 Ghost State Scanner
-- JavaScript 在 `tree-sitter` 路径下会启用 Ghost State Scanner，覆盖 class method、export function、export arrow function，并复用 TypeScript 的调用表达式类型推断
-- Python 在 `tree-sitter` 路径下会启用 Ghost State Scanner，覆盖 class method、module function、`self.xxx`、模块级状态、`import as` / `from ... import ... as ...` 绑定
-- Go 在 `tree-sitter` 路径下会启用 Ghost State Scanner，覆盖 method receiver 字段、包导入别名、模块级 `var/const`、顶层函数依赖与本文件函数返回类型推断
-- Rust 在 `tree-sitter` 路径下会启用 Ghost State Scanner，覆盖 `self.xxx`、`use` 导入、`static/const`、`impl` 方法中的隐式状态访问，并保留本地 crate 路径解析钩子
-- C++ 在 `tree-sitter` 路径下会启用 Ghost State Scanner，覆盖 class/struct 字段、全局对象、inline method、顶层函数，以及本地 `#include "..."` 头文件符号解析
-- Java 在 `tree-sitter` 路径下会启用 Ghost State Scanner，覆盖 `this.xxx`、类字段、静态字段、方法体内的隐式对象依赖，以及基于 `package/import` 的工作区符号解析
-- `tree-sitter` 路径下会对 `this.xxx`、相对导入绑定、模块级外部变量做语法级类型推断
+褰撳墠宸ョ▼杈圭晫锛?
+- 鎵€鏈夋敮鎸佽瑷€鐨?`init / sync / invoke --apply / apply` 鍧囧凡缁熶竴鍒?Tree-sitter 鎷撴墤瑙ｆ瀽璺緞
+- `native` 浠呯敤浜庡吋瀹规棫椤圭洰鎴栬皟璇曪紝涓嶅缓璁綔涓烘柊椤圭洰榛樿閰嶇疆
+- 浠ｇ爜鐢熸垚浠嶇敱鍚勮瑷€ adapter 璐熻矗锛岃В鏋愪晶宸蹭粠璇█涓撳睘鎵弿鍗囩骇涓虹粺涓€ AST 璇箟鎶藉彇
+- TypeScript 鍦?`native` 涓?`tree-sitter` 涓ゆ潯瑙ｆ瀽璺緞涓嬮兘浼氬惎鐢?Ghost State Scanner
+- JavaScript 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?class method銆乪xport function銆乪xport arrow function锛屽苟澶嶇敤 TypeScript 鐨勮皟鐢ㄨ〃杈惧紡绫诲瀷鎺ㄦ柇
+- Python 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?class method銆乵odule function銆乣self.xxx`銆佹ā鍧楃骇鐘舵€併€乣import as` / `from ... import ... as ...` 缁戝畾
+- Go 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?method receiver 瀛楁銆佸寘瀵煎叆鍒悕銆佹ā鍧楃骇 `var/const`銆侀《灞傚嚱鏁颁緷璧栦笌鏈枃浠跺嚱鏁拌繑鍥炵被鍨嬫帹鏂?- Rust 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?`self.xxx`銆乣use` 瀵煎叆銆乣static/const`銆乣impl` 鏂规硶涓殑闅愬紡鐘舵€佽闂紝骞朵繚鐣欐湰鍦?crate 璺緞瑙ｆ瀽閽╁瓙
+- C++ 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?class/struct 瀛楁銆佸叏灞€瀵硅薄銆乮nline method銆侀《灞傚嚱鏁帮紝浠ュ強鏈湴 `#include "..."` 澶存枃浠剁鍙疯В鏋?- Java 鍦?`tree-sitter` 璺緞涓嬩細鍚敤 Ghost State Scanner锛岃鐩?`this.xxx`銆佺被瀛楁銆侀潤鎬佸瓧娈点€佹柟娉曚綋鍐呯殑闅愬紡瀵硅薄渚濊禆锛屼互鍙婂熀浜?`package/import` 鐨勫伐浣滃尯绗﹀彿瑙ｆ瀽
+- `tree-sitter` 璺緞涓嬩細瀵?`this.xxx`銆佺浉瀵瑰鍏ョ粦瀹氥€佹ā鍧楃骇澶栭儴鍙橀噺鍋氳娉曠骇绫诲瀷鎺ㄦ柇
 
 ## Runtime Self-Healing
 
-运行时报错后：
-
+杩愯鏃舵姤閿欏悗锛?
 ```bash
 npm run triad:heal -- --message "TypeError: Cannot read properties of undefined"
 ```
 
-或把错误写入 `.triadmind/runtime-error.log` 后执行：
+鎴栨妸閿欒鍐欏叆 `.triadmind/runtime-error.log` 鍚庢墽琛岋細
 
 ```bash
 npm run triad:heal
 ```
 
-当前自愈链路：
-
+褰撳墠鑷剤閾捐矾锛?
 ```text
-错误日志
--> Trace-to-Node 节点映射
--> left/right/contract/topology 归因
--> blast radius 分析
+閿欒鏃ュ織
+-> Trace-to-Node 鑺傜偣鏄犲皠
+-> left/right/contract/topology 褰掑洜
+-> analyzer.ts contract graph blast radius 鍒嗘瀽
 -> healing-prompt.md
--> LLM 生成 repair protocol
+-> LLM 鐢熸垚 repair protocol
 -> plan / apply
 ```
 
 ## Always-On Rules
 
-执行：
-
+鎵ц锛?
 ```bash
 npm run triad:rules
 ```
 
-会自动生成：
+浼氳嚜鍔ㄧ敓鎴愶細
 
 - `.triadmind/agent-rules.md`
 - `AGENTS.md`
 - `.cursor/rules/triadmind.mdc`
 
-这样 AI 助手在实现前会先读取拓扑图、配置和总提示词，而不是直接跳进代码。
-
+杩欐牱 AI 鍔╂墜鍦ㄥ疄鐜板墠浼氬厛璇诲彇鎷撴墤鍥俱€侀厤缃拰鎬绘彁绀鸿瘝锛岃€屼笉鏄洿鎺ヨ烦杩涗唬鐮併€?
 ## Self Bootstrap
 
-TriadMind Core 可以用自己的规则描述自己：
-
+TriadMind Core 鍙互鐢ㄨ嚜宸辩殑瑙勫垯鎻忚堪鑷繁锛?
 ```bash
 cd triadmind-core
 npm run self
 ```
 
-该命令会生成：
-
+璇ュ懡浠や細鐢熸垚锛?
 - `.triadmind/self-bootstrap.md`
 - `.triadmind/self-bootstrap-protocol.json`
 - `.triadmind/draft-protocol.json`
@@ -335,12 +297,10 @@ npm run self
 - `AGENTS.md`
 - `.cursor/rules/triadmind.mdc`
 
-这表示 TriadMind 自身也被纳入同一套 `triad-map -> protocol -> visualizer -> rules` 闭环。
-
+杩欒〃绀?TriadMind 鑷韩涔熻绾冲叆鍚屼竴濂?`triad-map -> protocol -> visualizer -> rules` 闂幆銆?
 ## Validation
 
-开发时推荐至少验证：
-
+寮€鍙戞椂鎺ㄨ崘鑷冲皯楠岃瘉锛?
 ```bash
 cd triadmind-core && npm run typecheck
 cd ../microflow-ts && npm run triad:sync -- --force
@@ -349,12 +309,10 @@ cd ../microflow-ts && npm run triad:rules
 
 ## Verified Regression
 
-在完成自举重构后，TriadMind Core 已做过一轮功能回归验证，确认“能自举”且“原功能未失效”。
-
+鍦ㄥ畬鎴愯嚜涓鹃噸鏋勫悗锛孴riadMind Core 宸插仛杩囦竴杞姛鑳藉洖褰掗獙璇侊紝纭鈥滆兘鑷妇鈥濅笖鈥滃師鍔熻兘鏈け鏁堚€濄€?
 ### Core Commands
 
-在 `triadmind-core` 根目录已验证通过：
-
+鍦?`triadmind-core` 鏍圭洰褰曞凡楠岃瘉閫氳繃锛?
 ```bash
 npm run typecheck
 npm run adapters
@@ -365,44 +323,38 @@ npm run heal -- --message "TypeError: Cannot read properties of undefined at run
 npm run plan -- --no-open --apply
 ```
 
-验证结果：
-
-- `typecheck` 通过
-- `self` 可重新生成 `.triadmind/self-bootstrap.md`
-- `sync` 可增量同步 `triad-map.json`
-- `rules` 可重新生成 `AGENTS.md` 与 Cursor 规则
-- `heal` 可生成 `healing-report.json` 与 `healing-prompt.md`
-- `plan --apply` 可走完整审核与协议执行流程
-
+楠岃瘉缁撴灉锛?
+- `typecheck` 閫氳繃
+- `self` 鍙噸鏂扮敓鎴?`.triadmind/self-bootstrap.md`
+- `sync` 鍙閲忓悓姝?`triad-map.json`
+- `rules` 鍙噸鏂扮敓鎴?`AGENTS.md` 涓?Cursor 瑙勫垯
+- `heal` 鍙敓鎴?`healing-report.json` 涓?`healing-prompt.md`
+- `plan --apply` 鍙蛋瀹屾暣瀹℃牳涓庡崗璁墽琛屾祦绋?
 ### E2E Apply Test
 
-还使用一个最小 TypeScript 临时项目做了真实 E2E 验证：
+杩樹娇鐢ㄤ竴涓渶灏?TypeScript 涓存椂椤圭洰鍋氫簡鐪熷疄 E2E 楠岃瘉锛?
+1. 鍏堣繍琛?`init`
+2. 鍐欏叆涓€涓?`create_child` 鍗忚
+3. 鎵ц `plan --no-open --apply`
+4. 纭鏂伴鏋舵枃浠惰鐢熸垚
+5. 鍐嶅啓鍏ヤ竴涓?`modify` 鍗忚
+6. 鍐嶆鎵ц `plan --no-open --apply`
+7. 纭鍑芥暟绛惧悕琚洿鏂?
+瀹為檯楠岃瘉鍒扮殑琛屼负锛?
+- `create_child` 鑳芥柊澧?`CsvExporter.exportState`
+- `modify` 鑳芥洿鏂板凡瀛樺湪鑺傜偣鐨勫弬鏁扮鍚?- 褰?`modify` 璇曞浘鏀瑰彉鑺傜偣鏍稿績鑱岃矗 `problem` 鏃讹紝浼氳鍗忚瀹堝崼姝ｇ‘鎷︽埅
+- TypeScript 鍘熺敓瑙ｆ瀽璺緞鍙瘑鍒?`this.xxx`銆佸鍏ュ崟渚嬨€佹ā鍧楃骇澶栭儴鍙橀噺锛屽苟灏嗗叾杩藉姞鍒?`fission.demand`
 
-1. 先运行 `init`
-2. 写入一个 `create_child` 协议
-3. 执行 `plan --no-open --apply`
-4. 确认新骨架文件被生成
-5. 再写入一个 `modify` 协议
-6. 再次执行 `plan --no-open --apply`
-7. 确认函数签名被更新
+杩欒鏄庡綋鍓嶇増鏈湪瀹屾垚 `workflow / bootstrap / protocol / generator / healing` 鐨勫乏鍙冲垎鏀噸鏋勫悗锛屼互涓嬫牳蹇冭兘鍔涗粛鐒跺彲鐢細
 
-实际验证到的行为：
+- 鎷撴墤鎵弿
+- 鍗忚鏍￠獙
+- 鍥捐氨瀹℃牳
+- 楠ㄦ灦鐢熸垚
+- 鍗忚淇敼
+- 杩愯鏃惰嚜鎰堟彁绀鸿瘝鐢熸垚
 
-- `create_child` 能新增 `CsvExporter.exportState`
-- `modify` 能更新已存在节点的参数签名
-- 当 `modify` 试图改变节点核心职责 `problem` 时，会被协议守卫正确拦截
-- TypeScript 原生解析路径可识别 `this.xxx`、导入单例、模块级外部变量，并将其追加到 `fission.demand`
-
-这说明当前版本在完成 `workflow / bootstrap / protocol / generator / healing` 的左右分支重构后，以下核心能力仍然可用：
-
-- 拓扑扫描
-- 协议校验
-- 图谱审核
-- 骨架生成
-- 协议修改
-- 运行时自愈提示词生成
-
-如果你要在新环境重新复验，推荐最小顺序：
+濡傛灉浣犺鍦ㄦ柊鐜閲嶆柊澶嶉獙锛屾帹鑽愭渶灏忛『搴忥細
 
 ```bash
 npm install
@@ -413,12 +365,11 @@ npm run heal -- --message "TypeError: Cannot read properties of undefined at run
 
 ## Project Status
 
-TriadMind 正从“提示词手册”升级为“架构编译器”：
+TriadMind 姝ｄ粠鈥滄彁绀鸿瘝鎵嬪唽鈥濆崌绾т负鈥滄灦鏋勭紪璇戝櫒鈥濓細
 
-- Prompt 约束 -> Schema 硬约束
-- 人工同步 -> 增量同步 / watch
-- 手动提醒 -> Always-on 规则
-- TypeScript 单语种 -> 适配器 + Tree-sitter 泛化
-- 事后修 Bug -> 拓扑感知自愈
+- Prompt 绾︽潫 -> Schema 纭害鏉?- 浜哄伐鍚屾 -> 澧為噺鍚屾 / watch
+- 鎵嬪姩鎻愰啋 -> Always-on 瑙勫垯
+- TypeScript 鍗曡绉?-> 閫傞厤鍣?+ Tree-sitter 娉涘寲
+- 浜嬪悗淇?Bug -> 鎷撴墤鎰熺煡鑷剤
 
-如果你要看完整落地使用方式，请读 `triadmind-core/user guide.md`。
+濡傛灉浣犺鐪嬪畬鏁磋惤鍦颁娇鐢ㄦ柟寮忥紝璇疯 `triadmind-core/user guide.md`銆?

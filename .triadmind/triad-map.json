@@ -4,9 +4,10 @@
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "鎵ц getAvailableAdapters 娴佺▼",
+      "problem": "execute getAvailableAdapters flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] Map (adapterRegistry)"
       ],
       "answer": [
         "LanguageAdapter[]"
@@ -18,9 +19,10 @@
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "鎵ц registerAdapter 娴佺▼",
+      "problem": "execute registerAdapter flow",
       "demand": [
-        "LanguageAdapter (adapter)"
+        "LanguageAdapter (adapter)",
+        "[Ghost:Read] Map (adapterRegistry)"
       ],
       "answer": [
         "void"
@@ -32,12 +34,45 @@
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "鎵ц resolveAdapter 娴佺▼",
+      "problem": "execute resolveAdapter flow",
       "demand": [
-        "WorkspacePaths | string (pathsOrProjectRoot)"
+        "WorkspacePaths | string (pathsOrProjectRoot)",
+        "[Ghost:Read] Map (adapterRegistry)"
       ],
       "answer": [
         "LanguageAdapter"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.calculateBlastRadius",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute calculateBlastRadius flow",
+      "demand": [
+        "any[] (map)",
+        "string (targetNodeId)",
+        "boolean (isContractChange)"
+      ],
+      "answer": [
+        "string[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.detectTopologicalDrift",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "execute detectTopologicalDrift flow",
+      "demand": [
+        "any[] (oldMap)",
+        "any[] (newMap)",
+        "[Ghost:Read] getCycles (getCycles)"
+      ],
+      "answer": [
+        "DriftReport"
       ]
     }
   },
@@ -46,7 +81,7 @@
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "鎵ц buildSelfBootstrapArchitecture 娴佺▼",
+      "problem": "execute buildSelfBootstrapArchitecture flow",
       "demand": [
         "WorkspacePaths (paths)"
       ],
@@ -60,9 +95,12 @@
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "鎵ц buildSelfBootstrapProtocol 娴佺▼",
+      "problem": "execute buildSelfBootstrapProtocol flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] getSelfBootstrapNodeIds (getSelfBootstrapNodeIds)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] readTriadMap (readTriadMap)"
       ],
       "answer": [
         "UpgradeProtocol"
@@ -74,9 +112,10 @@
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "鎵ц writeSelfBootstrapProtocol 娴佺▼",
+      "problem": "execute writeSelfBootstrapProtocol flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -88,9 +127,11 @@
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "鎵ц writeSelfBootstrapReport 娴佺▼",
+      "problem": "execute writeSelfBootstrapReport flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] renderSelfBootstrapMarkdown (renderSelfBootstrapMarkdown)"
       ],
       "answer": [
         "void"
@@ -102,7 +143,7 @@
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getBootstrapModuleRoles 娴佺▼",
+      "problem": "execute getBootstrapModuleRoles flow",
       "demand": [
         "None"
       ],
@@ -116,7 +157,7 @@
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getSelfBootstrapLoopLines 娴佺▼",
+      "problem": "execute getSelfBootstrapLoopLines flow",
       "demand": [
         "None"
       ],
@@ -130,7 +171,7 @@
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getSelfBootstrapMicroRules 娴佺▼",
+      "problem": "execute getSelfBootstrapMicroRules flow",
       "demand": [
         "None"
       ],
@@ -144,7 +185,7 @@
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getSelfBootstrapNodeIds 娴佺▼",
+      "problem": "execute getSelfBootstrapNodeIds flow",
       "demand": [
         "None"
       ],
@@ -158,7 +199,7 @@
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getSelfBootstrapPreamble 娴佺▼",
+      "problem": "execute getSelfBootstrapPreamble flow",
       "demand": [
         "None"
       ],
@@ -172,10 +213,12 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "鎵ц ensureTriadConfig 娴佺▼",
+      "problem": "execute ensureTriadConfig flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)"
+        "unknown (force)",
+        "[Ghost:Read] buildDefaultConfig (buildDefaultConfig)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -187,9 +230,12 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "鎵ц loadTriadConfig 娴佺▼",
+      "problem": "execute loadTriadConfig flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] TriadConfig (DEFAULT_CONFIG)",
+        "[Ghost:Read] ensureTriadConfig (ensureTriadConfig)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "TriadConfig"
@@ -201,10 +247,12 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "鎵ц resolveCategoryFromConfig 娴佺▼",
+      "problem": "execute resolveCategoryFromConfig flow",
       "demand": [
         "string (sourcePath)",
-        "TriadConfig (config)"
+        "TriadConfig (config)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] TriadCategory (TriadCategory)"
       ],
       "answer": [
         "TriadCategory"
@@ -216,10 +264,11 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "鎵ц shouldExcludeSourcePath 娴佺▼",
+      "problem": "execute shouldExcludeSourcePath flow",
       "demand": [
         "string (sourcePath)",
-        "TriadConfig (config)"
+        "TriadConfig (config)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -231,10 +280,11 @@
     "category": "core",
     "sourcePath": "generator.ts",
     "fission": {
-      "problem": "鎵ц applyProtocol 娴佺▼",
+      "problem": "execute applyProtocol flow",
       "demand": [
         "string (projectRoot)",
-        "string (protocolPath)"
+        "string (protocolPath)",
+        "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
         "{ changedFiles: string[] }"
@@ -246,7 +296,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildFunctionStructure 娴佺▼",
+      "problem": "execute buildFunctionStructure flow",
       "demand": [
         "ParsedNodeRef (ref)",
         "TriadNodeDefinition (node)",
@@ -264,13 +314,14 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildMethodStructure 娴佺▼",
+      "problem": "execute buildMethodStructure flow",
       "demand": [
         "ParsedNodeRef (ref)",
         "TriadNodeDefinition (node)",
         "OptionalKind<ParameterDeclarationStructure>[] (parameters)",
         "string (returnType)",
-        "boolean (includeTodo)"
+        "boolean (includeTodo)",
+        "[Ghost:Read] Scope (Scope)"
       ],
       "answer": [
         "OptionalKind<MethodDeclarationStructure>"
@@ -282,9 +333,12 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildParameters 娴佺▼",
+      "problem": "execute buildParameters flow",
       "demand": [
-        "string[] (demand)"
+        "string[] (demand)",
+        "[Ghost:Read] OptionalKind (OptionalKind)",
+        "[Ghost:Read] ParameterDeclarationStructure (ParameterDeclarationStructure)",
+        "[Ghost:Read] parseDemandEntry (parseDemandEntry)"
       ],
       "answer": [
         "void"
@@ -296,7 +350,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildTodoStatement 娴佺▼",
+      "problem": "execute buildTodoStatement flow",
       "demand": [
         "string (nodeId)",
         "string (responsibility)"
@@ -311,7 +365,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildTriadGeneratedDoc 娴佺▼",
+      "problem": "execute buildTriadGeneratedDoc flow",
       "demand": [
         "string (responsibility)"
       ],
@@ -325,9 +379,10 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц collectTypeTokens 娴佺▼",
+      "problem": "execute collectTypeTokens flow",
       "demand": [
-        "string (typeText)"
+        "string (typeText)",
+        "[Ghost:Read] getBuiltinTypeNames (getBuiltinTypeNames)"
       ],
       "answer": [
         "void"
@@ -339,9 +394,10 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getBuiltinTypeNames 娴佺▼",
+      "problem": "execute getBuiltinTypeNames flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] Set (BUILTIN_TYPE_NAMES)"
       ],
       "answer": [
         "void"
@@ -353,7 +409,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц normalizeToken 娴佺▼",
+      "problem": "execute normalizeToken flow",
       "demand": [
         "string (value)"
       ],
@@ -367,12 +423,13 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц resolveSourceFilePath 娴佺▼",
+      "problem": "execute resolveSourceFilePath flow",
       "demand": [
         "string (projectRoot)",
         "ParsedNodeRef (ref)",
         "TriadNodeDefinition (node)",
-        "NodeLocationMap (nodeLocations)"
+        "NodeLocationMap (nodeLocations)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -384,10 +441,11 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц resolveTypesModuleSpecifier 娴佺▼",
+      "problem": "execute resolveTypesModuleSpecifier flow",
       "demand": [
         "string (projectRoot)",
-        "SourceFile (sourceFile)"
+        "SourceFile (sourceFile)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -399,11 +457,12 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "鎵ц shouldUseTopLevelFunction 娴佺▼",
+      "problem": "execute shouldUseTopLevelFunction flow",
       "demand": [
         "SourceFile (sourceFile)",
         "ParsedNodeRef (ref)",
-        "string (sourcePath)"
+        "string (sourcePath)",
+        "[Ghost:Read] normalizeToken (normalizeToken)"
       ],
       "answer": [
         "void"
@@ -415,11 +474,14 @@
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "鎵ц buildHealingPrompt 娴佺▼",
+      "problem": "execute buildHealingPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (errorText)",
-        "HealingDiagnosis (diagnosis)"
+        "HealingDiagnosis (diagnosis)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getHealingOutputRuleLines (getHealingOutputRuleLines)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -431,12 +493,14 @@
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "鎵ц diagnoseRuntimeFailure 娴佺▼",
+      "problem": "execute diagnoseRuntimeFailure flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (errorText)",
         "number (retryCount)",
-        "TriadNodeDefinition[] (nodes)"
+        "TriadNodeDefinition[] (nodes)",
+        "[Ghost:Read] buildSummary (buildSummary)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "HealingDiagnosis"
@@ -448,11 +512,13 @@
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "鎵ц prepareHealingArtifacts 娴佺▼",
+      "problem": "execute prepareHealingArtifacts flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (errorText)",
-        "unknown (retryCount)"
+        "unknown (retryCount)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] HealingDiagnosis (HealingDiagnosis)"
       ],
       "answer": [
         "void"
@@ -464,7 +530,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildEvidence 娴佺▼",
+      "problem": "execute buildEvidence flow",
       "demand": [
         "string (errorText)",
         "RuntimeTraceFrame[] (traceFrames)",
@@ -482,7 +548,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildSummary 娴佺▼",
+      "problem": "execute buildSummary flow",
       "demand": [
         "TriadNodeDefinition | null (matchedNode)",
         "HealingBranchKind (diagnosis)",
@@ -499,7 +565,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц chooseSuggestedAction 娴佺▼",
+      "problem": "execute chooseSuggestedAction flow",
       "demand": [
         "HealingBranchKind (diagnosis)",
         "number (retryCount)",
@@ -515,7 +581,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц classifyDiagnosis 娴佺▼",
+      "problem": "execute classifyDiagnosis flow",
       "demand": [
         "string (errorText)"
       ],
@@ -529,10 +595,11 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц estimateBlastRadius 娴佺▼",
+      "problem": "execute estimateBlastRadius flow",
       "demand": [
         "TriadNodeDefinition | null (rootNode)",
-        "TriadNodeDefinition[] (nodes)"
+        "TriadNodeDefinition[] (nodes)",
+        "boolean (isContractChange)"
       ],
       "answer": [
         "BlastRadius"
@@ -544,7 +611,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getContractGuardLine 娴佺▼",
+      "problem": "execute getContractGuardLine flow",
       "demand": [
         "boolean (requireHumanApprovalForContractChanges)"
       ],
@@ -558,7 +625,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getHealingOutputRuleLines 娴佺▼",
+      "problem": "execute getHealingOutputRuleLines flow",
       "demand": [
         "None"
       ],
@@ -572,11 +639,13 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц parseTraceLine 娴佺▼",
+      "problem": "execute parseTraceLine flow",
       "demand": [
         "string (line)",
         "string (projectRootNormalized)",
-        "string (projectRoot)"
+        "string (projectRoot)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -588,10 +657,11 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "鎵ц scoreNodeMatch 娴佺▼",
+      "problem": "execute scoreNodeMatch flow",
       "demand": [
         "RuntimeTraceFrame (frame)",
-        "TriadNodeDefinition (node)"
+        "TriadNodeDefinition (node)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -603,7 +673,7 @@
     "category": "core",
     "sourcePath": "ir.ts",
     "fission": {
-      "problem": "鎵ц buildTopologyIR 娴佺▼",
+      "problem": "execute buildTopologyIR flow",
       "demand": [
         "TriadNodeDefinition[] (nodes)",
         "TriadLanguage (language)"
@@ -618,10 +688,11 @@
     "category": "core",
     "sourcePath": "parser.ts",
     "fission": {
-      "problem": "鎵ц runParser 娴佺▼",
+      "problem": "execute runParser flow",
       "demand": [
         "string (targetDir)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
         "void"
@@ -633,9 +704,11 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "鎵ц createCppAdapter 娴佺▼",
+      "problem": "execute createCppAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -647,9 +720,11 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "鎵ц createGoAdapter 娴佺▼",
+      "problem": "execute createGoAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -661,9 +736,11 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "鎵ц createJavaAdapter 娴佺▼",
+      "problem": "execute createJavaAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -675,9 +752,11 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "鎵ц createJavaScriptAdapter 娴佺▼",
+      "problem": "execute createJavaScriptAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -689,9 +768,11 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "鎵ц createPythonAdapter 娴佺▼",
+      "problem": "execute createPythonAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -703,9 +784,11 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "鎵ц createRustAdapter 娴佺▼",
+      "problem": "execute createRustAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
+        "[Ghost:Read] Record<PolyglotLanguage, LanguageDescriptor> (DESCRIPTORS)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -717,10 +800,14 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "鎵ц assertProtocolShape 娴佺▼",
+      "problem": "execute assertProtocolShape flow",
       "demand": [
         "UpgradeProtocol (protocol)",
-        "ProtocolValidationContext (context)"
+        "ProtocolValidationContext (context)",
+        "[Ghost:Read] getUpgradeProtocolSchema (getUpgradeProtocolSchema)",
+        "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)",
+        "[Ghost:Read] validateConfidenceRules (validateConfidenceRules)",
+        "[Ghost:Read] validateTopologyRules (validateTopologyRules)"
       ],
       "answer": [
         "void"
@@ -732,10 +819,11 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "鎵ц normalizeCategory 娴佺▼",
+      "problem": "execute normalizeCategory flow",
       "demand": [
         "string (category)",
-        "TriadCategory (fallback)"
+        "TriadCategory (fallback)",
+        "[Ghost:Read] getPrefixCategoryMap (getPrefixCategoryMap)"
       ],
       "answer": [
         "TriadCategory"
@@ -747,7 +835,7 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "鎵ц parseDemandEntry 娴佺▼",
+      "problem": "execute parseDemandEntry flow",
       "demand": [
         "string (entry)",
         "number (index)"
@@ -762,7 +850,7 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "鎵ц parseNodeRef 娴佺▼",
+      "problem": "execute parseNodeRef flow",
       "demand": [
         "string (nodeId)",
         "string (category)"
@@ -777,7 +865,7 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "鎵ц parseReturnType 娴佺▼",
+      "problem": "execute parseReturnType flow",
       "demand": [
         "string (answer)"
       ],
@@ -791,9 +879,10 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "鎵ц readJsonFile 娴佺▼",
+      "problem": "execute readJsonFile flow",
       "demand": [
-        "string (filePath)"
+        "string (filePath)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "T"
@@ -805,9 +894,13 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "鎵ц readTriadMap 娴佺▼",
+      "problem": "execute readTriadMap flow",
       "demand": [
-        "string (mapPath)"
+        "string (mapPath)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getTriadNodeDefinitionSchema (getTriadNodeDefinitionSchema)",
+        "[Ghost:Read] readJsonFile (readJsonFile)",
+        "[Ghost:Read] TriadNodeDefinition (TriadNodeDefinition)"
       ],
       "answer": [
         "void"
@@ -819,9 +912,10 @@
     "category": "core",
     "sourcePath": "protocolRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getPrefixCategoryMap 娴佺▼",
+      "problem": "execute getPrefixCategoryMap flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] Record<string, TriadCategory> (PREFIX_CATEGORY_MAP)"
       ],
       "answer": [
         "void"
@@ -833,9 +927,10 @@
     "category": "core",
     "sourcePath": "protocolRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getTriadNodeDefinitionSchema 娴佺▼",
+      "problem": "execute getTriadNodeDefinitionSchema flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] object (triadNodeDefinitionSchema)"
       ],
       "answer": [
         "void"
@@ -847,9 +942,10 @@
     "category": "core",
     "sourcePath": "protocolRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getUpgradeProtocolSchema 娴佺▼",
+      "problem": "execute getUpgradeProtocolSchema flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] object (upgradeProtocolSchema)"
       ],
       "answer": [
         "void"
@@ -861,9 +957,13 @@
     "category": "core",
     "sourcePath": "rules.ts",
     "fission": {
-      "problem": "鎵ц installAlwaysOnRules 娴佺▼",
+      "problem": "execute installAlwaysOnRules flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] buildCursorRule (buildCursorRule)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] upsertAgentsMd (upsertAgentsMd)"
       ],
       "answer": [
         "void"
@@ -875,10 +975,11 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "鎵ц collectProtocolSnapshotFiles 娴佺▼",
+      "problem": "execute collectProtocolSnapshotFiles flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "UpgradeProtocol (protocol)"
+        "UpgradeProtocol (protocol)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -890,11 +991,14 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "鎵ц createSnapshot 娴佺▼",
+      "problem": "execute createSnapshot flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (label)",
-        "string[] (filePaths)"
+        "string[] (filePaths)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] updateSnapshotIndex (updateSnapshotIndex)"
       ],
       "answer": [
         "void"
@@ -906,9 +1010,10 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "鎵ц listSnapshots 娴佺▼",
+      "problem": "execute listSnapshots flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -920,10 +1025,13 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "鎵ц restoreSnapshot 娴佺▼",
+      "problem": "execute restoreSnapshot flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (snapshotId)"
+        "string (snapshotId)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] listSnapshots (listSnapshots)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -935,7 +1043,7 @@
     "category": "core",
     "sourcePath": "stage.ts",
     "fission": {
-      "problem": "鎵ц analyzeWorkspaceStage 娴佺▼",
+      "problem": "execute analyzeWorkspaceStage flow",
       "demand": [
         "StageAnalysisInput (input)"
       ],
@@ -949,10 +1057,13 @@
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "鎵ц syncTriadMap 娴佺▼",
+      "problem": "execute syncTriadMap flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)"
+        "unknown (force)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
         "void"
@@ -964,9 +1075,36 @@
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "鎵ц watchTriadMap 娴佺▼",
+      "problem": "execute watchTriadMap flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] module (fs)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "TreeSitterGhostScanner.scanTreeSitterGhostReferences",
+    "category": "core",
+    "sourcePath": "treeSitterGhostScanner.ts",
+    "fission": {
+      "problem": "execute scanTreeSitterGhostReferences flow",
+      "demand": [
+        "Parser.SyntaxNode (executableNode)",
+        "TreeSitterGhostScanOptions (options)",
+        "[Ghost:Read] collectLocalNames (collectLocalNames)",
+        "[Ghost:Read] getGhostAccessMode (getGhostAccessMode)",
+        "[Ghost:Read] isDeclarationName (isDeclarationName)",
+        "[Ghost:Read] isIdentifierNode (isIdentifierNode)",
+        "[Ghost:Read] isMemberExpression (isMemberExpression)",
+        "[Ghost:Read] isMemberPropertyName (isMemberPropertyName)",
+        "[Ghost:Read] isMemberRootIdentifier (isMemberRootIdentifier)",
+        "[Ghost:Read] isOutermostMemberExpression (isOutermostMemberExpression)",
+        "[Ghost:Read] mergeReference (mergeReference)",
+        "[Ghost:Read] walkNodes (walkNodes)"
       ],
       "answer": [
         "void"
@@ -978,12 +1116,18 @@
     "category": "core",
     "sourcePath": "treeSitterParser.ts",
     "fission": {
-      "problem": "鎵ц runTreeSitterParser 娴佺▼",
+      "problem": "execute runTreeSitterParser flow",
       "demand": [
         "TriadLanguage (language)",
         "string (targetDir)",
         "string (outputPath)",
-        "TriadConfig (config)"
+        "TriadConfig (config)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] collectLanguageNodes (collectLanguageNodes)",
+        "[Ghost:Read] dedupeNodes (dedupeNodes)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] Record<TriadLanguage, any> (TREE_SITTER_LANGUAGES)"
       ],
       "answer": [
         "void"
@@ -995,11 +1139,12 @@
     "category": "core",
     "sourcePath": "treeSitterParser.ts",
     "fission": {
-      "problem": "鎵ц runTreeSitterTypeScriptParser 娴佺▼",
+      "problem": "execute runTreeSitterTypeScriptParser flow",
       "demand": [
         "string (targetDir)",
         "string (outputPath)",
-        "TriadConfig (config)"
+        "TriadConfig (config)",
+        "[Ghost:Read] runTreeSitterParser (runTreeSitterParser)"
       ],
       "answer": [
         "void"
@@ -1011,10 +1156,11 @@
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "鎵ц applyUpgradeProtocol 娴佺▼",
+      "problem": "execute applyUpgradeProtocol flow",
       "demand": [
         "string (projectRoot)",
-        "string (protocolPath)"
+        "string (protocolPath)",
+        "[Ghost:Read] applyTypeScriptProtocol (applyTypeScriptProtocol)"
       ],
       "answer": [
         "{ changedFiles: string[] }"
@@ -1026,9 +1172,12 @@
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "鎵ц createTypeScriptAdapter 娴佺▼",
+      "problem": "execute createTypeScriptAdapter flow",
       "demand": [
-        "None"
+        "None",
+        "[Ghost:Read] applyUpgradeProtocol (applyUpgradeProtocol)",
+        "[Ghost:Read] parseTopology (parseTopology)",
+        "[Ghost:Read] readTopologyIR (readTopologyIR)"
       ],
       "answer": [
         "LanguageAdapter"
@@ -1040,10 +1189,12 @@
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "鎵ц parseTopology 娴佺▼",
+      "problem": "execute parseTopology flow",
       "demand": [
         "string (projectRoot)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] runTreeSitterParser (runTreeSitterParser)",
+        "[Ghost:Read] runTypeScriptParser (runTypeScriptParser)"
       ],
       "answer": [
         "void"
@@ -1055,9 +1206,11 @@
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "鎵ц readTopologyIR 娴佺▼",
+      "problem": "execute readTopologyIR flow",
       "demand": [
-        "string (projectRoot)"
+        "string (projectRoot)",
+        "[Ghost:Read] buildTopologyIR (buildTopologyIR)",
+        "[Ghost:Read] readTriadMap (readTriadMap)"
       ],
       "answer": [
         "TriadTopologyIR"
@@ -1069,10 +1222,15 @@
     "category": "core",
     "sourcePath": "typescriptGenerator.ts",
     "fission": {
-      "problem": "鎵ц applyTypeScriptProtocol 娴佺▼",
+      "problem": "execute applyTypeScriptProtocol flow",
       "demand": [
         "string (projectRoot)",
-        "string (protocolPath)"
+        "string (protocolPath)",
+        "[Ghost:Read] assertProtocolShape (assertProtocolShape)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)",
+        "[Ghost:Read] upsertNode (upsertNode)"
       ],
       "answer": [
         "{ changedFiles: string[] }"
@@ -1084,10 +1242,15 @@
     "category": "core",
     "sourcePath": "typescriptParser.ts",
     "fission": {
-      "problem": "鎵ц runTypeScriptParser 娴佺▼",
+      "problem": "execute runTypeScriptParser flow",
       "demand": [
         "string (targetDir)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] default (chalk)",
+        "[Ghost:Read] collectClassMethodNodes (collectClassMethodNodes)",
+        "[Ghost:Read] collectExportedFunctionNodes (collectExportedFunctionNodes)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -1099,11 +1262,13 @@
     "category": "core",
     "sourcePath": "visualizer.ts",
     "fission": {
-      "problem": "鎵ц generateDashboard 娴佺▼",
+      "problem": "execute generateDashboard flow",
       "demand": [
         "string (mapPath)",
         "string (protocolPath)",
-        "string (outputPath)"
+        "string (outputPath)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)"
       ],
       "answer": [
         "void"
@@ -1115,11 +1280,14 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildImplementationHandoffPrompt 娴佺▼",
+      "problem": "execute buildImplementationHandoffPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (triadSpec)",
-        "ImplementationHandoffInput (input)"
+        "ImplementationHandoffInput (input)",
+        "[Ghost:Read] getImplementationHandoffRuleLines (getImplementationHandoffRuleLines)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -1131,10 +1299,13 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildImplementationPrompt 娴佺▼",
+      "problem": "execute buildImplementationPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getImplementationExecutionWorkflowLines (getImplementationExecutionWorkflowLines)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1146,10 +1317,11 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildMacroPrompt 娴佺▼",
+      "problem": "execute buildMacroPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] buildMacroPromptShape (buildMacroPromptShape)"
       ],
       "answer": [
         "void"
@@ -1161,9 +1333,16 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildMasterPrompt 娴佺▼",
+      "problem": "execute buildMasterPrompt flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getMasterPromptExpectedBehaviorLines (getMasterPromptExpectedBehaviorLines)",
+        "[Ghost:Read] getMasterPromptImplementationPhaseLines (getMasterPromptImplementationPhaseLines)",
+        "[Ghost:Read] getMasterPromptProtocolPhaseLines (getMasterPromptProtocolPhaseLines)",
+        "[Ghost:Read] getMasterPromptStageRouterLines (getMasterPromptStageRouterLines)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "void"
@@ -1175,10 +1354,11 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildMesoPrompt 娴佺▼",
+      "problem": "execute buildMesoPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] buildMesoPromptShape (buildMesoPromptShape)"
       ],
       "answer": [
         "void"
@@ -1190,10 +1370,11 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildMicroPrompt 娴佺▼",
+      "problem": "execute buildMicroPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] buildMicroPromptShape (buildMicroPromptShape)"
       ],
       "answer": [
         "void"
@@ -1205,10 +1386,12 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildPipelinePrompt 娴佺▼",
+      "problem": "execute buildPipelinePrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1220,10 +1403,13 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц buildProtocolPrompt 娴佺▼",
+      "problem": "execute buildProtocolPrompt flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] getProtocolOutputContractLines (getProtocolOutputContractLines)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1235,11 +1421,13 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц createDraftTemplate 娴佺▼",
+      "problem": "execute createDraftTemplate flow",
       "demand": [
         "WorkspacePaths (paths)",
         "unknown (userDemand)",
-        "unknown (force)"
+        "unknown (force)",
+        "[Ghost:Read] createDraftProtocolTemplate (createDraftProtocolTemplate)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1251,11 +1439,17 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц ensureMultiPassTemplates 娴佺▼",
+      "problem": "execute ensureMultiPassTemplates flow",
       "demand": [
         "WorkspacePaths (paths)",
         "string (userDemand)",
-        "{ resetArtifacts?: boolean } (options)"
+        "{ resetArtifacts?: boolean } (options)",
+        "[Ghost:Read] buildMacroPrompt (buildMacroPrompt)",
+        "[Ghost:Read] buildMesoPrompt (buildMesoPrompt)",
+        "[Ghost:Read] buildMicroPrompt (buildMicroPrompt)",
+        "[Ghost:Read] ensurePipelineArtifactSeeds (ensurePipelineArtifactSeeds)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] resetPipelineArtifacts (resetPipelineArtifacts)"
       ],
       "answer": [
         "void"
@@ -1267,10 +1461,14 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц ensurePipelineArtifactSeeds 娴佺▼",
+      "problem": "execute ensurePipelineArtifactSeeds flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] createMacroSplitSeed (createMacroSplitSeed)",
+        "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
+        "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
+        "[Ghost:Read] writeJsonSeedIfMissing (writeJsonSeedIfMissing)"
       ],
       "answer": [
         "void"
@@ -1282,10 +1480,13 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц ensureTriadSpec 娴佺▼",
+      "problem": "execute ensureTriadSpec flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)"
+        "unknown (force)",
+        "[Ghost:Read] buildTriadSpec (buildTriadSpec)",
+        "[Ghost:Read] ensureTriadConfig (ensureTriadConfig)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1297,10 +1498,14 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц resetPipelineArtifacts 娴佺▼",
+      "problem": "execute resetPipelineArtifacts flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] createMacroSplitSeed (createMacroSplitSeed)",
+        "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
+        "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1312,10 +1517,12 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц writeImplementationHandoff 娴佺▼",
+      "problem": "execute writeImplementationHandoff flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "ImplementationHandoffInput (input)"
+        "ImplementationHandoffInput (input)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] writeMasterPrompt (writeMasterPrompt)"
       ],
       "answer": [
         "void"
@@ -1327,9 +1534,12 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц writeMasterPrompt 娴佺▼",
+      "problem": "execute writeMasterPrompt flow",
       "demand": [
-        "WorkspacePaths (paths)"
+        "WorkspacePaths (paths)",
+        "[Ghost:Read] buildMasterPrompt (buildMasterPrompt)",
+        "[Ghost:Read] ensureTriadSpec (ensureTriadSpec)",
+        "[Ghost:Read] module (fs)"
       ],
       "answer": [
         "void"
@@ -1341,10 +1551,15 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "鎵ц writePromptPacket 娴佺▼",
+      "problem": "execute writePromptPacket flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] createDraftTemplate (createDraftTemplate)",
+        "[Ghost:Read] ensureMultiPassTemplates (ensureMultiPassTemplates)",
+        "[Ghost:Read] ensureTriadSpec (ensureTriadSpec)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] writeMasterPrompt (writeMasterPrompt)"
       ],
       "answer": [
         "void"
@@ -1356,10 +1571,11 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildMacroPromptShape 娴佺▼",
+      "problem": "execute buildMacroPromptShape flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1371,10 +1587,11 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildMesoPromptShape 娴佺▼",
+      "problem": "execute buildMesoPromptShape flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1386,10 +1603,11 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildMicroPromptShape 娴佺▼",
+      "problem": "execute buildMicroPromptShape flow",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)"
+        "string (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1401,7 +1619,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц buildTriadSpecDocument 娴佺▼",
+      "problem": "execute buildTriadSpecDocument flow",
       "demand": [
         "string (projectName)"
       ],
@@ -1415,11 +1633,12 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц createDraftProtocolTemplate 娴佺▼",
+      "problem": "execute createDraftProtocolTemplate flow",
       "demand": [
         "string (projectRoot)",
         "string (mapFile)",
-        "unknown (userDemand)"
+        "unknown (userDemand)",
+        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1431,7 +1650,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц createMacroSplitSeed 娴佺▼",
+      "problem": "execute createMacroSplitSeed flow",
       "demand": [
         "string (userDemand)"
       ],
@@ -1445,7 +1664,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц createMesoSplitSeed 娴佺▼",
+      "problem": "execute createMesoSplitSeed flow",
       "demand": [
         "None"
       ],
@@ -1459,7 +1678,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц createMicroSplitSeed 娴佺▼",
+      "problem": "execute createMicroSplitSeed flow",
       "demand": [
         "None"
       ],
@@ -1473,7 +1692,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getImplementationExecutionWorkflowLines 娴佺▼",
+      "problem": "execute getImplementationExecutionWorkflowLines flow",
       "demand": [
         "None"
       ],
@@ -1487,7 +1706,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getImplementationHandoffRuleLines 娴佺▼",
+      "problem": "execute getImplementationHandoffRuleLines flow",
       "demand": [
         "None"
       ],
@@ -1501,7 +1720,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getMasterPromptExpectedBehaviorLines 娴佺▼",
+      "problem": "execute getMasterPromptExpectedBehaviorLines flow",
       "demand": [
         "None"
       ],
@@ -1515,7 +1734,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getMasterPromptImplementationPhaseLines 娴佺▼",
+      "problem": "execute getMasterPromptImplementationPhaseLines flow",
       "demand": [
         "None"
       ],
@@ -1529,7 +1748,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getMasterPromptProtocolPhaseLines 娴佺▼",
+      "problem": "execute getMasterPromptProtocolPhaseLines flow",
       "demand": [
         "None"
       ],
@@ -1543,7 +1762,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getMasterPromptStageRouterLines 娴佺▼",
+      "problem": "execute getMasterPromptStageRouterLines flow",
       "demand": [
         "None"
       ],
@@ -1557,7 +1776,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "鎵ц getProtocolOutputContractLines 娴佺▼",
+      "problem": "execute getProtocolOutputContractLines flow",
       "demand": [
         "None"
       ],
@@ -1571,9 +1790,10 @@
     "category": "core",
     "sourcePath": "workspace.ts",
     "fission": {
-      "problem": "鎵ц getWorkspacePaths 娴佺▼",
+      "problem": "execute getWorkspacePaths flow",
       "demand": [
-        "string (projectRoot)"
+        "string (projectRoot)",
+        "[Ghost:Read] module (path)"
       ],
       "answer": [
         "WorkspacePaths"
@@ -1585,7 +1805,7 @@
     "category": "core",
     "sourcePath": "workspace.ts",
     "fission": {
-      "problem": "鎵ц normalizePath 娴佺▼",
+      "problem": "execute normalizePath flow",
       "demand": [
         "string (input)"
       ],

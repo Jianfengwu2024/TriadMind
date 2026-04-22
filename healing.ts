@@ -58,7 +58,7 @@ export function diagnoseRuntimeFailure(
     const traceFrames = extractTraceFrames(errorText, paths.projectRoot);
     const match = locateBestNodeMatch(traceFrames, nodes);
     const diagnosis = classifyDiagnosis(errorText);
-    const blastRadius = estimateBlastRadius(match?.node ?? null, nodes);
+    const blastRadius = estimateBlastRadius(match?.node ?? null, nodes, diagnosis === 'contract');
     const suggestedAction = chooseSuggestedAction(diagnosis, retryCount, config.runtimeHealing.maxAutoRetries);
     const evidence = buildEvidence(errorText, traceFrames, match?.node ?? null, diagnosis, blastRadius);
 

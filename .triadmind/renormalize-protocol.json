@@ -1,0 +1,21 @@
+{
+  "protocolVersion": "1.0",
+  "protocolType": "triadmind-renormalize",
+  "actions": [
+    {
+      "op": "create_macro_node",
+      "macro_node_id": "MacroNode.Protocol_normalizeCategory",
+      "absorbed_nodes": [
+        "Protocol.normalizeCategory"
+      ],
+      "new_demand": [
+        "string"
+      ],
+      "new_answer": [],
+      "rationale": "Collapse the strongly connected component Protocol.normalizeCategory into a language-agnostic macro node and expose only its external contract boundary."
+    }
+  ],
+  "summary": [
+    "MacroNode.Protocol_normalizeCategory absorbs 1 node(s) with 1 external demand(s) and 0 external answer(s)."
+  ]
+}

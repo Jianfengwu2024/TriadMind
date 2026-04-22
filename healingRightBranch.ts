@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { calculateBlastRadius } from './analyzer';
 import { parseNodeRef, TriadNodeDefinition } from './protocol';
 import { normalizePath } from './workspace';
 
@@ -157,36 +158,19 @@ export function chooseSuggestedAction(
 /**
  * @RightBranch
  */
-export function estimateBlastRadius(rootNode: TriadNodeDefinition | null, nodes: TriadNodeDefinition[]): BlastRadius {
+export function estimateBlastRadius(
+    rootNode: TriadNodeDefinition | null,
+    nodes: TriadNodeDefinition[],
+    isContractChange: boolean
+): BlastRadius {
     if (!rootNode) {
         return {
             impactedNodeIds: [],
-            risk: 'medium'
+            risk: 'low'
         };
     }
 
-    const rootRef = parseNodeRef(rootNode.nodeId, rootNode.category);
-    const impactedNodeIds = nodes
-        .filter((node) => node.nodeId !== rootNode.nodeId)
-        .filter((node) => {
-            const sameSource = node.sourcePath && rootNode.sourcePath && node.sourcePath === rootNode.sourcePath;
-            if (sameSource) {
-                return true;
-            }
-
-            const ref = parseNodeRef(node.nodeId, node.category);
-            if (ref.className === rootRef.className) {
-                return true;
-            }
-
-            const signatureText = `${node.fission.demand.join(' ')} ${node.fission.answer.join(' ')}`.toLowerCase();
-            return (
-                signatureText.includes(rootRef.className.toLowerCase()) ||
-                signatureText.includes(rootRef.methodName.toLowerCase())
-            );
-        })
-        .map((node) => node.nodeId)
-        .slice(0, 12);
+    const impactedNodeIds = calculateBlastRadius(nodes, rootNode.nodeId, isContractChange);
 
     const risk: BlastRadius['risk'] =
         impactedNodeIds.length >= 5 ? 'high' : impactedNodeIds.length >= 2 ? 'medium' : 'low';

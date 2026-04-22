@@ -6,7 +6,7 @@ import * as path from 'path';
 import { spawn } from 'child_process';
 import chalk from 'chalk';
 import { getAvailableAdapters, resolveAdapter } from './adapter';
-import { loadTriadConfig } from './config';
+import { loadTriadConfig, TriadLanguage } from './config';
 import { generateDashboard } from './visualizer';
 import { assertProtocolShape, readJsonFile, readTriadMap, UpgradeProtocol } from './protocol';
 import { prepareHealingArtifacts } from './healing';
@@ -14,6 +14,8 @@ import { installAlwaysOnRules } from './rules';
 import { collectProtocolSnapshotFiles, createSnapshot, listSnapshots, restoreSnapshot } from './snapshot';
 import { syncTriadMap, watchTriadMap } from './sync';
 import { writeSelfBootstrapProtocol, writeSelfBootstrapReport } from './bootstrap';
+import { calculateBlastRadius, detectCycles, detectTopologicalDrift, generateRenormalizeProtocol } from './analyzer';
+import { LanguageAdapter } from './languageAdapter';
 import {
     createDraftTemplate,
     ensureTriadSpec,
@@ -24,6 +26,17 @@ import {
 } from './workflow';
 
 const program = new Command();
+const BLAST_RADIUS_WARNING_THRESHOLD = 5;
+
+interface ILanguageAdapter {
+    applyProtocol(protocol: any, projectRoot: string): void;
+}
+
+type CliLanguageAdapter = ILanguageAdapter & {
+    language: TriadLanguage;
+    displayName: string;
+    consumeChangedFiles(): string[];
+};
 
 program.name('triadmind').description('TriadMind：顶点三元法驱动的项目拓扑规划与骨架生成工具').version('1.2.0');
 
@@ -32,10 +45,12 @@ program
     .description('初始化目标项目的 `.triadmind` 工作区，并重新生成 `triad-map.json`')
     .action(() => {
         const paths = getWorkspacePaths(process.cwd());
+        const previousMap = readCurrentTriadMap(paths);
 
         console.log(chalk.cyan('🧭 [TriadMind] 正在初始化工作区...'));
         ensureTriadSpec(paths);
         syncProjectTopology(paths, true);
+        assertNoTopologicalDegradation(paths, previousMap, 'init');
         installAlwaysOnRules(paths);
         writeMasterPrompt(paths);
 
@@ -181,6 +196,39 @@ program
     });
 
 program
+    .command('renormalize')
+    .description('Detect cyclic dependencies and emit a language-agnostic renormalization protocol')
+    .action(() => {
+        const paths = getWorkspacePaths(process.cwd());
+        const renormalizeProtocolFile = path.join(paths.triadDir, 'renormalize-protocol.json');
+
+        ensureTriadSpec(paths);
+        if (!fs.existsSync(paths.mapFile)) {
+            syncProjectTopology(paths, true);
+        }
+
+        const map = readCurrentTriadMap(paths);
+        const cycles = detectCycles(map);
+
+        if (cycles.length === 0) {
+            console.log(chalk.green('✅ No cyclic dependencies found; renormalization is not required.'));
+            if (fs.existsSync(renormalizeProtocolFile)) {
+                fs.unlinkSync(renormalizeProtocolFile);
+            }
+            return;
+        }
+
+        const protocol = generateRenormalizeProtocol(map, cycles);
+        fs.writeFileSync(renormalizeProtocolFile, JSON.stringify(protocol, null, 2), 'utf-8');
+
+        console.log(chalk.yellow(`⚠️ Detected ${cycles.length} cyclic component(s).`));
+        cycles.forEach((cycle, index) => {
+            console.log(chalk.yellow(`   ${index + 1}. ${cycle.join(' -> ')}`));
+        });
+        console.log(chalk.green(`✅ Renormalization protocol written: ${renormalizeProtocolFile}`));
+    });
+
+program
     .command('plan')
     .description('读取 `draft-protocol.json`，生成 `visualizer.html`，并在确认后落地骨架代码')
     .option('--apply', '跳过交互确认，直接执行 apply')
@@ -204,13 +252,16 @@ program
             return;
         }
 
+        let protocol: UpgradeProtocol;
         try {
-            validateDraftProtocol(paths);
+            protocol = validateDraftProtocol(paths);
         } catch (error: any) {
             console.log(chalk.red(`Draft protocol validation failed: ${error.message}`));
             process.exitCode = 1;
             return;
         }
+
+        warnBlastRadiusIfNeeded(paths, protocol);
 
         generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile);
         console.log(chalk.green(`✅ 演化视图已生成：${paths.visualizerFile}`));
@@ -296,14 +347,17 @@ program
             return;
         }
 
+        let protocol: UpgradeProtocol;
         try {
-            validateDraftProtocol(paths);
+            protocol = validateDraftProtocol(paths);
         } catch (error: any) {
             console.log(chalk.red(`❌ 当前 draft-protocol.json 尚不能落地：${error.message}`));
             console.log(chalk.yellow(`➡️ 请先让 AI 助手把完整协议写入 ${paths.draftFile}，然后重试 \`invoke --apply\``));
             process.exitCode = 1;
             return;
         }
+
+        warnBlastRadiusIfNeeded(paths, protocol);
 
         generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile);
         console.log(chalk.green(`✅ 静默审核图已生成：${paths.visualizerFile}`));
@@ -546,6 +600,7 @@ function executeApply(projectRoot: string) {
             syncProjectTopology(paths);
         }
 
+        const previousMap = readCurrentTriadMap(paths);
         const protocol = validateDraftProtocol(paths);
         const snapshot = createSnapshot(paths, 'before-apply', collectProtocolSnapshotFiles(paths, protocol));
         console.log(chalk.gray(`   - [Snapshot] created ${snapshot.id}`));
@@ -553,8 +608,9 @@ function executeApply(projectRoot: string) {
         const approvedProtocolJson = JSON.stringify(protocol, null, 2);
         fs.writeFileSync(paths.approvedProtocolFile, approvedProtocolJson, 'utf-8');
 
-        const result = applyUpgradeProtocol(projectRoot, paths.draftFile);
+        const result = dispatchProtocolApply(projectRoot, protocol);
         syncProjectTopology(paths, true);
+        assertNoTopologicalDegradation(paths, previousMap, 'apply');
         writeHandoffPrompt(projectRoot, result.changedFiles, approvedProtocolJson);
 
         if (fs.existsSync(paths.draftFile)) {
@@ -573,9 +629,144 @@ function syncProjectTopology(paths: ReturnType<typeof getWorkspacePaths>, force 
     return syncTriadMap(paths, force);
 }
 
-function applyUpgradeProtocol(projectRoot: string, protocolPath?: string) {
-    const adapter = resolveAdapter(projectRoot);
-    return adapter.applyUpgradeProtocol(projectRoot, protocolPath);
+function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {
+    return fs.existsSync(paths.mapFile) ? readTriadMap(paths.mapFile) : [];
+}
+
+function sniffProjectLanguage(projectRoot: string): TriadLanguage {
+    if (fs.existsSync(path.join(projectRoot, 'tsconfig.json'))) {
+        return 'typescript';
+    }
+
+    if (
+        fs.existsSync(path.join(projectRoot, 'requirements.txt')) ||
+        fs.existsSync(path.join(projectRoot, 'pyproject.toml'))
+    ) {
+        return 'python';
+    }
+
+    if (fs.existsSync(path.join(projectRoot, 'go.mod'))) {
+        return 'go';
+    }
+
+    return loadTriadConfig(getWorkspacePaths(projectRoot)).architecture.language;
+}
+
+function resolveStableAdapter(language: TriadLanguage): LanguageAdapter {
+    const adapters = getAvailableAdapters().filter((adapter) => adapter.language === language);
+    const stableAdapter = adapters.find((adapter) => adapter.status === 'stable');
+    const adapter = stableAdapter ?? adapters[0];
+
+    if (!adapter) {
+        throw new Error(`No language adapter registered for ${language}`);
+    }
+
+    return adapter;
+}
+
+function createCliLanguageAdapter(language: TriadLanguage): CliLanguageAdapter {
+    const adapter = resolveStableAdapter(language);
+    let changedFiles: string[] = [];
+
+    return {
+        language,
+        displayName: adapter.displayName,
+        applyProtocol(protocol: any, projectRoot: string) {
+            const paths = getWorkspacePaths(projectRoot);
+            const approvedProtocolPath = paths.approvedProtocolFile;
+            fs.writeFileSync(approvedProtocolPath, JSON.stringify(protocol, null, 2), 'utf-8');
+            changedFiles = adapter.applyUpgradeProtocol(projectRoot, approvedProtocolPath).changedFiles;
+        },
+        consumeChangedFiles() {
+            const current = changedFiles;
+            changedFiles = [];
+            return current;
+        }
+    };
+}
+
+function dispatchProtocolApply(projectRoot: string, protocol: UpgradeProtocol) {
+    const detectedLanguage = sniffProjectLanguage(projectRoot);
+    const adapter = createCliLanguageAdapter(detectedLanguage);
+    console.log(chalk.gray(`   - [Adapter] detected ${detectedLanguage} -> ${adapter.displayName}`));
+    adapter.applyProtocol(protocol, projectRoot);
+
+    return {
+        language: detectedLanguage,
+        changedFiles: adapter.consumeChangedFiles()
+    };
+}
+
+function assertNoTopologicalDegradation(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    previousMap: any[],
+    lifecycle: 'init' | 'apply'
+) {
+    const drift = detectTopologicalDrift(previousMap, readCurrentTriadMap(paths));
+    if (!drift.isDegraded) {
+        return;
+    }
+
+    throw new Error(`[${lifecycle}] topological drift detected: ${drift.summary.join(' ')}`);
+}
+
+function warnBlastRadiusIfNeeded(paths: ReturnType<typeof getWorkspacePaths>, protocol: UpgradeProtocol) {
+    const currentMap = readCurrentTriadMap(paths);
+    if (currentMap.length === 0) {
+        return;
+    }
+
+    const currentNodeMap = new Map(currentMap.map((node) => [node.nodeId, node]));
+    const impactedNodeIds = new Set<string>();
+    const hotspots: string[] = [];
+
+    for (const action of protocol.actions) {
+        if (action.op !== 'modify') {
+            continue;
+        }
+
+        const currentNode = currentNodeMap.get(action.nodeId);
+        if (!currentNode) {
+            continue;
+        }
+
+        const isContractChange = hasContractChange(currentNode, action.fission);
+        const impacted = calculateBlastRadius(currentMap, action.nodeId, isContractChange);
+        impacted.forEach((nodeId) => impactedNodeIds.add(nodeId));
+
+        if (isContractChange && impacted.length > 0) {
+            hotspots.push(`${action.nodeId} -> ${impacted.length}`);
+        }
+    }
+
+    if (impactedNodeIds.size < BLAST_RADIUS_WARNING_THRESHOLD) {
+        return;
+    }
+
+    console.log(
+        chalk.yellow(
+            `⚠️ Blast radius warning: ${impactedNodeIds.size} downstream nodes may be affected (${Array.from(impactedNodeIds)
+                .sort()
+                .slice(0, 8)
+                .join(', ')}).`
+        )
+    );
+
+    if (hotspots.length > 0) {
+        console.log(chalk.yellow(`   - contract hotspots: ${hotspots.join('; ')}`));
+    }
+}
+
+function hasContractChange(
+    currentNode: { fission: { demand: string[]; answer: string[] } },
+    nextFission: { demand: string[]; answer: string[] }
+) {
+    const normalizeEntries = (entries: string[]) => entries.map((entry) => entry.trim()).filter(Boolean);
+
+    return (
+        JSON.stringify(normalizeEntries(currentNode.fission.demand)) !== JSON.stringify(normalizeEntries(nextFission.demand)) ||
+        JSON.stringify(normalizeEntries(currentNode.fission.answer)) !== JSON.stringify(normalizeEntries(nextFission.answer))
+    );
 }
 
 function resolveHealingInput(paths: ReturnType<typeof getWorkspacePaths>, errorFile?: string, inlineMessage?: string) {

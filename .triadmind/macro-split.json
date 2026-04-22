@@ -1,16 +1,6 @@
 {
-  "anchorNodeId": "Adapter.resolveAdapter",
-  "vertexGoal": "将 AST 解析与代码生成从 ts-morph 绑定中抽离，升级为 LanguageAdapter 驱动的多语言泛化架构。",
-  "leftBranch": [
-    "定义 LanguageAdapter 统一接口，承载 readTopologyIR、parseTopology 与 applyUpgradeProtocol 动态能力",
-    "封装 TypeScriptAdapter，把现有 TypeScript parser/generator 实现迁入适配器",
-    "新增 AdapterRegistry，根据 .triadmind/config.json 动态选择语言适配器",
-    "改造 parser 和 generator 为纯调度器，只委托当前 Adapter 执行"
-  ],
-  "rightBranch": [
-    "TriadConfig.architecture.language / parserEngine / adapter 作为静态路由配置",
-    "AdapterRegistry 作为稳定适配器目录，保存语言到适配器的映射关系",
-    "Triad-IR / triad-map.json 作为跨语言中间拓扑契约",
-    "协议 Schema 与 reuse/modify/create_child 规则保持核心引擎稳定边界"
-  ]
+  "anchorNodeId": "",
+  "vertexGoal": "角色与背景：你现在是底层架构师。我们要重构 cli.ts 的 triadmind plan 和 apply 流程，支持基于 Tree-sitter 的多语言生成分发。任务 1 (构建 Adapter 调度器)：在 cli.ts 中实现一个语言嗅探与调度逻辑：检查当前目标项目目录，若存在 tsconfig.json 则判定为 TypeScript；若存在 requirements.txt / pyproject.toml 则判定为 Python；若存在 go.mod 则判定为 Go。声明一个接口 interface ILanguageAdapter { applyProtocol(protocol: any, projectRoot: string): void }。任务 2 (组装拦截生命周期)：在 Init/Apply 之后：调用我们写好的 detectTopologicalDrift。若 isDegraded === true，拦截报错，拒绝执行。在 Plan 接收到 LLM 草案后：调用 calculateBlastRadius。若波及过多节点，发出警告。在最终 Apply 执行时：不再直接调用写死的 generator.ts，而是根据嗅探到的语言，将协议 JSON 传递给对应的 ILanguageAdapter 实例去执行代码生成。要求：请写出这个具有 Adapter 模式与多生命周期拦截机制的 cli.ts 核心控制流代码。",
+  "leftBranch": [],
+  "rightBranch": []
 }
