@@ -2,7 +2,7 @@
   "schemaVersion": "1.1",
   "architecture": {
     "language": "typescript",
-    "parserEngine": "native",
+    "parserEngine": "tree-sitter",
     "adapter": "@triadmind/plugin-ts"
   },
   "categories": {

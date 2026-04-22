@@ -164,5 +164,5 @@ function hashFile(filePath: string) {
 }
 
 function isSourceFile(filePath: string) {
-    return /\.(ts|tsx|mts|cts|js|jsx|py|go|rs)$/.test(filePath) && !filePath.endsWith('.d.ts');
+    return /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py|go|rs|cpp|cc|cxx|hpp|hh|h|java)$/i.test(filePath) && !filePath.endsWith('.d.ts');
 }

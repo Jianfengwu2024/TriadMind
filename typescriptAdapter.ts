@@ -2,7 +2,7 @@ import { loadTriadConfig } from './config';
 import { buildTopologyIR, TriadTopologyIR } from './ir';
 import { LanguageAdapter } from './languageAdapter';
 import { readTriadMap } from './protocol';
-import { runTreeSitterTypeScriptParser } from './treeSitterParser';
+import { runTreeSitterParser } from './treeSitterParser';
 import { applyTypeScriptProtocol } from './typescriptGenerator';
 import { runTypeScriptParser } from './typescriptParser';
 import { getWorkspacePaths } from './workspace';
@@ -11,7 +11,7 @@ export function createTypeScriptAdapter(): LanguageAdapter {
     return {
         language: 'typescript',
         displayName: 'TypeScript',
-        parserEngine: 'native',
+        parserEngine: 'tree-sitter',
         adapterPackage: '@triadmind/plugin-ts',
         status: 'stable',
         readTopologyIR,
@@ -38,12 +38,12 @@ export function parseTopology(projectRoot: string, outputPath?: string): void {
     const paths = getWorkspacePaths(projectRoot);
     const config = loadTriadConfig(paths);
 
-    if (config.architecture.parserEngine === 'tree-sitter') {
-        runTreeSitterTypeScriptParser(projectRoot, outputPath ?? paths.mapFile, config);
+    if (config.architecture.parserEngine === 'native') {
+        runTypeScriptParser(projectRoot, outputPath);
         return;
     }
 
-    runTypeScriptParser(projectRoot, outputPath);
+    runTreeSitterParser('typescript', projectRoot, outputPath ?? paths.mapFile, config);
 }
 
 /**

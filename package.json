@@ -2,11 +2,22 @@
   "name": "triadmind-core",
   "version": "1.0.0",
   "bin": {
-    "triadmind": "./cli.ts"
+    "triadmind": "dist/cli.js"
   },
-  "description": "",
-  "main": "index.js",
+  "description": "TriadMind: topology-first AI software architecture CLI based on the vertex triad method.",
+  "main": "dist/cli.js",
+  "types": "dist/cli.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "user guide.md"
+  ],
   "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm run build",
     "init": "tsx cli.ts init",
     "prompt": "tsx cli.ts prompt",
     "pipeline": "tsx cli.ts pipeline",
@@ -31,16 +42,31 @@
     "apply": "tsx cli.ts apply",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "architecture",
+    "agent",
+    "topology",
+    "cli",
+    "triadmind"
+  ],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
   "type": "commonjs",
   "dependencies": {
     "chalk": "^4.1.2",
     "commander": "^14.0.3",
     "inquirer": "^8.2.7",
-    "open": "^11.0.0",
     "tree-sitter": "^0.21.1",
+    "tree-sitter-cpp": "^0.21.0",
+    "tree-sitter-go": "^0.21.0",
+    "tree-sitter-java": "^0.21.0",
+    "tree-sitter-javascript": "^0.21.4",
+    "tree-sitter-python": "^0.21.0",
+    "tree-sitter-rust": "^0.21.0",
     "tree-sitter-typescript": "^0.23.2",
     "ts-morph": "^28.0.0",
     "zod": "^4.3.6"

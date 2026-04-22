@@ -60,7 +60,7 @@
 ### Generator
 
 - Source: `generator.ts`
-- Responsibility: 骨架落地左分支，把已批准协议真正落地为 TypeScript 源码结构。
+- Responsibility: 骨架落地左分支，把已批准协议委托给当前语言适配器并落地为源码结构。
 - Static Right Branch: apply pipeline / node upsert execution
 - Dynamic Left Branch: `Generator.applyProtocol`
 
@@ -95,9 +95,16 @@
 ### Parser
 
 - Source: `parser.ts`
-- Responsibility: 源码拓扑抽取层，把 TypeScript 源码抽取为 triad-map 叶节点。
-- Static Right Branch: tsconfig.json / JSDoc tags / sourcePath
+- Responsibility: 源码拓扑抽取层，把当前语言源码抽取为 triad-map 叶节点。
+- Static Right Branch: language adapter / JSDoc tags / sourcePath
 - Dynamic Left Branch: `Parser.runParser`
+
+### PolyglotAdapter
+
+- Source: `polyglotAdapter.ts`
+- Responsibility: TriadMind 核心模块。
+- Static Right Branch: module exports / type signatures
+- Dynamic Left Branch: `PolyglotAdapter.createCppAdapter`, `PolyglotAdapter.createGoAdapter`, `PolyglotAdapter.createJavaAdapter`, `PolyglotAdapter.createJavaScriptAdapter`, `PolyglotAdapter.createPythonAdapter`, `PolyglotAdapter.createRustAdapter`
 
 ### Protocol
 
@@ -146,7 +153,7 @@
 - Source: `treeSitterParser.ts`
 - Responsibility: Tree-sitter 解析层，为跨语言泛化提供统一 AST 路径。
 - Static Right Branch: tree-sitter grammar / query patterns
-- Dynamic Left Branch: `TreeSitterParser.runTreeSitterTypeScriptParser`
+- Dynamic Left Branch: `TreeSitterParser.runTreeSitterParser`, `TreeSitterParser.runTreeSitterTypeScriptParser`
 
 ### TypescriptAdapter
 

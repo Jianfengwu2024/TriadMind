@@ -1,18 +1,29 @@
 import { loadTriadConfig, TriadLanguage } from './config';
 import { createTypeScriptAdapter } from './typescriptAdapter';
 import { LanguageAdapter } from './languageAdapter';
+import {
+    createCppAdapter,
+    createGoAdapter,
+    createJavaAdapter,
+    createJavaScriptAdapter,
+    createPythonAdapter,
+    createRustAdapter
+} from './polyglotAdapter';
 import { WorkspacePaths, getWorkspacePaths } from './workspace';
 
 const adapterRegistry = new Map<TriadLanguage, LanguageAdapter>();
 
-const plannedAdapters: LanguageAdapter[] = [
-    createPlannedAdapter('python', 'Python', '@triadmind/plugin-python'),
-    createPlannedAdapter('go', 'Go', '@triadmind/plugin-go'),
-    createPlannedAdapter('rust', 'Rust', '@triadmind/plugin-rust')
+const builtinAdapters: LanguageAdapter[] = [
+    createTypeScriptAdapter(),
+    createJavaScriptAdapter(),
+    createPythonAdapter(),
+    createGoAdapter(),
+    createRustAdapter(),
+    createCppAdapter(),
+    createJavaAdapter()
 ];
 
-registerAdapter(createTypeScriptAdapter());
-plannedAdapters.forEach((adapter) => registerAdapter(adapter));
+builtinAdapters.forEach((adapter) => registerAdapter(adapter));
 
 /**
  * TriadMind 自动生成骨架
@@ -56,22 +67,4 @@ export function resolveAdapter(pathsOrProjectRoot: WorkspacePaths | string): Lan
  */
 export function getAvailableAdapters(): LanguageAdapter[] {
     return Array.from(adapterRegistry.values());
-}
-
-function createPlannedAdapter(language: TriadLanguage, displayName: string, adapterPackage: string): LanguageAdapter {
-    const fail = () => {
-        throw new Error(`${displayName} adapter is planned but not implemented yet`);
-    };
-
-    return {
-        language,
-        displayName,
-        parserEngine: 'tree-sitter',
-        adapterPackage,
-        status: 'planned',
-        readTopologyIR: fail,
-        parseTopology: fail,
-        applyUpgradeProtocol: fail,
-        supportsRuntimeHealing: true
-    };
 }

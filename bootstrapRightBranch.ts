@@ -20,7 +20,7 @@ export function getBootstrapModuleRoles() {
             staticRightBranch: ['TriadConfig', 'DEFAULT_CONFIG', '.triadmind/config.json']
         },
         Generator: {
-            role: '骨架落地左分支，把已批准协议真正落地为 TypeScript 源码结构。',
+            role: '骨架落地左分支，把已批准协议委托给当前语言适配器并落地为源码结构。',
             staticRightBranch: ['apply pipeline', 'node upsert execution']
         },
         GeneratorRightBranch: {
@@ -40,8 +40,8 @@ export function getBootstrapModuleRoles() {
             staticRightBranch: ['TriadTopologyIR', 'TriadIRNode', 'TriadIREdge']
         },
         Parser: {
-            role: '源码拓扑抽取层，把 TypeScript 源码抽取为 triad-map 叶节点。',
-            staticRightBranch: ['tsconfig.json', 'JSDoc tags', 'sourcePath']
+            role: '源码拓扑抽取层，把当前语言源码抽取为 triad-map 叶节点。',
+            staticRightBranch: ['language adapter', 'JSDoc tags', 'sourcePath']
         },
         Protocol: {
             role: '协议编译器左分支，用 Schema 与拓扑规则拦截非法演化。',

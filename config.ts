@@ -1,8 +1,9 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { WorkspacePaths, normalizePath } from './workspace';
 import { TriadCategory } from './protocol';
 
-export type TriadLanguage = 'typescript' | 'python' | 'go' | 'rust';
+export type TriadLanguage = 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'cpp' | 'java';
 export type TriadParserEngine = 'native' | 'tree-sitter';
 
 export interface TriadConfig {
@@ -38,7 +39,7 @@ const DEFAULT_CONFIG: TriadConfig = {
     schemaVersion: '1.1',
     architecture: {
         language: 'typescript',
-        parserEngine: 'native',
+        parserEngine: 'tree-sitter',
         adapter: '@triadmind/plugin-ts'
     },
     categories: {
@@ -67,11 +68,32 @@ const DEFAULT_CONFIG: TriadConfig = {
     }
 };
 
+const LANGUAGE_ADAPTER_PACKAGE: Record<TriadLanguage, string> = {
+    typescript: '@triadmind/plugin-ts',
+    javascript: '@triadmind/plugin-js',
+    python: '@triadmind/plugin-python',
+    go: '@triadmind/plugin-go',
+    rust: '@triadmind/plugin-rust',
+    cpp: '@triadmind/plugin-cpp',
+    java: '@triadmind/plugin-java'
+};
+
+const LANGUAGE_PARSER_ENGINE: Record<TriadLanguage, TriadParserEngine> = {
+    typescript: 'tree-sitter',
+    javascript: 'tree-sitter',
+    python: 'tree-sitter',
+    go: 'tree-sitter',
+    rust: 'tree-sitter',
+    cpp: 'tree-sitter',
+    java: 'tree-sitter'
+};
+
 export function ensureTriadConfig(paths: WorkspacePaths, force = false) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
 
     if (force || !fs.existsSync(paths.configFile)) {
-        fs.writeFileSync(paths.configFile, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8');
+        const detectedLanguage = detectProjectLanguage(paths.projectRoot);
+        fs.writeFileSync(paths.configFile, JSON.stringify(buildDefaultConfig(detectedLanguage), null, 2), 'utf-8');
     }
 }
 
@@ -113,12 +135,18 @@ export function shouldExcludeSourcePath(sourcePath: string, config: TriadConfig)
 }
 
 function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
+    const language = normalizeLanguage(
+        value.architecture?.language,
+        value.architecture?.adapter,
+        DEFAULT_CONFIG.architecture.language
+    );
+
     return {
         schemaVersion: DEFAULT_CONFIG.schemaVersion,
         architecture: {
-            language: value.architecture?.language ?? DEFAULT_CONFIG.architecture.language,
-            parserEngine: value.architecture?.parserEngine ?? DEFAULT_CONFIG.architecture.parserEngine,
-            adapter: value.architecture?.adapter ?? DEFAULT_CONFIG.architecture.adapter
+            language,
+            parserEngine: normalizeParserEngine(value.architecture?.parserEngine, language),
+            adapter: value.architecture?.adapter ?? LANGUAGE_ADAPTER_PACKAGE[language]
         },
         categories: {
             frontend: value.categories?.frontend ?? DEFAULT_CONFIG.categories.frontend,
@@ -148,4 +176,144 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             snapshotStrategy: value.runtimeHealing?.snapshotStrategy ?? DEFAULT_CONFIG.runtimeHealing.snapshotStrategy
         }
     };
+}
+
+function buildDefaultConfig(language: TriadLanguage): TriadConfig {
+    return {
+        ...DEFAULT_CONFIG,
+        architecture: {
+            language,
+            parserEngine: LANGUAGE_PARSER_ENGINE[language],
+            adapter: LANGUAGE_ADAPTER_PACKAGE[language]
+        }
+    };
+}
+
+function normalizeLanguage(
+    value?: string,
+    adapterValue?: string,
+    fallback: TriadLanguage = 'typescript'
+): TriadLanguage {
+    const normalized = (value ?? '').trim().toLowerCase();
+
+    if (normalized === 'typescript' || normalized === 'ts') {
+        return 'typescript';
+    }
+    if (normalized === 'javascript' || normalized === 'js' || normalized === 'node' || normalized === 'nodejs') {
+        return 'javascript';
+    }
+    if (normalized === 'python' || normalized === 'py') {
+        return 'python';
+    }
+    if (normalized === 'go' || normalized === 'golang') {
+        return 'go';
+    }
+    if (normalized === 'rust' || normalized === 'rs') {
+        return 'rust';
+    }
+    if (normalized === 'cpp' || normalized === 'c++' || normalized === 'cxx' || normalized === 'cc') {
+        return 'cpp';
+    }
+    if (normalized === 'java' || normalized === 'jdk') {
+        return 'java';
+    }
+
+    const adapter = (adapterValue ?? '').trim().toLowerCase();
+    if (adapter.includes('javascript') || adapter.includes('plugin-js')) {
+        return 'javascript';
+    }
+    if (adapter.includes('python')) {
+        return 'python';
+    }
+    if (adapter.includes('go')) {
+        return 'go';
+    }
+    if (adapter.includes('rust')) {
+        return 'rust';
+    }
+    if (adapter.includes('cpp') || adapter.includes('cxx') || adapter.includes('c++')) {
+        return 'cpp';
+    }
+    if (adapter.includes('java')) {
+        return 'java';
+    }
+
+    return fallback;
+}
+
+function normalizeParserEngine(value: string | undefined, language: TriadLanguage): TriadParserEngine {
+    if (value === 'tree-sitter') {
+        return 'tree-sitter';
+    }
+    if (value === 'native') {
+        return 'native';
+    }
+
+    return LANGUAGE_PARSER_ENGINE[language];
+}
+
+function detectProjectLanguage(projectRoot: string): TriadLanguage {
+    if (fs.existsSync(path.join(projectRoot, 'tsconfig.json'))) {
+        return 'typescript';
+    }
+
+    const extensionScore = new Map<TriadLanguage, number>([
+        ['javascript', 0],
+        ['python', 0],
+        ['go', 0],
+        ['rust', 0],
+        ['cpp', 0],
+        ['java', 0],
+        ['typescript', 0]
+    ]);
+
+    walkProject(projectRoot, (filePath) => {
+        const normalized = normalizePath(path.relative(projectRoot, filePath)).toLowerCase();
+        if (normalized.includes('node_modules') || normalized.includes('.triadmind') || normalized.includes('.git')) {
+            return;
+        }
+
+        if (/\.(ts|tsx|mts|cts)$/.test(filePath)) {
+            extensionScore.set('typescript', (extensionScore.get('typescript') ?? 0) + 1);
+        } else if (/\.(js|jsx|mjs|cjs)$/.test(filePath)) {
+            extensionScore.set('javascript', (extensionScore.get('javascript') ?? 0) + 1);
+        } else if (/\.py$/.test(filePath)) {
+            extensionScore.set('python', (extensionScore.get('python') ?? 0) + 1);
+        } else if (/\.go$/.test(filePath)) {
+            extensionScore.set('go', (extensionScore.get('go') ?? 0) + 1);
+        } else if (/\.rs$/.test(filePath)) {
+            extensionScore.set('rust', (extensionScore.get('rust') ?? 0) + 1);
+        } else if (/\.(cpp|cc|cxx|hpp|hh|h)$/.test(filePath)) {
+            extensionScore.set('cpp', (extensionScore.get('cpp') ?? 0) + 1);
+        } else if (/\.java$/.test(filePath)) {
+            extensionScore.set('java', (extensionScore.get('java') ?? 0) + 1);
+        }
+    });
+
+    let detected: TriadLanguage = 'typescript';
+    let bestScore = 0;
+    for (const [language, score] of extensionScore.entries()) {
+        if (score > bestScore) {
+            detected = language;
+            bestScore = score;
+        }
+    }
+
+    return detected;
+}
+
+function walkProject(currentPath: string, visit: (filePath: string) => void) {
+    if (!fs.existsSync(currentPath)) {
+        return;
+    }
+
+    const stat = fs.statSync(currentPath);
+    if (stat.isFile()) {
+        visit(currentPath);
+        return;
+    }
+
+    for (const entry of fs.readdirSync(currentPath)) {
+        walkProject(path.join(currentPath, entry), visit);
+    }
 }

@@ -1,8 +1,9 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import inquirer from 'inquirer';
-import open from 'open';
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawn } from 'child_process';
 import chalk from 'chalk';
 import { getAvailableAdapters, resolveAdapter } from './adapter';
 import { loadTriadConfig } from './config';
@@ -216,7 +217,7 @@ program
 
         if (options.open !== false) {
             try {
-                await open(paths.visualizerFile);
+                await openFile(paths.visualizerFile);
             } catch (error: any) {
                 console.log(chalk.yellow(`📝 自动打开浏览器失败：${error.message}`));
             }
@@ -689,6 +690,20 @@ function resolveDemand(
 
 function normalizeInvokeDemand(value: string) {
     return value.trim().replace(/^@?triadmind(?:\s*[:：-]\s*|\s+)/i, '').trim();
+}
+
+async function openFile(filePath: string) {
+    const command =
+        process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+    const args =
+        process.platform === 'win32' ? ['/c', 'start', '', filePath] : [filePath];
+
+    const child = spawn(command, args, {
+        detached: true,
+        stdio: 'ignore'
+    });
+
+    child.unref();
 }
 
 program.parse(process.argv);

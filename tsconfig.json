@@ -7,13 +7,13 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "declaration": true,
+    "sourceMap": true,
     "types": ["node"],
     "ignoreDeprecations": "6.0"
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules"],
-  "scripts": {
-    "start": "tsx parser.ts",
-    "dev": "tsx watch parser.ts"
-  }
+  "exclude": ["node_modules", "dist", ".triadmind", ".git"]
 }

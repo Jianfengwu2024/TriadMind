@@ -1,4 +1,6 @@
 node_modules/
+dist/
+*.tgz
 .triadmind/cache/
 .triadmind/snapshots/
 .triadmind/runtime-error.log

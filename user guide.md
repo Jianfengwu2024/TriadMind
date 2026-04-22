@@ -427,18 +427,23 @@ TriadMind 不会盲信 LLM。
 
 ## 11. 多语言路径
 
-当前稳定支持：
+当前稳定支持的语言都默认走统一 Tree-sitter AST 路径：
 
-- `typescript + native`
 - `typescript + tree-sitter`
+- `javascript + tree-sitter`
+- `python + tree-sitter`
+- `go + tree-sitter`
+- `rust + tree-sitter`
+- `cpp + tree-sitter`
+- `java + tree-sitter`
 
 可在配置中切换：
 
 ```json
 "architecture": {
-  "language": "typescript",
+  "language": "python",
   "parserEngine": "tree-sitter",
-  "adapter": "@triadmind/plugin-ts"
+  "adapter": "@triadmind/plugin-python"
 }
 ```
 
@@ -451,10 +456,16 @@ npm run triad:adapters
 当前架构已经把“协议”与“语言实现”解耦：
 
 ```text
-代码 -> 解析器 -> Triad-IR -> protocol -> adapter -> 骨架
+代码 -> Tree-sitter AST -> Triad-IR -> protocol -> adapter -> 骨架
 ```
 
-未来要扩展 Python / Go / Rust，主要是在适配器层继续补齐。
+`javascript / go / rust / cpp / java` 同理可把 `language` 改成 `javascript`、`go`、`rust`、`cpp`、`java`。如果不手动配置，`init` 会根据项目源码扩展名自动识别。
+
+当前边界：
+
+- `typescript / javascript / python / go / rust / cpp / java` 已支持 `init / sync / apply / invoke --apply`
+- `native` 仅保留为旧项目兼容或调试回退路径，新项目不建议使用
+- 解析侧已统一为 Tree-sitter AST；骨架生成仍由各语言 adapter 按目标语言语法落盘
 
 ---
 
@@ -562,7 +573,7 @@ npm run triad:rollback -- "<snapshot-id>"
 {
   "architecture": {
     "language": "typescript",
-    "parserEngine": "native",
+    "parserEngine": "tree-sitter",
     "adapter": "@triadmind/plugin-ts"
   },
   "protocol": {
@@ -578,10 +589,10 @@ npm run triad:rollback -- "<snapshot-id>"
 }
 ```
 
-如果你想验证更通用的解析路线，可切到：
+如果旧项目确实需要回退兼容解析，可临时切到：
 
 ```json
-"parserEngine": "tree-sitter"
+"parserEngine": "native"
 ```
 
 ---
