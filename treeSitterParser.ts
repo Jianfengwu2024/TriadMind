@@ -143,9 +143,9 @@ function collectLanguageNodes(
         case 'rust':
             return collectRustNodes(rootNode, filePath, sourcePath, category, parsedFiles);
         case 'cpp':
-            return collectCppNodes(rootNode, filePath, sourcePath, category);
+            return collectCppNodes(rootNode, filePath, sourcePath, category, parsedFiles);
         case 'java':
-            return collectJavaNodes(rootNode, sourcePath, category);
+            return collectJavaNodes(rootNode, filePath, sourcePath, category, parsedFiles);
     }
 }
 
@@ -1959,9 +1959,147 @@ function collectRustNodes(
     return triadGraph;
 }
 
-function collectCppNodes(rootNode: Parser.SyntaxNode, filePath: string, sourcePath: string, category: string) {
+function buildCppGhostContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
+    return {
+        importedBindings: collectCppImportedBindings(rootNode, filePath, parsedFiles),
+        moduleBindings: collectCppModuleBindings(rootNode)
+    };
+}
+
+function collectCppImportedBindings(
+    _rootNode: Parser.SyntaxNode,
+    _filePath: string,
+    _parsedFiles: ParsedSourceFile[]
+) {
+    return new Map<string, BindingInfo>();
+}
+
+function collectCppModuleBindings(rootNode: Parser.SyntaxNode) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const child of rootNode.namedChildren) {
+        if (child.type === 'declaration') {
+            const typeNode = child.namedChildren.find(
+                (node) => node.type === 'type_identifier' || node.type.endsWith('_type') || node.type === 'primitive_type'
+            );
+            const localName = getNameText(
+                child.namedChildren.find((node) => node.type === 'identifier' || node.type === 'field_identifier') ?? null
+            );
+            if (localName) {
+                bindings.set(localName, {
+                    typeName: normalizeTypeText(typeNode?.text ?? guessBindingTypeFromName(localName))
+                });
+            }
+            continue;
+        }
+
+        if (child.type === 'function_definition') {
+            const declarator = child.childForFieldName('declarator') ?? child.namedChildren.find((node) => node.type === 'function_declarator');
+            const nameNode =
+                declarator?.childForFieldName('declarator') ??
+                declarator?.childForFieldName('name') ??
+                declarator?.namedChildren.find((node) => node.type === 'identifier' || node.type === 'qualified_identifier') ??
+                null;
+            const localName = getNameText(nameNode);
+            if (localName) {
+                bindings.set(localName, { typeName: localName });
+            }
+            continue;
+        }
+
+        if (child.type === 'class_specifier' || child.type === 'struct_specifier') {
+            const localName = getFirstNamedChildText(child, ['type_identifier']);
+            if (localName) {
+                bindings.set(localName, { typeName: localName });
+            }
+        }
+    }
+
+    return bindings;
+}
+
+function collectCppClassPropertyTypes(classNode: Parser.SyntaxNode) {
+    const propertyTypes = new Map<string, string>();
+    const body = classNode.childForFieldName('body') ?? classNode.namedChildren.find((child) => child.type === 'field_declaration_list');
+    if (!body) {
+        return propertyTypes;
+    }
+
+    for (const field of body.namedChildren.filter((child) => child.type === 'field_declaration')) {
+        const declarator = field.descendantsOfType('function_declarator')[0];
+        if (declarator) {
+            continue;
+        }
+
+        const typeNode = field.namedChildren.find(
+            (node) => node.type === 'type_identifier' || node.type.endsWith('_type') || node.type === 'primitive_type'
+        );
+        const typeName = normalizeTypeText(typeNode?.text ?? 'unknown');
+        for (const fieldNameNode of field.namedChildren.filter((node) => node.type === 'field_identifier')) {
+            propertyTypes.set(fieldNameNode.text, typeName);
+        }
+    }
+
+    return propertyTypes;
+}
+
+function collectCppGhostDemand(
+    executableNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext,
+    classPropertyTypes = new Map<string, string>()
+) {
+    const ghostStates = new Map<string, { typeName: string; read: boolean; write: boolean }>();
+
+    for (const reference of scanTreeSitterGhostReferences(executableNode, {
+        localDeclarationNodes: ['declaration', 'init_declarator', 'for_range_loop'],
+        memberExpressionNodes: ['field_expression', 'qualified_identifier'],
+        functionBodyNodes: ['compound_statement'],
+        selfNames: ['this']
+    })) {
+        if (reference.kind === 'self') {
+            const propertyName = reference.propertyName ?? reference.rootName;
+            const typeName = classPropertyTypes.get(propertyName) ?? 'unknown';
+            registerGhostState(ghostStates, reference.label, typeName, reference.mode);
+            continue;
+        }
+
+        const selfTypeName = classPropertyTypes.get(reference.rootName);
+        if (selfTypeName) {
+            registerGhostState(ghostStates, reference.label, selfTypeName, reference.mode);
+            continue;
+        }
+
+        const binding = ghostContext.importedBindings.get(reference.rootName) ?? ghostContext.moduleBindings.get(reference.rootName);
+        if (!binding) {
+            continue;
+        }
+
+        registerGhostState(ghostStates, reference.label, binding.typeName, reference.mode);
+    }
+
+    return Array.from(ghostStates.entries())
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, state]) => {
+            if (state.read && state.write) {
+                return `[Ghost:ReadWrite] ${state.typeName} (${label})`;
+            }
+            if (state.write) {
+                return `[Ghost:Write] ${state.typeName} (${label})`;
+            }
+            return `[Ghost:Read] ${state.typeName} (${label})`;
+        });
+}
+
+function collectCppNodes(
+    rootNode: Parser.SyntaxNode,
+    filePath: string,
+    sourcePath: string,
+    category: string,
+    parsedFiles: ParsedSourceFile[]
+) {
     const triadGraph: TriadNode[] = [];
     const moduleName = toPascalCase(path.basename(filePath).replace(/\.(cpp|cc|cxx|hpp|hh|h)$/i, ''));
+    const ghostContext = buildCppGhostContext(rootNode, filePath, parsedFiles);
 
     for (const node of rootNode.namedChildren) {
         if (node.type === 'class_specifier' || node.type === 'struct_specifier') {
@@ -1971,24 +2109,33 @@ function collectCppNodes(rootNode: Parser.SyntaxNode, filePath: string, sourcePa
                 continue;
             }
 
-            for (const field of body.namedChildren.filter((child) => child.type === 'field_declaration')) {
-                const declarator = field.descendantsOfType('function_declarator')[0];
+            const classPropertyTypes = collectCppClassPropertyTypes(node);
+            for (const memberNode of body.namedChildren.filter((child) => child.type === 'field_declaration' || child.type === 'function_definition')) {
+                const declarator =
+                    memberNode.type === 'function_definition'
+                        ? memberNode.childForFieldName('declarator') ?? memberNode.namedChildren.find((child) => child.type === 'function_declarator')
+                        : memberNode.descendantsOfType('function_declarator')[0];
                 const methodName = getNameText(declarator?.childForFieldName('declarator') ?? declarator?.childForFieldName('name') ?? declarator?.namedChildren[0]);
                 if (!declarator || !methodName || methodName === className || methodName === `~${className}`) {
                     continue;
                 }
 
+                const functionNode =
+                    memberNode.type === 'function_definition'
+                        ? memberNode
+                        : memberNode.namedChildren.find((child) => child.type === 'function_definition') ?? declarator.parent?.parent ?? memberNode;
+                const ghostDemand = collectCppGhostDemand(functionNode, ghostContext, classPropertyTypes);
                 triadGraph.push(
                     createTriadNode(
                         `${className}.${methodName}`,
                         category,
                         sourcePath,
-                        parseCppParametersAst(
+                        mergeDemandEntries(parseCppParametersAst(
                             declarator.childForFieldName('parameters') ??
                                 declarator.namedChildren.find((child) => child.type === 'parameter_list') ??
                                 null
-                        ),
-                        [extractCppReturnType(field)]
+                        ), ghostDemand),
+                        [extractCppReturnType(memberNode)]
                     )
                 );
             }
@@ -2012,16 +2159,17 @@ function collectCppNodes(rootNode: Parser.SyntaxNode, filePath: string, sourcePa
                 continue;
             }
 
+            const ghostDemand = collectCppGhostDemand(node, ghostContext);
             triadGraph.push(
                 createTriadNode(
                     `${ownerName}.${functionName}`,
                     category,
                     sourcePath,
-                    parseCppParametersAst(
+                    mergeDemandEntries(parseCppParametersAst(
                         declarator.childForFieldName('parameters') ??
                             declarator.namedChildren.find((child) => child.type === 'parameter_list') ??
                             null
-                    ),
+                    ), ghostDemand),
                     [extractCppReturnType(node)]
                 )
             );
@@ -2031,8 +2179,152 @@ function collectCppNodes(rootNode: Parser.SyntaxNode, filePath: string, sourcePa
     return triadGraph;
 }
 
-function collectJavaNodes(rootNode: Parser.SyntaxNode, sourcePath: string, category: string) {
+function buildJavaGhostContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
+    return {
+        importedBindings: collectJavaImportedBindings(rootNode, filePath, parsedFiles),
+        moduleBindings: collectJavaModuleBindings(rootNode)
+    };
+}
+
+function collectJavaImportedBindings(
+    rootNode: Parser.SyntaxNode,
+    _filePath: string,
+    _parsedFiles: ParsedSourceFile[]
+) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const importNode of rootNode.descendantsOfType('import_declaration')) {
+        const scopedNode = importNode.namedChildren.find((node) => node.type === 'scoped_identifier' || node.type === 'identifier');
+        const localName = getNameText(scopedNode);
+        if (!localName) {
+            continue;
+        }
+
+        bindings.set(localName, {
+            typeName: guessBindingTypeFromName(localName)
+        });
+    }
+
+    return bindings;
+}
+
+function collectJavaModuleBindings(rootNode: Parser.SyntaxNode) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const classNode of rootNode.namedChildren.filter((node) => node.type === 'class_declaration')) {
+        const className = getNameText(classNode.childForFieldName('name'));
+        if (!className) {
+            continue;
+        }
+
+        bindings.set(className, { typeName: className });
+        const classBody = classNode.childForFieldName('body');
+        if (!classBody) {
+            continue;
+        }
+
+        for (const child of classBody.namedChildren) {
+            if (child.type === 'field_declaration') {
+                const typeNode = child.childForFieldName('type') ?? child.namedChildren.find((node) => node.type.endsWith('_type')) ?? null;
+                const typeName = normalizeTypeText(typeNode?.text ?? 'unknown');
+                for (const declarator of child.namedChildren.filter((node) => node.type === 'variable_declarator')) {
+                    const localName = getNameText(declarator.childForFieldName('name') ?? declarator.namedChildren[0] ?? null);
+                    if (localName) {
+                        bindings.set(localName, { typeName });
+                    }
+                }
+                continue;
+            }
+
+            if (child.type === 'method_declaration') {
+                const localName = getNameText(child.childForFieldName('name'));
+                if (localName) {
+                    bindings.set(localName, { typeName: localName });
+                }
+            }
+        }
+    }
+
+    return bindings;
+}
+
+function collectJavaClassPropertyTypes(classNode: Parser.SyntaxNode) {
+    const propertyTypes = new Map<string, string>();
+    const classBody = classNode.childForFieldName('body');
+    if (!classBody) {
+        return propertyTypes;
+    }
+
+    for (const child of classBody.namedChildren.filter((node) => node.type === 'field_declaration')) {
+        const typeNode = child.childForFieldName('type') ?? child.namedChildren.find((node) => node.type.endsWith('_type')) ?? null;
+        const typeName = normalizeTypeText(typeNode?.text ?? 'unknown');
+        for (const declarator of child.namedChildren.filter((node) => node.type === 'variable_declarator')) {
+            const propertyName = getNameText(declarator.childForFieldName('name') ?? declarator.namedChildren[0] ?? null);
+            if (propertyName) {
+                propertyTypes.set(propertyName, typeName);
+            }
+        }
+    }
+
+    return propertyTypes;
+}
+
+function collectJavaGhostDemand(
+    executableNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext,
+    classPropertyTypes = new Map<string, string>()
+) {
+    const ghostStates = new Map<string, { typeName: string; read: boolean; write: boolean }>();
+
+    for (const reference of scanTreeSitterGhostReferences(executableNode, {
+        localDeclarationNodes: ['local_variable_declaration', 'variable_declarator', 'catch_formal_parameter'],
+        memberExpressionNodes: ['field_access', 'method_invocation'],
+        functionBodyNodes: ['block'],
+        selfNames: ['this']
+    })) {
+        if (reference.kind === 'self') {
+            const propertyName = reference.propertyName ?? reference.rootName;
+            const typeName = classPropertyTypes.get(propertyName) ?? 'unknown';
+            registerGhostState(ghostStates, reference.label, typeName, reference.mode);
+            continue;
+        }
+
+        const selfTypeName = classPropertyTypes.get(reference.rootName);
+        if (selfTypeName) {
+            registerGhostState(ghostStates, reference.label, selfTypeName, reference.mode);
+            continue;
+        }
+
+        const binding = ghostContext.importedBindings.get(reference.rootName) ?? ghostContext.moduleBindings.get(reference.rootName);
+        if (!binding) {
+            continue;
+        }
+
+        registerGhostState(ghostStates, reference.label, binding.typeName, reference.mode);
+    }
+
+    return Array.from(ghostStates.entries())
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, state]) => {
+            if (state.read && state.write) {
+                return `[Ghost:ReadWrite] ${state.typeName} (${label})`;
+            }
+            if (state.write) {
+                return `[Ghost:Write] ${state.typeName} (${label})`;
+            }
+            return `[Ghost:Read] ${state.typeName} (${label})`;
+        });
+}
+
+function collectJavaNodes(
+    rootNode: Parser.SyntaxNode,
+    filePath: string,
+    sourcePath: string,
+    category: string,
+    parsedFiles: ParsedSourceFile[]
+) {
     const triadGraph: TriadNode[] = [];
+    const ghostContext = buildJavaGhostContext(rootNode, filePath, parsedFiles);
 
     for (const classNode of rootNode.namedChildren.filter((node) => node.type === 'class_declaration')) {
         const className = getNameText(classNode.childForFieldName('name'));
@@ -2041,18 +2333,20 @@ function collectJavaNodes(rootNode: Parser.SyntaxNode, sourcePath: string, categ
             continue;
         }
 
+        const classPropertyTypes = collectJavaClassPropertyTypes(classNode);
         for (const methodNode of classBody.namedChildren.filter((child) => child.type === 'method_declaration')) {
             const methodName = getNameText(methodNode.childForFieldName('name'));
             if (!methodName) {
                 continue;
             }
 
+            const ghostDemand = collectJavaGhostDemand(methodNode, ghostContext, classPropertyTypes);
             triadGraph.push(
                 createTriadNode(
                     `${className}.${methodName}`,
                     category,
                     sourcePath,
-                    parseJavaParametersAst(methodNode.childForFieldName('parameters')),
+                    mergeDemandEntries(parseJavaParametersAst(methodNode.childForFieldName('parameters')), ghostDemand),
                     [normalizeTypeText(methodNode.childForFieldName('type')?.text ?? 'void')]
                 )
             );
