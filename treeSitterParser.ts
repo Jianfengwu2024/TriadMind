@@ -31,13 +31,13 @@ interface ParsedSourceFile {
     rootNode: Parser.SyntaxNode;
 }
 
-interface TypeScriptBindingInfo {
+interface BindingInfo {
     typeName: string;
 }
 
-interface TypeScriptGhostContext {
-    importedBindings: Map<string, TypeScriptBindingInfo>;
-    moduleBindings: Map<string, TypeScriptBindingInfo>;
+interface GhostBindingContext {
+    importedBindings: Map<string, BindingInfo>;
+    moduleBindings: Map<string, BindingInfo>;
 }
 
 const TREE_SITTER_LANGUAGES: Record<TriadLanguage, any> = {
@@ -137,7 +137,7 @@ function collectLanguageNodes(
         case 'javascript':
             return collectJavaScriptNodes(rootNode, source, filePath, sourcePath, category, config, parsedFiles);
         case 'python':
-            return collectPythonNodes(rootNode, sourcePath, category);
+            return collectPythonNodes(rootNode, filePath, sourcePath, category, parsedFiles);
         case 'go':
             return collectGoNodes(rootNode, sourcePath, category);
         case 'rust':
@@ -159,7 +159,7 @@ function collectTypeScriptNodes(
     parsedFiles: ParsedSourceFile[]
 ) {
     const triadGraph: TriadNode[] = [];
-    const ghostContext = buildTypeScriptGhostContext(rootNode, filePath, parsedFiles);
+    const ghostContext = buildGhostBindingContext(rootNode, filePath, parsedFiles);
 
     for (const classNode of rootNode.descendantsOfType('class_declaration')) {
         const className = getNameText(classNode.childForFieldName('name'));
@@ -228,7 +228,7 @@ function collectTypeScriptNodes(
     return triadGraph;
 }
 
-function buildTypeScriptGhostContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
+function buildGhostBindingContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
     return {
         importedBindings: collectTypeScriptImportedBindings(rootNode, filePath, parsedFiles),
         moduleBindings: collectTypeScriptModuleBindings(rootNode)
@@ -240,7 +240,7 @@ function collectTypeScriptImportedBindings(
     filePath: string,
     parsedFiles: ParsedSourceFile[]
 ) {
-    const bindings = new Map<string, TypeScriptBindingInfo>();
+    const bindings = new Map<string, BindingInfo>();
 
     for (const importNode of rootNode.descendantsOfType('import_statement')) {
         const modulePath = getImportModulePath(importNode);
@@ -290,7 +290,7 @@ function collectTypeScriptImportedBindings(
 }
 
 function collectTypeScriptModuleBindings(rootNode: Parser.SyntaxNode) {
-    const bindings = new Map<string, TypeScriptBindingInfo>();
+    const bindings = new Map<string, BindingInfo>();
 
     for (const child of rootNode.namedChildren) {
         const declarationNode = child.type === 'export_statement' ? child.namedChildren[0] : child;
@@ -348,7 +348,7 @@ function collectTypeScriptModuleBindings(rootNode: Parser.SyntaxNode) {
 
 function collectTypeScriptClassPropertyTypes(
     classNode: Parser.SyntaxNode,
-    ghostContext: TypeScriptGhostContext
+    ghostContext: GhostBindingContext
 ) {
     const propertyTypes = new Map<string, string>();
     const classBody = classNode.childForFieldName('body');
@@ -377,7 +377,7 @@ function collectTypeScriptClassPropertyTypes(
 
 function collectTypeScriptGhostDemand(
     executableNode: Parser.SyntaxNode,
-    ghostContext: TypeScriptGhostContext,
+    ghostContext: GhostBindingContext,
     classPropertyTypes = new Map<string, string>()
 ) {
     const ghostStates = new Map<string, { typeName: string; read: boolean; write: boolean }>();
@@ -581,7 +581,7 @@ function inferTypeScriptDeclaratorType(declarator: Parser.SyntaxNode, fallbackNa
 function inferTypeScriptValueType(
     valueNode: Parser.SyntaxNode | null,
     fallbackName: string,
-    ghostContext?: TypeScriptGhostContext
+    ghostContext?: GhostBindingContext
 ) {
     if (!valueNode) {
         return guessBindingTypeFromName(fallbackName);
@@ -769,7 +769,7 @@ function collectJavaScriptImportedBindings(
     filePath: string,
     parsedFiles: ParsedSourceFile[]
 ) {
-    const bindings = new Map<string, TypeScriptBindingInfo>();
+    const bindings = new Map<string, BindingInfo>();
 
     for (const importNode of rootNode.descendantsOfType('import_statement')) {
         const modulePath = getImportModulePath(importNode);
@@ -842,7 +842,7 @@ function collectJavaScriptImportedBindings(
 }
 
 function collectJavaScriptModuleBindings(rootNode: Parser.SyntaxNode) {
-    const bindings = new Map<string, TypeScriptBindingInfo>();
+    const bindings = new Map<string, BindingInfo>();
 
     for (const child of rootNode.namedChildren) {
         const declarationNode = child.type === 'export_statement' ? child.namedChildren[0] : child;
@@ -890,7 +890,7 @@ function collectJavaScriptModuleBindings(rootNode: Parser.SyntaxNode) {
 
 function collectJavaScriptClassPropertyTypes(
     classNode: Parser.SyntaxNode,
-    ghostContext: TypeScriptGhostContext
+    ghostContext: GhostBindingContext
 ) {
     const propertyTypes = new Map<string, string>();
     const classBody = classNode.childForFieldName('body');
@@ -916,7 +916,7 @@ function collectJavaScriptExportNode(
     moduleName: string,
     category: string,
     sourcePath: string,
-    ghostContext: TypeScriptGhostContext
+    ghostContext: GhostBindingContext
 ) {
     const triadGraph: TriadNode[] = [];
     const functionNode = exportNode.namedChildren.find((node) => node.type === 'function_declaration');
@@ -952,7 +952,7 @@ function collectJavaScriptVariableFunctions(
     moduleName: string,
     category: string,
     sourcePath: string,
-    ghostContext: TypeScriptGhostContext
+    ghostContext: GhostBindingContext
 ) {
     const triadGraph: TriadNode[] = [];
 
@@ -1040,14 +1040,21 @@ function inferJavaScriptDeclaratorType(declarator: Parser.SyntaxNode, fallbackNa
 function inferJavaScriptValueType(
     valueNode: Parser.SyntaxNode | null,
     fallbackName: string,
-    ghostContext?: TypeScriptGhostContext
+    ghostContext?: GhostBindingContext
 ) {
     return inferTypeScriptValueType(valueNode, fallbackName, ghostContext);
 }
 
-function collectPythonNodes(rootNode: Parser.SyntaxNode, sourcePath: string, category: string) {
+function collectPythonNodes(
+    rootNode: Parser.SyntaxNode,
+    filePath: string,
+    sourcePath: string,
+    category: string,
+    parsedFiles: ParsedSourceFile[]
+) {
     const triadGraph: TriadNode[] = [];
     const moduleName = toPascalCase(path.basename(sourcePath).replace(/\.py$/, ''));
+    const ghostContext = buildPythonGhostContext(rootNode, filePath, parsedFiles);
 
     for (const node of rootNode.namedChildren) {
         if (node.type === 'class_definition') {
@@ -1057,18 +1064,20 @@ function collectPythonNodes(rootNode: Parser.SyntaxNode, sourcePath: string, cat
                 continue;
             }
 
+            const classPropertyTypes = collectPythonClassPropertyTypes(node, ghostContext);
             for (const methodNode of classBody.namedChildren.filter((child) => child.type === 'function_definition')) {
                 const methodName = getNameText(methodNode.childForFieldName('name'));
                 if (!methodName || methodName === '__init__') {
                     continue;
                 }
 
+                const ghostDemand = collectPythonGhostDemand(methodNode, ghostContext, classPropertyTypes);
                 triadGraph.push(
                     createTriadNode(
                         `${className}.${methodName}`,
                         category,
                         sourcePath,
-                        parsePythonParametersAst(methodNode.childForFieldName('parameters')),
+                        mergeDemandEntries(parsePythonParametersAst(methodNode.childForFieldName('parameters')), ghostDemand),
                         [extractPythonReturnType(methodNode)]
                     )
                 );
@@ -1082,12 +1091,13 @@ function collectPythonNodes(rootNode: Parser.SyntaxNode, sourcePath: string, cat
                 continue;
             }
 
+            const ghostDemand = collectPythonGhostDemand(node, ghostContext);
             triadGraph.push(
                 createTriadNode(
                     `${moduleName}.${functionName}`,
                     category,
                     sourcePath,
-                    parsePythonParametersAst(node.childForFieldName('parameters')),
+                    mergeDemandEntries(parsePythonParametersAst(node.childForFieldName('parameters')), ghostDemand),
                     [extractPythonReturnType(node)]
                 )
             );
@@ -1095,6 +1105,366 @@ function collectPythonNodes(rootNode: Parser.SyntaxNode, sourcePath: string, cat
     }
 
     return triadGraph;
+}
+
+function buildPythonGhostContext(rootNode: Parser.SyntaxNode, filePath: string, parsedFiles: ParsedSourceFile[]) {
+    return {
+        importedBindings: collectPythonImportedBindings(rootNode, filePath, parsedFiles),
+        moduleBindings: collectPythonModuleBindings(rootNode)
+    };
+}
+
+function collectPythonImportedBindings(
+    rootNode: Parser.SyntaxNode,
+    filePath: string,
+    parsedFiles: ParsedSourceFile[]
+) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const importFrom of rootNode.descendantsOfType('import_from_statement')) {
+        const moduleNode = importFrom.namedChildren.find((node) => node.type === 'dotted_name');
+        const modulePath = moduleNode?.text ?? '';
+        const targetFile = resolvePythonImportedParsedFile(filePath, modulePath, parsedFiles);
+        const importedNodes = importFrom.namedChildren.filter((node, index) => node.type === 'dotted_name' && index > 0);
+
+        for (const importedNode of importedNodes) {
+            const localName = importedNode.text;
+            if (!localName) {
+                continue;
+            }
+
+            bindings.set(localName, {
+                typeName: resolvePythonImportedBindingType(targetFile, localName)
+            });
+        }
+    }
+
+    for (const importStatement of rootNode.descendantsOfType('import_statement')) {
+        for (const child of importStatement.namedChildren) {
+            if (child.type === 'aliased_import') {
+                const moduleNode = child.namedChildren.find((node) => node.type === 'dotted_name');
+                const aliasNode = child.namedChildren.find((node) => node.type === 'identifier');
+                const localName = aliasNode?.text ?? moduleNode?.text.split('.').pop() ?? '';
+                if (!localName) {
+                    continue;
+                }
+
+                bindings.set(localName, {
+                    typeName: 'module'
+                });
+                continue;
+            }
+
+            if (child.type === 'dotted_name') {
+                const localName = child.text.split('.').pop() ?? '';
+                if (!localName) {
+                    continue;
+                }
+
+                bindings.set(localName, {
+                    typeName: 'module'
+                });
+            }
+        }
+    }
+
+    return bindings;
+}
+
+function collectPythonModuleBindings(rootNode: Parser.SyntaxNode) {
+    const bindings = new Map<string, BindingInfo>();
+
+    for (const child of rootNode.namedChildren) {
+        if (child.type === 'function_definition') {
+            const localName = getNameText(child.childForFieldName('name'));
+            if (localName) {
+                bindings.set(localName, { typeName: localName });
+            }
+            continue;
+        }
+
+        if (child.type === 'class_definition') {
+            const localName = getNameText(child.childForFieldName('name'));
+            if (localName) {
+                bindings.set(localName, { typeName: localName });
+            }
+            continue;
+        }
+
+        if (child.type === 'expression_statement') {
+            const assignmentNode = child.namedChildren.find((node) => node.type === 'assignment');
+            if (!assignmentNode) {
+                continue;
+            }
+
+            const leftNode = assignmentNode.childForFieldName('left') ?? assignmentNode.namedChildren[0] ?? null;
+            const localName = extractBindingNames(leftNode)[0];
+            if (!localName) {
+                continue;
+            }
+
+            bindings.set(localName, {
+                typeName: inferPythonAssignmentType(assignmentNode, localName)
+            });
+        }
+    }
+
+    return bindings;
+}
+
+function collectPythonClassPropertyTypes(
+    classNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext
+) {
+    const propertyTypes = new Map<string, string>();
+    const classBody = classNode.childForFieldName('body');
+    if (!classBody) {
+        return propertyTypes;
+    }
+
+    for (const child of classBody.namedChildren) {
+        if (child.type === 'expression_statement') {
+            const assignmentNode = child.namedChildren.find((node) => node.type === 'assignment');
+            if (!assignmentNode) {
+                continue;
+            }
+
+            const leftNode = assignmentNode.childForFieldName('left') ?? assignmentNode.namedChildren[0] ?? null;
+            const propertyName = extractBindingNames(leftNode)[0];
+            if (!propertyName) {
+                continue;
+            }
+
+            propertyTypes.set(propertyName, inferPythonAssignmentType(assignmentNode, propertyName, ghostContext));
+            continue;
+        }
+
+        if (child.type === 'function_definition' && getNameText(child.childForFieldName('name')) === '__init__') {
+            const initBody = child.childForFieldName('body');
+            if (!initBody) {
+                continue;
+            }
+
+            for (const stmt of initBody.namedChildren.filter((node) => node.type === 'expression_statement')) {
+                const assignmentNode = stmt.namedChildren.find((node) => node.type === 'assignment');
+                if (!assignmentNode) {
+                    continue;
+                }
+
+                const leftNode = assignmentNode.childForFieldName('left') ?? assignmentNode.namedChildren[0] ?? null;
+                if (!leftNode || leftNode.type !== 'attribute') {
+                    continue;
+                }
+
+                const rootNode = leftNode.namedChildren[0] ?? null;
+                const propertyNode = leftNode.namedChildren[1] ?? null;
+                if (!rootNode || rootNode.text !== 'self' || !propertyNode) {
+                    continue;
+                }
+
+                const propertyName = getNameText(propertyNode);
+                if (!propertyName) {
+                    continue;
+                }
+
+                if (propertyTypes.has(propertyName)) {
+                    continue;
+                }
+
+                propertyTypes.set(propertyName, inferPythonAssignmentType(assignmentNode, propertyName, ghostContext));
+            }
+        }
+    }
+
+    return propertyTypes;
+}
+
+function collectPythonGhostDemand(
+    executableNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext,
+    classPropertyTypes = new Map<string, string>()
+) {
+    const ghostStates = new Map<string, { typeName: string; read: boolean; write: boolean }>();
+
+    for (const reference of scanTreeSitterGhostReferences(executableNode, {
+        localDeclarationNodes: ['assignment', 'for_statement', 'for_in_clause', 'with_item'],
+        memberExpressionNodes: ['attribute', 'subscript'],
+        functionBodyNodes: ['block'],
+        selfNames: ['self', 'cls']
+    })) {
+        if (reference.kind === 'self') {
+            const propertyName = reference.propertyName ?? reference.rootName;
+            const typeName = classPropertyTypes.get(propertyName) ?? 'unknown';
+            registerGhostState(ghostStates, reference.label, typeName, reference.mode);
+            continue;
+        }
+
+        const binding = ghostContext.importedBindings.get(reference.rootName) ?? ghostContext.moduleBindings.get(reference.rootName);
+        if (!binding) {
+            continue;
+        }
+
+        registerGhostState(ghostStates, reference.label, binding.typeName, reference.mode);
+    }
+
+    return Array.from(ghostStates.entries())
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, state]) => {
+            if (state.read && state.write) {
+                return `[Ghost:ReadWrite] ${state.typeName} (${label})`;
+            }
+            if (state.write) {
+                return `[Ghost:Write] ${state.typeName} (${label})`;
+            }
+            return `[Ghost:Read] ${state.typeName} (${label})`;
+        });
+}
+
+function resolvePythonImportedParsedFile(
+    currentFilePath: string,
+    importPath: string,
+    parsedFiles: ParsedSourceFile[]
+) {
+    if (!importPath) {
+        return undefined;
+    }
+
+    const modulePath = importPath.replace(/\./g, path.sep);
+    const relativeCandidates = [
+        `${modulePath}.py`,
+        path.join(modulePath, '__init__.py')
+    ].map((candidate) => path.normalize(candidate));
+
+    const siblingCandidates = relativeCandidates.map((candidate) => path.normalize(path.join(path.dirname(currentFilePath), candidate)));
+
+    return parsedFiles.find((entry) => {
+        const normalized = path.normalize(entry.filePath);
+        return siblingCandidates.includes(normalized) || relativeCandidates.some((candidate) => normalized.endsWith(candidate));
+    });
+}
+
+function resolvePythonImportedBindingType(targetFile: ParsedSourceFile | undefined, bindingName: string) {
+    if (!targetFile) {
+        return guessBindingTypeFromName(bindingName);
+    }
+
+    const exportedType = lookupPythonExportedBindingType(targetFile.rootNode, bindingName);
+    return exportedType || guessBindingTypeFromName(bindingName);
+}
+
+function lookupPythonExportedBindingType(rootNode: Parser.SyntaxNode, bindingName: string) {
+    for (const child of rootNode.namedChildren) {
+        if (child.type === 'class_definition') {
+            const name = getNameText(child.childForFieldName('name'));
+            if (name === bindingName) {
+                return name;
+            }
+            continue;
+        }
+
+        if (child.type === 'function_definition') {
+            const name = getNameText(child.childForFieldName('name'));
+            if (name === bindingName) {
+                return name;
+            }
+            continue;
+        }
+
+        if (child.type === 'expression_statement') {
+            const assignmentNode = child.namedChildren.find((node) => node.type === 'assignment');
+            if (!assignmentNode) {
+                continue;
+            }
+
+            const leftNode = assignmentNode.childForFieldName('left') ?? assignmentNode.namedChildren[0] ?? null;
+            const name = extractBindingNames(leftNode)[0];
+            if (name === bindingName) {
+                return inferPythonAssignmentType(assignmentNode, bindingName);
+            }
+        }
+    }
+
+    return '';
+}
+
+function inferPythonAssignmentType(
+    assignmentNode: Parser.SyntaxNode,
+    fallbackName: string,
+    ghostContext?: GhostBindingContext
+) {
+    const leftNode = assignmentNode.childForFieldName('left') ?? assignmentNode.namedChildren[0] ?? null;
+    const rightNode = assignmentNode.childForFieldName('right') ?? assignmentNode.namedChildren[1] ?? null;
+    const explicitTypeNode = assignmentNode.namedChildren.find((node) => node.type === 'type') ?? null;
+
+    if (explicitTypeNode) {
+        return normalizeTypeText(explicitTypeNode.text);
+    }
+
+    return inferPythonValueType(rightNode, fallbackName, ghostContext, leftNode);
+}
+
+function inferPythonValueType(
+    valueNode: Parser.SyntaxNode | null,
+    fallbackName: string,
+    ghostContext?: GhostBindingContext,
+    leftNode?: Parser.SyntaxNode | null
+) {
+    if (!valueNode) {
+        return guessBindingTypeFromName(fallbackName);
+    }
+
+    if (valueNode.type === 'dictionary') {
+        const fields: string[] = [];
+        for (const pair of valueNode.namedChildren.filter((node) => node.type === 'pair')) {
+            const key = pair.namedChildren[0]?.text.replace(/^['"]|['"]$/g, '') ?? '';
+            const val = pair.namedChildren[1] ?? null;
+            if (key) {
+                fields.push(`${key}: ${inferPythonValueType(val, key, ghostContext)}`);
+            }
+        }
+        return fields.length > 0 ? `{ ${fields.join('; ')} }` : 'dict';
+    }
+
+    if (valueNode.type === 'list' || valueNode.type === 'tuple') {
+        return 'list';
+    }
+
+    if (valueNode.type === 'string') {
+        return 'str';
+    }
+
+    if (valueNode.type === 'integer' || valueNode.type === 'float') {
+        return 'number';
+    }
+
+    if (valueNode.type === 'true' || valueNode.type === 'false') {
+        return 'bool';
+    }
+
+    if (valueNode.type === 'identifier') {
+        const binding = ghostContext?.importedBindings.get(valueNode.text) ?? ghostContext?.moduleBindings.get(valueNode.text);
+        return binding?.typeName ?? guessBindingTypeFromName(valueNode.text);
+    }
+
+    if (valueNode.type === 'attribute') {
+        const rootName = getNameText(valueNode.namedChildren[0] ?? null);
+        const binding = ghostContext?.importedBindings.get(rootName) ?? ghostContext?.moduleBindings.get(rootName);
+        return binding?.typeName ?? guessBindingTypeFromName(rootName || fallbackName);
+    }
+
+    if (valueNode.type === 'call') {
+        const callee = valueNode.namedChildren[0] ?? null;
+        return guessBindingTypeFromName(getNameText(callee) || fallbackName);
+    }
+
+    if (leftNode?.type === 'attribute') {
+        const propertyName = getNameText(leftNode.namedChildren[1] ?? null);
+        if (propertyName) {
+            return guessBindingTypeFromName(propertyName);
+        }
+    }
+
+    return guessBindingTypeFromName(fallbackName);
 }
 
 function collectGoNodes(rootNode: Parser.SyntaxNode, sourcePath: string, category: string) {

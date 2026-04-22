@@ -206,6 +206,10 @@ function extractBindingNames(
         return [];
     }
 
+    if (isMemberExpression(node, profile) || node.type === 'subscript') {
+        return [];
+    }
+
     if (isIdentifierNode(node, profile) && !isMemberPropertyName(node, profile)) {
         const name = normalizeName(node.text);
         return name ? [name] : [];
@@ -309,7 +313,9 @@ function getGhostAccessMode(
     }
 
     if (isAssignmentNode(parent) && parent.namedChildren[0]?.id === target.id) {
-        return parent.type === 'augmented_assignment_expression' ? 'readwrite' : 'write';
+        return parent.type === 'augmented_assignment_expression' || parent.type === 'augmented_assignment'
+            ? 'readwrite'
+            : 'write';
     }
 
     if (parent.type === 'update_expression' && parent.namedChildren.some((child) => child.id === target.id)) {
@@ -376,6 +382,7 @@ function isAssignmentNode(node: Parser.SyntaxNode) {
     return (
         node.type === 'assignment_expression' ||
         node.type === 'augmented_assignment_expression' ||
+        node.type === 'augmented_assignment' ||
         node.type === 'assignment_statement' ||
         node.type === 'short_var_declaration'
     );
