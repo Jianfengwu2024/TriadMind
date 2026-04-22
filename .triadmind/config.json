@@ -45,6 +45,10 @@
     "excludePathPatterns": [
       "tests",
       "test",
+      "schemas",
+      "models",
+      "migrations",
+      "alembic/versions",
       "__pycache__",
       "node_modules",
       "venv",
@@ -73,7 +77,9 @@
     "excludeNodeNamePatterns": [
       "^test_",
       "^_",
-      "^(get|set|build|parse|format|normalize|sanitize|validate)_"
+      "^(get|set|build|parse|format|normalize|sanitize|validate)_",
+      "^__.*__$",
+      "^(upgrade|downgrade)$"
     ],
     "ignoreGenericContracts": true,
     "genericContractIgnoreList": [
@@ -90,6 +96,9 @@
       "array",
       "any",
       "unknown",
+      "json",
+      "request",
+      "response",
       "void",
       "none",
       "dict[str,any]",
@@ -103,8 +112,12 @@
     }
   },
   "visualizer": {
+    "defaultView": "architecture",
+    "showIsolatedCapabilities": false,
     "maxContractEdges": 1200,
+    "maxPrimaryEdges": 1500,
     "fastMayaThreshold": 10,
+    "fastFingerprintThreshold": 8,
     "maxRenderNodes": 400
   },
   "protocol": {

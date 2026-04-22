@@ -4813,11 +4813,168 @@ function createTriadNode(
         category,
         sourcePath,
         fission: {
-            problem: problem ?? `execute ${methodName} flow`,
+            problem: deriveCapabilityProblem(nodeId, sourcePath, demand, answer, problem ?? `execute ${methodName} flow`),
             demand: demand.length > 0 ? demand : ['None'],
             answer: answer.length > 0 ? answer : ['void']
         }
     };
+}
+
+function deriveCapabilityProblem(
+    nodeId: string,
+    sourcePath: string,
+    demand: string[],
+    answer: string[],
+    rawProblem: string
+) {
+    if (!isLowSemanticProblem(rawProblem)) {
+        return rawProblem;
+    }
+
+    const nodeParts = nodeId.split('.').filter(Boolean);
+    const methodName = nodeParts[nodeParts.length - 1] ?? 'capability';
+    const ownerName = nodeParts.length > 1 ? nodeParts.slice(0, -1).join(' ') : '';
+    const capabilityType = inferCapabilityProblemType(nodeId, sourcePath, methodName);
+    const verb = inferCapabilityProblemVerb(methodName, rawProblem);
+    const subject = buildCapabilityProblemSubject(ownerName, methodName, sourcePath, demand, answer);
+    const prefix = isLowSemanticSubject(subject, methodName, sourcePath) ? '[low_semantic_name] ' : '';
+    return `${prefix}${capabilityType} Capability: ${verb} ${subject}`;
+}
+
+function isLowSemanticProblem(value: string) {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    return (
+        !normalized ||
+        /^execute\s+.+\s+(flow|capability|pipeline)$/.test(normalized) ||
+        /^execute\s+.+\s+(aggregate|module|class)\s+capability$/.test(normalized) ||
+        /^aggregate\s+(module|domain)\s+capability\s+for\s+/.test(normalized)
+    );
+}
+
+function inferCapabilityProblemType(nodeId: string, sourcePath: string, methodName: string) {
+    const text = `${nodeId} ${sourcePath} ${methodName}`.toLowerCase();
+    if (/(api|route|endpoint|controller|handler|command|consumer|rpc|webhook)/.test(text)) return 'Interface';
+    if (/(workflow|pipeline|orchestrat|stage|sync|plan|apply|dispatch|handoff|protocol)/.test(text)) return 'Workflow';
+    if (/(adapter|gateway|repository|storage|database|db|queue|client|filesystem|network|model)/.test(text)) {
+        return 'Adapter';
+    }
+    if (/(policy|rule|guard|auth|permission|decide|resolver|router|validator)/.test(text)) return 'Policy';
+    if (/(worker|job|tool|agent|operator|kernel|execute|runner|runtime|healing)/.test(text)) return 'Execution';
+    if (/(service|usecase|manager|domain)/.test(text)) return 'Service';
+    return 'System';
+}
+
+function inferCapabilityProblemVerb(methodName: string, rawProblem: string) {
+    const name = methodName.toLowerCase();
+    if (/^(handle|process|dispatch|consume|receive)/.test(name)) return 'Handle';
+    if (/^(plan|prepare|draft|protocol)/.test(name) || /\bplan\b/i.test(rawProblem)) return 'Plan';
+    if (/^(apply|commit|write|save|persist|upsert|generate|create)/.test(name)) return 'Produce';
+    if (/^(sync|watch|heal|recover|rollback|restore)/.test(name)) return 'Coordinate';
+    if (/^(detect|analyze|diagnose|calculate|resolve|scan|parse|read|load)/.test(name)) return 'Analyze';
+    if (/^(execute|run|invoke|call)/.test(name)) return 'Run';
+    return 'Provide';
+}
+
+function buildCapabilityProblemSubject(
+    ownerName: string,
+    methodName: string,
+    sourcePath: string,
+    demand: string[],
+    answer: string[]
+) {
+    const ownerTokens = tokenizeSemanticName(ownerName);
+    const methodTokens = tokenizeSemanticName(methodName);
+    const sourceTokens = tokenizeSemanticName(getSemanticSourcePathTail(sourcePath));
+    const contractTokens = tokenizeSemanticName(getFirstDomainContractName([...answer, ...demand]));
+    const tokens = dedupeSemanticTokens([
+        ...ownerTokens,
+        ...methodTokens.filter((token) => !GENERIC_METHOD_TOKENS.has(token)),
+        ...sourceTokens.filter((token) => !GENERIC_SOURCE_TOKENS.has(token)).slice(0, 2),
+        ...contractTokens.slice(0, 2)
+    ]).filter((token) => !GENERIC_SUBJECT_TOKENS.has(token));
+
+    if (tokens.length === 0) {
+        return toHumanCapabilityName(methodName || ownerName || getSemanticSourcePathTail(sourcePath) || 'capability');
+    }
+
+    return toHumanCapabilityName(tokens.join(' '));
+}
+
+function isLowSemanticSubject(subject: string, methodName: string, sourcePath: string) {
+    const tokens = tokenizeSemanticName(`${subject} ${getSemanticSourcePathTail(sourcePath)}`);
+    const meaningfulTokens = tokens.filter((token) => !GENERIC_SUBJECT_TOKENS.has(token));
+    return meaningfulTokens.length <= 1 && GENERIC_METHOD_TOKENS.has(methodName.toLowerCase());
+}
+
+const GENERIC_METHOD_TOKENS = new Set([
+    'execute',
+    'run',
+    'handle',
+    'process',
+    'dispatch',
+    'apply',
+    'invoke',
+    'call',
+    'capability',
+    'pipeline',
+    'flow'
+]);
+
+const GENERIC_SOURCE_TOKENS = new Set(['index', 'main', 'src', 'lib', 'core', 'app', 'server', 'client']);
+
+const GENERIC_SUBJECT_TOKENS = new Set([
+    'module',
+    'domain',
+    'capability',
+    'pipeline',
+    'flow',
+    'aggregate',
+    'class',
+    'function',
+    'method',
+    'index',
+    'main'
+]);
+
+function tokenizeSemanticName(value: string) {
+    return String(value ?? '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_\-./\\:]+/g, ' ')
+        .split(/\s+/)
+        .map((token) => token.trim().toLowerCase())
+        .filter(Boolean);
+}
+
+function dedupeSemanticTokens(tokens: string[]) {
+    const seen = new Set<string>();
+    return tokens.filter((token) => {
+        if (seen.has(token)) {
+            return false;
+        }
+        seen.add(token);
+        return true;
+    });
+}
+
+function getSemanticSourcePathTail(sourcePath: string) {
+    const normalized = normalizePath(String(sourcePath ?? '').trim()).replace(/\.[^.\/]+$/, '');
+    const parts = normalized.split('/').filter(Boolean);
+    return parts.slice(-2).join(' ');
+}
+
+function getFirstDomainContractName(contracts: string[]) {
+    return (
+        contracts
+            .map((contract) => String(contract ?? '').replace(/^\[[^\]]+\]\s*/, '').split(/[<(]/)[0].trim())
+            .find((contract) => contract && !/^(none|void|unknown|\[generic\])/i.test(contract)) ?? ''
+    );
+}
+
+function toHumanCapabilityName(value: string) {
+    const text = tokenizeSemanticName(value)
+        .filter((token) => token.length > 0)
+        .join(' ');
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Capability';
 }
 
 function dedupeNodes(nodes: TriadNode[]) {
@@ -4946,10 +5103,15 @@ function buildAggregateNode(
         }
     }
 
-    const problem =
+    const problem = deriveCapabilityProblem(
+        group.nodeId,
+        group.sourcePath,
+        Array.from(demandByKey.values()),
+        Array.from(answerByKey.values()),
         level === 'module'
             ? `aggregate module capability for ${group.sourcePath}`
-            : `aggregate domain capability for ${group.sourcePath || group.nodeId}`;
+            : `aggregate domain capability for ${group.sourcePath || group.nodeId}`
+    );
 
     return {
         nodeId: group.nodeId,

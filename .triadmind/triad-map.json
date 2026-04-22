@@ -4,7 +4,7 @@
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "execute AdapterRegistry.registerAdapter capability",
+      "problem": "Adapter Capability: Provide Adapter registry register language",
       "demand": [
         "LanguageAdapter (adapter)",
         "[Ghost:Read] Map (adapterRegistry)"
@@ -19,7 +19,7 @@
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "execute AdapterRegistry.resolveAdapter capability",
+      "problem": "Adapter Capability: Analyze Adapter registry resolve language",
       "demand": [
         "WorkspacePaths | string (pathsOrProjectRoot)",
         "[Ghost:Read] Map (adapterRegistry)"
@@ -34,7 +34,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.calculateBlastRadius capability",
+      "problem": "System Capability: Analyze Analyzer calculate blast radius string[]",
       "demand": [
         "any[] (map)",
         "[Generic] string (targetNodeId)",
@@ -51,7 +51,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.calculateProducerConsumerEdges capability",
+      "problem": "Interface Capability: Analyze Analyzer calculate producer consumer edges removed edge[]",
       "demand": [
         "any[] (map)",
         "AnalyzerOptions (options)"
@@ -66,7 +66,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.detectCycles capability",
+      "problem": "System Capability: Analyze Analyzer detect cycles string[][]",
       "demand": [
         "any[] (map)",
         "AnalyzerOptions (options)",
@@ -82,7 +82,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.detectTopologicalDrift capability",
+      "problem": "System Capability: Analyze Analyzer detect topological drift report",
       "demand": [
         "any[] (oldMap)",
         "any[] (newMap)",
@@ -99,7 +99,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.generateFeatureHash capability",
+      "problem": "System Capability: Produce Analyzer generate feature hash string",
       "demand": [
         "number[][] (matrix)",
         "[Ghost:Read] generateMayaFeatureHash (generateMayaFeatureHash)"
@@ -114,7 +114,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.generateMayaFeatureHash capability",
+      "problem": "System Capability: Produce Analyzer generate maya feature hash string",
       "demand": [
         "number[] (mayaSequence)",
         "[Ghost:Read] createHash (createHash)"
@@ -129,7 +129,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.generateMayanMatrix capability",
+      "problem": "System Capability: Produce Analyzer generate mayan matrix number[][]",
       "demand": [
         "any[] (normalizedNodes)",
         "[Ghost:Read] generateMayaSequence (generateMayaSequence)",
@@ -145,7 +145,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.generateMayaSequence capability",
+      "problem": "System Capability: Produce Analyzer generate maya sequence number[]",
       "demand": [
         "number[] (partition)"
       ],
@@ -159,7 +159,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.generateRenormalizeProtocol capability",
+      "problem": "Workflow Capability: Produce Analyzer generate renormalize protocol",
       "demand": [
         "any[] (map)",
         "string[][] (cycles)",
@@ -175,7 +175,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.mapTopologyToYoungPartition capability",
+      "problem": "System Capability: Provide Analyzer map topology to young partition number[]",
       "demand": [
         "any[] (subgraph)",
         "[Ghost:Read] buildYoungPartitionFromNormalizedNodes (buildYoungPartitionFromNormalizedNodes)"
@@ -190,7 +190,7 @@
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute Analyzer.normalizeSubgraph capability",
+      "problem": "System Capability: Provide Analyzer normalize subgraph any[]",
       "demand": [
         "any[] (subgraph)",
         "[Ghost:Read] cloneJson (cloneJson)"
@@ -205,7 +205,7 @@
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "execute Bootstrap.writeSelfBootstrapProtocol capability",
+      "problem": "Workflow Capability: Produce Bootstrap write self protocol workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] module (fs)"
@@ -220,7 +220,7 @@
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "execute Bootstrap.writeSelfBootstrapReport capability",
+      "problem": "System Capability: Produce Bootstrap write self report workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] module (fs)",
@@ -236,7 +236,7 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute Config.createSourcePathFilter capability",
+      "problem": "System Capability: Produce Config create source path filter string",
       "demand": [
         "[Generic] string (projectRoot)",
         "TriadConfig (config)",
@@ -252,7 +252,7 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute Config.describeSourceScanScope capability",
+      "problem": "System Capability: Provide Config describe source scan scope string",
       "demand": [
         "[Generic] string (projectRoot)",
         "TriadConfig (config)"
@@ -267,7 +267,7 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute Config.ensureTriadConfig capability",
+      "problem": "System Capability: Provide Config ensure triad workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] unknown (force)",
@@ -284,7 +284,7 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute Config.resolveCategoryFromConfig capability",
+      "problem": "System Capability: Analyze Config resolve category from triad",
       "demand": [
         "[Generic] string (sourcePath)",
         "TriadConfig (config)",
@@ -301,7 +301,7 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute Config.shouldExcludeSourcePath capability",
+      "problem": "System Capability: Provide Config should exclude source path string",
       "demand": [
         "[Generic] string (sourcePath)",
         "TriadConfig (config)",
@@ -318,7 +318,7 @@
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute Config.shouldSkipWalkPath capability",
+      "problem": "System Capability: Provide Config should skip walk path string",
       "demand": [
         "[Generic] string (value)",
         "[Ghost:Read] unknown[] (HARD_EXCLUDE_BASENAME_PATTERNS)",
@@ -334,7 +334,7 @@
     "category": "core",
     "sourcePath": "generator.ts",
     "fission": {
-      "problem": "execute Generator.applyProtocol capability",
+      "problem": "Workflow Capability: Produce Generator protocol { changed",
       "demand": [
         "[Generic] string (projectRoot)",
         "[Generic] string (protocolPath)",
@@ -350,7 +350,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "execute GeneratorRightBranch.collectTypeTokens capability",
+      "problem": "System Capability: Provide Generator right branch collect type tokens string",
       "demand": [
         "[Generic] string (typeText)",
         "[Ghost:Read] getBuiltinTypeNames (getBuiltinTypeNames)"
@@ -365,7 +365,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "execute GeneratorRightBranch.resolveSourceFilePath capability",
+      "problem": "System Capability: Analyze Generator right branch resolve source file path string",
       "demand": [
         "[Generic] string (projectRoot)",
         "ParsedNodeRef (ref)",
@@ -383,7 +383,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "execute GeneratorRightBranch.resolveTypesModuleSpecifier capability",
+      "problem": "System Capability: Analyze Generator right branch resolve types specifier string",
       "demand": [
         "[Generic] string (projectRoot)",
         "SourceFile (sourceFile)",
@@ -399,7 +399,7 @@
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "execute GeneratorRightBranch.shouldUseTopLevelFunction capability",
+      "problem": "System Capability: Provide Generator right branch should use top level source file",
       "demand": [
         "SourceFile (sourceFile)",
         "ParsedNodeRef (ref)",
@@ -416,7 +416,7 @@
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "execute Healing.diagnoseRuntimeFailure capability",
+      "problem": "Execution Capability: Analyze Healing diagnose runtime failure diagnosis",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (errorText)",
@@ -435,7 +435,7 @@
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "execute Healing.prepareHealingArtifacts capability",
+      "problem": "Execution Capability: Plan Healing prepare artifacts workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (errorText)",
@@ -453,7 +453,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute HealingRightBranch.chooseSuggestedAction capability",
+      "problem": "Execution Capability: Provide Healing right branch choose suggested action",
       "demand": [
         "HealingBranchKind (diagnosis)",
         "[Generic] number (retryCount)",
@@ -469,7 +469,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute HealingRightBranch.classifyDiagnosis capability",
+      "problem": "Execution Capability: Provide Healing right branch classify diagnosis",
       "demand": [
         "[Generic] string (errorText)"
       ],
@@ -483,7 +483,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute HealingRightBranch.estimateBlastRadius capability",
+      "problem": "Execution Capability: Provide Healing right branch estimate blast radius",
       "demand": [
         "TriadNodeDefinition | null (rootNode)",
         "TriadNodeDefinition[] (nodes)",
@@ -499,7 +499,7 @@
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute HealingRightBranch.scoreNodeMatch capability",
+      "problem": "Execution Capability: Provide Healing right branch score node match runtime trace",
       "demand": [
         "RuntimeTraceFrame (frame)",
         "TriadNodeDefinition (node)",
@@ -515,7 +515,7 @@
     "category": "core",
     "sourcePath": "parser.ts",
     "fission": {
-      "problem": "execute Parser.runParser capability",
+      "problem": "System Capability: Run Parser string",
       "demand": [
         "[Generic] string (targetDir)",
         "[Generic] string (outputPath)",
@@ -531,7 +531,7 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute PolyglotAdapter.createCppAdapter capability",
+      "problem": "Adapter Capability: Produce Polyglot adapter create cpp language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -547,7 +547,7 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute PolyglotAdapter.createGoAdapter capability",
+      "problem": "Adapter Capability: Produce Polyglot adapter create go language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -563,7 +563,7 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute PolyglotAdapter.createJavaAdapter capability",
+      "problem": "Adapter Capability: Produce Polyglot adapter create java language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -579,7 +579,7 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute PolyglotAdapter.createJavaScriptAdapter capability",
+      "problem": "Adapter Capability: Produce Polyglot adapter create java script language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -595,7 +595,7 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute PolyglotAdapter.createPythonAdapter capability",
+      "problem": "Adapter Capability: Produce Polyglot adapter create python language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -611,7 +611,7 @@
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute PolyglotAdapter.createRustAdapter capability",
+      "problem": "Adapter Capability: Produce Polyglot adapter create rust language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -627,7 +627,7 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "execute Protocol.assertProtocolShape capability",
+      "problem": "Workflow Capability: Provide Protocol assert shape upgrade",
       "demand": [
         "UpgradeProtocol (protocol)",
         "ProtocolValidationContext (context)",
@@ -646,7 +646,7 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "execute Protocol.normalizeCategory capability",
+      "problem": "Workflow Capability: Provide Protocol normalize category triad",
       "demand": [
         "[Generic] string (category)",
         "TriadCategory (fallback)",
@@ -662,7 +662,7 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "execute Protocol.readJsonFile capability",
+      "problem": "Workflow Capability: Analyze Protocol read json file t",
       "demand": [
         "[Generic] string (filePath)",
         "[Ghost:Read] module (fs)"
@@ -677,7 +677,7 @@
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "execute Protocol.readTriadMap capability",
+      "problem": "Workflow Capability: Analyze Protocol read triad map string",
       "demand": [
         "[Generic] string (mapPath)",
         "[Ghost:Read] module (fs)",
@@ -695,7 +695,7 @@
     "category": "core",
     "sourcePath": "rules.ts",
     "fission": {
-      "problem": "execute Rules.installAlwaysOnRules capability",
+      "problem": "Policy Capability: Provide Rules install always on workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] buildCursorRule (buildCursorRule)",
@@ -713,7 +713,7 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "execute Snapshot.collectProtocolSnapshotFiles capability",
+      "problem": "Workflow Capability: Provide Snapshot collect protocol files workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "UpgradeProtocol (protocol)",
@@ -729,7 +729,7 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "execute Snapshot.createSnapshot capability",
+      "problem": "System Capability: Produce Snapshot create workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (label)",
@@ -748,7 +748,7 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "execute Snapshot.listSnapshots capability",
+      "problem": "System Capability: Provide Snapshot list snapshots workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] module (fs)"
@@ -763,7 +763,7 @@
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "execute Snapshot.restoreSnapshot capability",
+      "problem": "System Capability: Coordinate Snapshot restore workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (snapshotId)",
@@ -781,7 +781,7 @@
     "category": "core",
     "sourcePath": "stage.ts",
     "fission": {
-      "problem": "execute Stage.analyzeWorkspaceStage capability",
+      "problem": "Workflow Capability: Analyze Stage analyze workspace analysis",
       "demand": [
         "StageAnalysisInput (input)"
       ],
@@ -795,7 +795,7 @@
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "execute Sync.syncTriadMap capability",
+      "problem": "Workflow Capability: Coordinate Sync triad map workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] unknown (force)",
@@ -813,7 +813,7 @@
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "execute Sync.watchTriadMap capability",
+      "problem": "Workflow Capability: Coordinate Sync watch triad map workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] default (chalk)",
@@ -829,7 +829,7 @@
     "category": "core",
     "sourcePath": "treeSitterGhostScanner.ts",
     "fission": {
-      "problem": "execute TreeSitterGhostScanner.scanTreeSitterGhostReferences capability",
+      "problem": "System Capability: Analyze Tree sitter ghost scanner scan references parser syntax",
       "demand": [
         "Parser.SyntaxNode (executableNode)",
         "TreeSitterGhostScanOptions (options)",
@@ -854,7 +854,7 @@
     "category": "core",
     "sourcePath": "treeSitterParser.ts",
     "fission": {
-      "problem": "execute TreeSitterParser.runTreeSitterParser capability",
+      "problem": "System Capability: Run Tree sitter parser triad language",
       "demand": [
         "TriadLanguage (language)",
         "[Generic] string (targetDir)",
@@ -879,7 +879,7 @@
     "category": "core",
     "sourcePath": "treeSitterParser.ts",
     "fission": {
-      "problem": "execute TreeSitterParser.runTreeSitterTypeScriptParser capability",
+      "problem": "System Capability: Run Tree sitter parser type script string",
       "demand": [
         "[Generic] string (targetDir)",
         "[Generic] string (outputPath)",
@@ -896,7 +896,7 @@
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "execute TypescriptAdapter.applyUpgradeProtocol capability",
+      "problem": "Workflow Capability: Produce Typescript adapter upgrade protocol { changed",
       "demand": [
         "[Generic] string (projectRoot)",
         "[Generic] string (protocolPath)",
@@ -912,7 +912,7 @@
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "execute TypescriptAdapter.createTypeScriptAdapter capability",
+      "problem": "Adapter Capability: Produce Typescript adapter create type script language",
       "demand": [
         "None",
         "[Ghost:Read] applyUpgradeProtocol (applyUpgradeProtocol)",
@@ -929,7 +929,7 @@
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "execute TypescriptAdapter.readTopologyIR capability",
+      "problem": "Adapter Capability: Analyze Typescript adapter read topology ir triad",
       "demand": [
         "[Generic] string (projectRoot)",
         "[Ghost:Read] buildTopologyIR (buildTopologyIR)",
@@ -945,7 +945,7 @@
     "category": "core",
     "sourcePath": "typescriptGenerator.ts",
     "fission": {
-      "problem": "execute TypescriptGenerator.applyTypeScriptProtocol capability",
+      "problem": "Workflow Capability: Produce Typescript generator type script protocol { changed",
       "demand": [
         "[Generic] string (projectRoot)",
         "[Generic] string (protocolPath)",
@@ -965,7 +965,7 @@
     "category": "core",
     "sourcePath": "typescriptParser.ts",
     "fission": {
-      "problem": "execute TypescriptParser.runTypeScriptParser capability",
+      "problem": "System Capability: Run Typescript parser type script string",
       "demand": [
         "[Generic] string (targetDir)",
         "[Generic] string (outputPath)",
@@ -985,11 +985,12 @@
     "category": "core",
     "sourcePath": "visualizer.ts",
     "fission": {
-      "problem": "execute Visualizer.generateDashboard capability",
+      "problem": "System Capability: Produce Visualizer generate dashboard string",
       "demand": [
         "[Generic] string (mapPath)",
         "[Generic] string (protocolPath)",
         "[Generic] string (outputPath)",
+        "DashboardOptions (dashboardOptions)",
         "[Ghost:Read] buildHtml (buildHtml)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)"
@@ -1004,7 +1005,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.createDraftTemplate capability",
+      "problem": "Workflow Capability: Produce Workflow create draft template workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] unknown (userDemand)",
@@ -1022,7 +1023,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.ensureMultiPassTemplates capability",
+      "problem": "Workflow Capability: Provide Workflow ensure multi pass templates workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (userDemand)",
@@ -1044,7 +1045,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.ensurePipelineArtifactSeeds capability",
+      "problem": "Workflow Capability: Provide Workflow ensure artifact seeds workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (userDemand)",
@@ -1063,7 +1064,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.ensureTriadSpec capability",
+      "problem": "Workflow Capability: Provide Workflow ensure triad spec workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] unknown (force)",
@@ -1081,7 +1082,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.resetPipelineArtifacts capability",
+      "problem": "Workflow Capability: Provide Workflow reset artifacts workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (userDemand)",
@@ -1100,7 +1101,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.writeImplementationHandoff capability",
+      "problem": "Workflow Capability: Produce Workflow write implementation handoff workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "ImplementationHandoffInput (input)",
@@ -1117,7 +1118,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.writeMasterPrompt capability",
+      "problem": "Workflow Capability: Produce Workflow write master prompt workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] buildMasterPrompt (buildMasterPrompt)",
@@ -1134,7 +1135,7 @@
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute Workflow.writePromptPacket capability",
+      "problem": "Workflow Capability: Produce Workflow write prompt packet workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] string (userDemand)",
@@ -1154,7 +1155,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "execute WorkflowRightBranch.createDraftProtocolTemplate capability",
+      "problem": "Workflow Capability: Produce Workflow right branch create draft protocol template string",
       "demand": [
         "[Generic] string (projectRoot)",
         "[Generic] string (mapFile)",
@@ -1171,7 +1172,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "execute WorkflowRightBranch.createMesoSplitSeed capability",
+      "problem": "Workflow Capability: Produce Workflow right branch create meso split seed",
       "demand": [
         "None"
       ],
@@ -1185,7 +1186,7 @@
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "execute WorkflowRightBranch.createMicroSplitSeed capability",
+      "problem": "Workflow Capability: Produce Workflow right branch create micro split seed",
       "demand": [
         "None"
       ],
@@ -1199,7 +1200,7 @@
     "category": "core",
     "sourcePath": "workspace.ts",
     "fission": {
-      "problem": "execute Workspace module capability",
+      "problem": "Workflow Capability: Provide Workspace string",
       "demand": [
         "[Generic] string (input)"
       ],

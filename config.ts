@@ -33,8 +33,12 @@ export interface TriadConfig {
         };
     };
     visualizer: {
+        defaultView: 'architecture' | 'leaf';
+        showIsolatedCapabilities: boolean;
         maxContractEdges: number;
+        maxPrimaryEdges: number;
         fastMayaThreshold: number;
+        fastFingerprintThreshold: number;
         maxRenderNodes: number;
     };
     protocol: {
@@ -66,6 +70,10 @@ const DEFAULT_CONFIG: TriadConfig = {
         excludePathPatterns: [
             'tests',
             'test',
+            'schemas',
+            'models',
+            'migrations',
+            'alembic/versions',
             '__pycache__',
             'node_modules',
             'venv',
@@ -81,7 +89,9 @@ const DEFAULT_CONFIG: TriadConfig = {
         excludeNodeNamePatterns: [
             '^test_',
             '^_',
-            '^(get|set|build|parse|format|normalize|sanitize|validate)_'
+            '^(get|set|build|parse|format|normalize|sanitize|validate)_',
+            '^__.*__$',
+            '^(upgrade|downgrade)$'
         ],
         ignoreGenericContracts: true,
         genericContractIgnoreList: [
@@ -98,6 +108,9 @@ const DEFAULT_CONFIG: TriadConfig = {
             'array',
             'any',
             'unknown',
+            'json',
+            'request',
+            'response',
             'void',
             'none',
             'dict[str,any]',
@@ -111,8 +124,12 @@ const DEFAULT_CONFIG: TriadConfig = {
         }
     },
     visualizer: {
+        defaultView: 'architecture',
+        showIsolatedCapabilities: false,
         maxContractEdges: 1200,
+        maxPrimaryEdges: 1500,
         fastMayaThreshold: 10,
+        fastFingerprintThreshold: 8,
         maxRenderNodes: 400
     },
     protocol: {
@@ -303,13 +320,27 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             }
         },
         visualizer: {
+            defaultView:
+                value.visualizer?.defaultView === 'leaf' || value.visualizer?.defaultView === 'architecture'
+                    ? value.visualizer.defaultView
+                    : DEFAULT_CONFIG.visualizer.defaultView,
+            showIsolatedCapabilities:
+                value.visualizer?.showIsolatedCapabilities ?? DEFAULT_CONFIG.visualizer.showIsolatedCapabilities,
             maxContractEdges: normalizePositiveInteger(
-                value.visualizer?.maxContractEdges,
+                value.visualizer?.maxContractEdges ?? value.visualizer?.maxPrimaryEdges,
                 DEFAULT_CONFIG.visualizer.maxContractEdges
             ),
+            maxPrimaryEdges: normalizePositiveInteger(
+                value.visualizer?.maxPrimaryEdges ?? value.visualizer?.maxContractEdges,
+                DEFAULT_CONFIG.visualizer.maxPrimaryEdges
+            ),
             fastMayaThreshold: normalizePositiveInteger(
-                value.visualizer?.fastMayaThreshold,
+                value.visualizer?.fastMayaThreshold ?? value.visualizer?.fastFingerprintThreshold,
                 DEFAULT_CONFIG.visualizer.fastMayaThreshold
+            ),
+            fastFingerprintThreshold: normalizePositiveInteger(
+                value.visualizer?.fastFingerprintThreshold ?? value.visualizer?.fastMayaThreshold,
+                DEFAULT_CONFIG.visualizer.fastFingerprintThreshold
             ),
             maxRenderNodes: normalizePositiveInteger(
                 value.visualizer?.maxRenderNodes,

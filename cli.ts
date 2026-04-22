@@ -38,6 +38,14 @@ type CliLanguageAdapter = ILanguageAdapter & {
     consumeChangedFiles(): string[];
 };
 
+type DashboardView = 'architecture' | 'leaf';
+
+interface DashboardCliOptions {
+    view?: string;
+    showIsolated?: boolean;
+    fullContractEdges?: boolean;
+}
+
 program.name('triadmind').description('TriadMind：顶点三元法驱动的项目拓扑规划与骨架生成工具').version('1.2.0');
 
 program
@@ -246,7 +254,10 @@ program
     .description('读取 `draft-protocol.json`，生成 `visualizer.html`，并在确认后落地骨架代码')
     .option('--apply', '跳过交互确认，直接执行 apply')
     .option('--no-open', '仅生成 `visualizer.html`，不自动打开浏览器')
-    .action(async (options: { apply?: boolean; open?: boolean }) => {
+    .option('--view <architecture|leaf>', 'Set initial visualizer view')
+    .option('--show-isolated', 'Show isolated capability nodes in architecture view')
+    .option('--full-contract-edges', 'Disable visualizer contract-edge capping')
+    .action(async (options: { apply?: boolean; open?: boolean } & DashboardCliOptions) => {
         const paths = getWorkspacePaths(process.cwd());
 
         console.log(chalk.cyan('🗺️ [TriadMind] 正在准备拓扑升级演化视图...'));
@@ -276,7 +287,7 @@ program
 
         warnBlastRadiusIfNeeded(paths, protocol);
 
-        generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile);
+        generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile, toDashboardOptions(options));
         console.log(chalk.green(`✅ 演化视图已生成：${paths.visualizerFile}`));
 
         if (options.open !== false) {
@@ -335,7 +346,10 @@ program
     .description('供 AI 助手静默触发的一键入口；兼容 `@triadmind <需求>` 输入')
     .option('-d, --demand <text>', '显式传入用户需求文本')
     .option('--apply', '如果 `draft-protocol.json` 已完备，则直接静默执行 plan/apply')
-    .action((demandParts: string[], options: { demand?: string; apply?: boolean }) => {
+    .option('--view <architecture|leaf>', 'Set initial visualizer view when --apply generates review graph')
+    .option('--show-isolated', 'Show isolated capability nodes in architecture view')
+    .option('--full-contract-edges', 'Disable visualizer contract-edge capping')
+    .action((demandParts: string[], options: { demand?: string; apply?: boolean } & DashboardCliOptions) => {
         const paths = getWorkspacePaths(process.cwd());
         const rawDemand = resolveDemand(demandParts, options.demand, paths);
         const demand = normalizeInvokeDemand(rawDemand);
@@ -377,7 +391,7 @@ program
 
         warnBlastRadiusIfNeeded(paths, protocol);
 
-        generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile);
+        generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile, toDashboardOptions(options));
         console.log(chalk.green(`✅ 静默审核图已生成：${paths.visualizerFile}`));
         executeApply(paths.projectRoot);
     });
@@ -649,6 +663,22 @@ function syncProjectTopology(paths: ReturnType<typeof getWorkspacePaths>, force 
 
 function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {
     return fs.existsSync(paths.mapFile) ? readTriadMap(paths.mapFile) : [];
+}
+
+function toDashboardOptions(options: DashboardCliOptions) {
+    return {
+        defaultView: normalizeDashboardView(options.view),
+        showIsolatedCapabilities: options.showIsolated,
+        fullContractEdges: options.fullContractEdges
+    };
+}
+
+function normalizeDashboardView(value?: string): DashboardView | undefined {
+    if (value === 'architecture' || value === 'leaf') {
+        return value;
+    }
+
+    return undefined;
 }
 
 function sniffProjectLanguage(projectRoot: string): TriadLanguage {

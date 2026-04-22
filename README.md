@@ -258,6 +258,7 @@ TriadMind Core 现在的正确理解不是：
 - 默认能力粒度：`parser.scanMode` 默认改为 `capability`，并补充支持 `module`。
 - 通用类型降噪：新增 `parser.genericContractIgnoreList`，默认忽略 `str`、`string`、`int`、`bool`、`dict`、`any`、`Dict[str,Any]`、`Optional[str]` 这类低语义契约边。
 - 可视化性能保护：新增 `visualizer.maxContractEdges`、`visualizer.fastMayaThreshold`、`visualizer.maxRenderNodes`，用于大图快速模式、契约边限流和 Maya fallback。
+- 默认主视图：`visualizer.defaultView` 现在默认是 `architecture`，默认隐藏左右分支和非关键孤立 capability。
 - 配置先于扫描：`.triadmind/config.json` 的排除和降噪配置，现在会在语言探测、manifest 构建、parser walk、polyglot walk 中统一生效。
 
 推荐配置：
@@ -280,6 +281,10 @@ TriadMind Core 现在的正确理解不是：
     ]
   },
   "visualizer": {
+    "defaultView": "architecture",
+    "showIsolatedCapabilities": false,
+    "maxPrimaryEdges": 1500,
+    "fastFingerprintThreshold": 8,
     "maxContractEdges": 1200,
     "fastMayaThreshold": 10,
     "maxRenderNodes": 400
@@ -299,6 +304,8 @@ TriadMind now treats a capability node as:
 Default scan policy:
 
 - default mode is `capability`
+- default visualizer view is `architecture`
+- isolated non-critical capability nodes are hidden by default
 - `leaf` is for local debugging only
 - `module` is a real file/module aggregation view
 - `domain` is a real bounded-context aggregation view
@@ -338,11 +345,17 @@ The default configuration now exposes:
     "excludeNodeNamePatterns": [
       "^test_",
       "^_",
-      "^(get|set|build|parse|format|normalize|sanitize|validate)_"
+      "^(get|set|build|parse|format|normalize|sanitize|validate)_",
+      "^__.*__$",
+      "^(upgrade|downgrade)$"
     ],
     "excludePathPatterns": [
       "tests",
       "test",
+      "schemas",
+      "models",
+      "migrations",
+      "alembic/versions",
       "__pycache__",
       "node_modules",
       "venv",
@@ -351,9 +364,37 @@ The default configuration now exposes:
       "dist",
       "build"
     ]
+  },
+  "visualizer": {
+    "defaultView": "architecture",
+    "showIsolatedCapabilities": false,
+    "maxPrimaryEdges": 1500,
+    "fastFingerprintThreshold": 8
   }
 }
 ```
+
+The formal default-behavior spec is tracked in `capability-topology-spec.md`.
+
+Architecture view behavior:
+
+- hides `left_branch` / `right_branch` nodes by default
+- hides isolated non-critical capability nodes by default
+- keeps producer-consumer and protocol edges between visible capabilities
+- still allows drill-down into capability internals via node detail and focused inspection
+
+Reviewer controls:
+
+- `triadmind plan --view leaf` starts the review graph in leaf view
+- `triadmind plan --show-isolated` keeps isolated capabilities visible
+- `triadmind plan --full-contract-edges` disables contract-edge capping for deep inspection
+- the generated `visualizer.html` now includes `Architecture` / `Leaf` view toggle buttons in the UI
+
+Semantic naming:
+
+- low-signal defaults like `execute xxx capability` are now normalized into capability-oriented labels
+- naming now prefers owner/module semantics, source-path context, method intent, and contract hints
+- only unresolved generic cases fall back to `[low_semantic_name] ...`
 
 Aggregation behavior:
 

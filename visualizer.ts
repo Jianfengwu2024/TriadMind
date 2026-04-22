@@ -55,15 +55,24 @@ interface MayaPanelData {
     byOwner: Record<string, MayaFingerprint>;
     byMacro: Record<string, MayaFingerprint>;
     fastMode: boolean;
+    defaultView: 'architecture' | 'leaf';
 }
 
 interface VisualizerOptions {
     analyzer: AnalyzerOptions;
+    defaultView: 'architecture' | 'leaf';
+    showIsolatedCapabilities: boolean;
     maxContractEdges: number;
     fastMayaThreshold: number;
     maxRenderNodes: number;
     compressExistingBranches: boolean;
     fastMode: boolean;
+}
+
+export interface DashboardOptions {
+    defaultView?: 'architecture' | 'leaf';
+    showIsolatedCapabilities?: boolean;
+    fullContractEdges?: boolean;
 }
 
 interface KnowledgeNode {
@@ -91,6 +100,7 @@ interface KnowledgeEdge {
     label: string;
     title: string;
     highlighted: boolean;
+    hidden?: boolean;
 }
 
 const STATUS_COLORS: Record<NodeStatus, { background: string; border: string; highlight: string }> = {
@@ -109,7 +119,7 @@ const COMMUNITY_COLORS: Record<string, string> = {
 };
 
 const MACRO_CLUSTER_PALETTE = ['#f43f5e', '#38bdf8', '#f59e0b', '#22c55e', '#a78bfa', '#14b8a6'];
-export function generateDashboard(mapPath: string, protocolPath: string, outputPath: string) {
+export function generateDashboard(mapPath: string, protocolPath: string, outputPath: string, dashboardOptions: DashboardOptions = {}) {
     if (!fs.existsSync(mapPath) || !fs.existsSync(protocolPath)) {
         throw new Error(`Cannot find required TriadMind files. Map: ${mapPath}, Protocol: ${protocolPath}`);
     }
@@ -119,7 +129,7 @@ export function generateDashboard(mapPath: string, protocolPath: string, outputP
     const originalMap = readJsonFile<TriadMapNode[]>(mapPath);
     const protocol = readJsonFile<UpgradeProtocol>(protocolPath);
     const renormalizeProtocol = readRenormalizeProtocol(mapPath, outputPath);
-    const options = buildVisualizerOptions(config, originalMap, protocol);
+    const options = buildVisualizerOptions(config, originalMap, protocol, dashboardOptions);
     const graph = buildKnowledgeGraph(originalMap, protocol, renormalizeProtocol, options);
     const previewMap = buildPreviewTopology(originalMap, protocol);
     const mayaData = buildMayaPanelData(previewMap, protocol, renormalizeProtocol, options);
@@ -249,14 +259,57 @@ function buildKnowledgeGraph(
 
     contractEdges.slice(0, options.maxContractEdges).forEach((edge) => addUniqueEdge(edges, edge));
 
-    const nodes = Array.from(nodeMap.values()).map((node) => ({ ...node, degree: edges.filter((edge) => edge.from === node.id || edge.to === node.id).length }));
+    const nodeDegrees = new Map<string, number>();
+    const primaryDegrees = new Map<string, number>();
+    edges.forEach((edge) => {
+        nodeDegrees.set(edge.from, (nodeDegrees.get(edge.from) ?? 0) + 1);
+        nodeDegrees.set(edge.to, (nodeDegrees.get(edge.to) ?? 0) + 1);
+
+        if (!isPrimaryTopologyEdge(edge)) {
+            return;
+        }
+
+        primaryDegrees.set(edge.from, (primaryDegrees.get(edge.from) ?? 0) + 1);
+        primaryDegrees.set(edge.to, (primaryDegrees.get(edge.to) ?? 0) + 1);
+    });
+
+    const hiddenNodeIds = new Set<string>();
+    if (options.defaultView === 'architecture') {
+        Array.from(nodeMap.values()).forEach((node) => {
+            if (node.kind === 'left_branch' || node.kind === 'right_branch') {
+                hiddenNodeIds.add(node.id);
+                return;
+            }
+
+            if (!options.showIsolatedCapabilities && isHideableIsolatedCapability(node, primaryDegrees)) {
+                hiddenNodeIds.add(node.id);
+            }
+        });
+    }
+
+    const visibleEdges = edges.map((edge) => ({
+        ...edge,
+        hidden:
+            options.defaultView === 'architecture' &&
+            (edge.type === 'triad_left' ||
+                edge.type === 'triad_right' ||
+                hiddenNodeIds.has(edge.from) ||
+                hiddenNodeIds.has(edge.to))
+    }));
+
+    const nodes = Array.from(nodeMap.values()).map((node) => ({
+        ...node,
+        degree:
+            options.defaultView === 'architecture' ? primaryDegrees.get(node.id) ?? 0 : nodeDegrees.get(node.id) ?? 0,
+        hidden: hiddenNodeIds.has(node.id)
+    }));
     return {
         nodes,
-        edges,
+        edges: visibleEdges,
         legend: buildLegend(nodes),
         stats: {
-            nodes: nodes.length,
-            edges: edges.length,
+            nodes: nodes.filter((node) => !node.hidden).length,
+            edges: visibleEdges.filter((edge) => !edge.hidden).length,
             vertices: nodes.filter((node) => node.kind === 'vertex').length,
             macroNodes: nodes.filter((node) => node.kind === 'macro').length,
             branchNodes: nodes.filter((node) => node.kind === 'left_branch' || node.kind === 'right_branch').length,
@@ -395,9 +448,11 @@ function buildHtml(
             },
             font: { color: '#f8fafc', size: node.status === 'existing' ? 0 : 14, face: 'Inter, Segoe UI, sans-serif' },
             title: escapeHtml(node.problem || node.label),
+            hidden: Boolean((node as KnowledgeNode & { hidden?: boolean }).hidden),
             _status: node.status, _kind: node.kind, _community: node.community, _community_name: node.communityName, _sourcePath: node.sourcePath,
             _problem: node.problem, _demand: node.demand, _answer: node.answer, _degree: node.degree, _triadOwner: node.triadOwner,
-            _branchTitle: node.branchTitle, _absorbedNodes: node.absorbedNodes, _rationale: node.rationale, _macroOwner: ownerId ?? '', _macroColor: macroColor ?? ''
+            _branchTitle: node.branchTitle, _absorbedNodes: node.absorbedNodes, _rationale: node.rationale, _macroOwner: ownerId ?? '', _macroColor: macroColor ?? '',
+            _baseHidden: Boolean((node as KnowledgeNode & { hidden?: boolean }).hidden)
         };
     });
 
@@ -406,12 +461,14 @@ function buildHtml(
         return {
             id: index, from: edge.from, to: edge.to, label: edge.highlighted ? edge.label : '', title: escapeHtml(edge.title),
             dashes: style.dashes, width: style.width,
+            hidden: Boolean(edge.hidden),
             color: { color: style.color, highlight: style.highlight, opacity: style.opacity },
             arrows: { to: { enabled: true, scaleFactor: edge.highlighted ? 1.1 : 0.6 } },
             font: { align: 'middle', color: edge.highlighted ? '#e0f2fe' : '#94a3b8', strokeWidth: 3, strokeColor: '#0f0f1a' },
             smooth: { enabled: true, type: edge.highlighted ? 'curvedCW' : 'continuous', roundness: edge.highlighted ? 0.22 : 0.12 },
             _type: edge.type,
-            _highlighted: edge.highlighted
+            _highlighted: edge.highlighted,
+            _baseHidden: Boolean(edge.hidden)
         };
     });
 
@@ -424,6 +481,7 @@ function buildHtml(
         `reused: ${graph.stats.reusedNodes}`
     ].join(' · ');
     const performanceSummary = [
+        `view: ${mayaData.defaultView}`,
         graph.stats.branchCompression ? 'fast-render: compressed branch nodes' : '',
         graph.stats.cappedContractEdges > 0 ? `contract edges capped: +${graph.stats.cappedContractEdges} hidden` : '',
         mayaData.fastMode ? 'maya: fast fallback enabled' : ''
@@ -480,7 +538,11 @@ ${buildStyles()}
   <section id="info-panel"><h3>Node Info</h3><div id="info-content"><span class="empty">Click a node to inspect it</span></div></section>
   <section id="legend-wrap"><h3>Communities</h3><div id="legend"></div></section>
 </aside>
-<div id="cluster-controls"><button id="toggle-clusters" type="button">Collapse Macro Clusters</button></div>
+<div id="cluster-controls">
+  <button class="view-toggle" data-view="architecture" type="button">Architecture</button>
+  <button class="view-toggle" data-view="leaf" type="button">Leaf</button>
+  <button id="toggle-clusters" type="button">Collapse Macro Clusters</button>
+</div>
 ${buildScript(visNodes, visEdges, graph.legend, mayaData)}
 </body>
 </html>`;
@@ -500,7 +562,7 @@ function edgeStyle(edge: KnowledgeEdge) {
 
 function buildStyles() {
     return `<style>
-*{box-sizing:border-box;margin:0;padding:0}body{background:#0f0f1a;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;height:100vh;overflow:hidden}#graph{flex:1;min-width:0}#sidebar{width:380px;background:#1a1a2e;border-left:1px solid #2a2a4e;display:flex;flex-direction:column;overflow:hidden}#hero{padding:16px;border-bottom:1px solid #2a2a4e}.eyebrow{color:#38bdf8;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}h1{font-size:18px;margin-bottom:8px;color:#f8fafc}#hero p{color:#cbd5e1;font-size:12px;line-height:1.5;max-height:58px;overflow:auto}.stats{color:#94a3b8;font-size:11px;margin-top:10px}#search-wrap{padding:12px;border-bottom:1px solid #2a2a4e}#search{width:100%;background:#0f0f1a;border:1px solid #3a3a5e;color:#e0e0e0;padding:8px 10px;border-radius:6px;font-size:13px;outline:none}#search:focus{border-color:#38bdf8}#search-results{max-height:150px;overflow-y:auto;display:none;padding-top:8px}#status-legend,#maya-panel,#renormalize-panel,#info-panel,#legend-wrap{padding:14px;border-bottom:1px solid #2a2a4e}#legend-wrap{flex:1;overflow-y:auto}#cluster-controls{position:absolute;top:16px;left:16px;z-index:20}#cluster-controls button{background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:8px 12px;border-radius:999px;cursor:pointer;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25)}#cluster-controls button:hover{filter:brightness(1.1)}h3{font-size:12px;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}.status-row{display:flex;align-items:center;gap:8px;color:#cbd5e1;font-size:12px;padding:3px 0;line-height:1.5}.status-dot{width:12px;height:12px;border-radius:999px;display:inline-block;border:2px solid currentColor;flex-shrink:0}.status-new{color:#38bdf8;background:#082f49;box-shadow:0 0 14px rgba(56,189,248,.8)}.status-modified{color:#fb923c;background:#431407}.status-reused{color:#fbbf24;background:#312e12}.status-left{color:#22c55e;background:#052e16}.status-right{color:#c084fc;background:#2e1065}.status-macro{color:#f43f5e;background:#3f0d12}.status-line{width:22px;height:3px;background:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,.9);display:inline-block;flex-shrink:0}.triad-explain{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px;margin-bottom:10px;color:#cbd5e1;font-size:11px;line-height:1.7}.branch-chip{display:inline-block;min-width:24px;text-align:center;border-radius:999px;padding:1px 6px;margin-right:6px;font-weight:700}.left-chip{background:#052e16;color:#86efac;border:1px solid #22c55e}.vertex-chip{background:#082f49;color:#7dd3fc;border:1px solid #38bdf8}.right-chip{background:#2e1065;color:#e9d5ff;border:1px solid #c084fc}.maya-block{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;margin-bottom:10px}.maya-block:last-child{margin-bottom:0}.maya-caption{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}.maya-grid{display:grid;gap:7px}.maya-line{font-size:12px;color:#cbd5e1;line-height:1.55;word-break:break-word}.maya-key{color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em}.maya-pills,.maya-node-list{display:flex;flex-wrap:wrap;gap:6px}.maya-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#111827;border:1px solid #334155;color:#e2e8f0;font-size:12px}.maya-strip{display:flex;flex-wrap:nowrap;gap:0;overflow-x:auto;padding:10px 0 6px 0;border-radius:10px;background:linear-gradient(180deg,#0b1220 0%,#111827 100%);border:1px solid #334155;box-shadow:inset 0 0 0 1px rgba(148,163,184,.06)}.maya-cell{position:relative;min-width:22px;height:38px;display:flex;align-items:center;justify-content:center;border-right:1px solid rgba(148,163,184,.14);flex-shrink:0}.maya-cell:last-child{border-right:none}.maya-cell.black{background:linear-gradient(180deg,#0f172a 0%,#020617 100%)}.maya-cell.white{background:linear-gradient(180deg,#f8fafc 0%,#cbd5e1 100%)}.maya-pebble{width:12px;height:12px;border-radius:999px;display:block;box-shadow:0 0 0 1px rgba(148,163,184,.35),0 4px 10px rgba(15,23,42,.28)}.maya-cell.black .maya-pebble{background:#f8fafc;box-shadow:0 0 0 1px rgba(248,250,252,.45),0 0 14px rgba(248,250,252,.22)}.maya-cell.white .maya-pebble{background:#0f172a;box-shadow:0 0 0 1px rgba(15,23,42,.35),0 0 14px rgba(15,23,42,.18)}.maya-bitline{display:flex;flex-wrap:nowrap;gap:0;overflow-x:auto;padding:4px 0 0 0}.maya-bit{min-width:22px;text-align:center;font-size:10px;color:#94a3b8;flex-shrink:0}.maya-node{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#082f49;border:1px solid #38bdf8;color:#dbeafe;font-size:11px;cursor:pointer}.maya-node:hover{filter:brightness(1.1)}#info-content{font-size:12px;color:#ccc;line-height:1.55;max-height:300px;overflow-y:auto}.field{margin-bottom:6px;word-break:break-word}.field b{color:#f8fafc}.empty{color:#64748b;font-style:italic}.triad-card{display:grid;grid-template-columns:1fr;gap:7px;margin:10px 0}.triad-col{border-radius:8px;padding:8px;border:1px solid #334155;cursor:pointer;word-break:break-word}.triad-col:hover{filter:brightness(1.16)}.triad-col b{display:block;color:#f8fafc;margin-bottom:2px}.triad-col small{display:block;color:#94a3b8;margin-bottom:5px}.triad-col span{display:block;color:#cbd5e1}.triad-left{background:rgba(5,46,22,.8);border-color:#22c55e}.triad-vertex{background:rgba(8,47,73,.8);border-color:#38bdf8}.triad-right{background:rgba(46,16,101,.8);border-color:#c084fc}.pill{display:inline-block;padding:2px 6px;border-radius:999px;background:#0f172a;border:1px solid #334155;margin:2px 4px 2px 0;color:#cbd5e1}.neighbor-link,.search-item{display:block;padding:5px 8px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.neighbor-link{padding:3px 6px;margin:3px 0;border-left:3px solid #333}.neighbor-link:hover,.search-item:hover,.legend-item:hover{background:#2a2a4e}.legend-item{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;border-radius:4px;font-size:12px}.legend-item.dimmed{opacity:.35}.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}.legend-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.legend-count{color:#777;font-size:11px}
+*{box-sizing:border-box;margin:0;padding:0}body{background:#0f0f1a;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;height:100vh;overflow:hidden}#graph{flex:1;min-width:0}#sidebar{width:380px;background:#1a1a2e;border-left:1px solid #2a2a4e;display:flex;flex-direction:column;overflow:hidden}#hero{padding:16px;border-bottom:1px solid #2a2a4e}.eyebrow{color:#38bdf8;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}h1{font-size:18px;margin-bottom:8px;color:#f8fafc}#hero p{color:#cbd5e1;font-size:12px;line-height:1.5;max-height:58px;overflow:auto}.stats{color:#94a3b8;font-size:11px;margin-top:10px}#search-wrap{padding:12px;border-bottom:1px solid #2a2a4e}#search{width:100%;background:#0f0f1a;border:1px solid #3a3a5e;color:#e0e0e0;padding:8px 10px;border-radius:6px;font-size:13px;outline:none}#search:focus{border-color:#38bdf8}#search-results{max-height:150px;overflow-y:auto;display:none;padding-top:8px}#status-legend,#maya-panel,#renormalize-panel,#info-panel,#legend-wrap{padding:14px;border-bottom:1px solid #2a2a4e}#legend-wrap{flex:1;overflow-y:auto}#cluster-controls{position:absolute;top:16px;left:16px;z-index:20;display:flex;gap:8px;flex-wrap:wrap}#cluster-controls button{background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:8px 12px;border-radius:999px;cursor:pointer;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25)}#cluster-controls button:hover{filter:brightness(1.1)}#cluster-controls button.active{background:#082f49;border-color:#38bdf8;color:#e0f2fe;box-shadow:0 0 18px rgba(56,189,248,.28)}h3{font-size:12px;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}.status-row{display:flex;align-items:center;gap:8px;color:#cbd5e1;font-size:12px;padding:3px 0;line-height:1.5}.status-dot{width:12px;height:12px;border-radius:999px;display:inline-block;border:2px solid currentColor;flex-shrink:0}.status-new{color:#38bdf8;background:#082f49;box-shadow:0 0 14px rgba(56,189,248,.8)}.status-modified{color:#fb923c;background:#431407}.status-reused{color:#fbbf24;background:#312e12}.status-left{color:#22c55e;background:#052e16}.status-right{color:#c084fc;background:#2e1065}.status-macro{color:#f43f5e;background:#3f0d12}.status-line{width:22px;height:3px;background:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,.9);display:inline-block;flex-shrink:0}.triad-explain{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px;margin-bottom:10px;color:#cbd5e1;font-size:11px;line-height:1.7}.branch-chip{display:inline-block;min-width:24px;text-align:center;border-radius:999px;padding:1px 6px;margin-right:6px;font-weight:700}.left-chip{background:#052e16;color:#86efac;border:1px solid #22c55e}.vertex-chip{background:#082f49;color:#7dd3fc;border:1px solid #38bdf8}.right-chip{background:#2e1065;color:#e9d5ff;border:1px solid #c084fc}.maya-block{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;margin-bottom:10px}.maya-block:last-child{margin-bottom:0}.maya-caption{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}.maya-grid{display:grid;gap:7px}.maya-line{font-size:12px;color:#cbd5e1;line-height:1.55;word-break:break-word}.maya-key{color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em}.maya-pills,.maya-node-list{display:flex;flex-wrap:wrap;gap:6px}.maya-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#111827;border:1px solid #334155;color:#e2e8f0;font-size:12px}.maya-strip{display:flex;flex-wrap:nowrap;gap:0;overflow-x:auto;padding:10px 0 6px 0;border-radius:10px;background:linear-gradient(180deg,#0b1220 0%,#111827 100%);border:1px solid #334155;box-shadow:inset 0 0 0 1px rgba(148,163,184,.06)}.maya-cell{position:relative;min-width:22px;height:38px;display:flex;align-items:center;justify-content:center;border-right:1px solid rgba(148,163,184,.14);flex-shrink:0}.maya-cell:last-child{border-right:none}.maya-cell.black{background:linear-gradient(180deg,#0f172a 0%,#020617 100%)}.maya-cell.white{background:linear-gradient(180deg,#f8fafc 0%,#cbd5e1 100%)}.maya-pebble{width:12px;height:12px;border-radius:999px;display:block;box-shadow:0 0 0 1px rgba(148,163,184,.35),0 4px 10px rgba(15,23,42,.28)}.maya-cell.black .maya-pebble{background:#f8fafc;box-shadow:0 0 0 1px rgba(248,250,252,.45),0 0 14px rgba(248,250,252,.22)}.maya-cell.white .maya-pebble{background:#0f172a;box-shadow:0 0 0 1px rgba(15,23,42,.35),0 0 14px rgba(15,23,42,.18)}.maya-bitline{display:flex;flex-wrap:nowrap;gap:0;overflow-x:auto;padding:4px 0 0 0}.maya-bit{min-width:22px;text-align:center;font-size:10px;color:#94a3b8;flex-shrink:0}.maya-node{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#082f49;border:1px solid #38bdf8;color:#dbeafe;font-size:11px;cursor:pointer}.maya-node:hover{filter:brightness(1.1)}#info-content{font-size:12px;color:#ccc;line-height:1.55;max-height:300px;overflow-y:auto}.field{margin-bottom:6px;word-break:break-word}.field b{color:#f8fafc}.empty{color:#64748b;font-style:italic}.triad-card{display:grid;grid-template-columns:1fr;gap:7px;margin:10px 0}.triad-col{border-radius:8px;padding:8px;border:1px solid #334155;cursor:pointer;word-break:break-word}.triad-col:hover{filter:brightness(1.16)}.triad-col b{display:block;color:#f8fafc;margin-bottom:2px}.triad-col small{display:block;color:#94a3b8;margin-bottom:5px}.triad-col span{display:block;color:#cbd5e1}.triad-left{background:rgba(5,46,22,.8);border-color:#22c55e}.triad-vertex{background:rgba(8,47,73,.8);border-color:#38bdf8}.triad-right{background:rgba(46,16,101,.8);border-color:#c084fc}.pill{display:inline-block;padding:2px 6px;border-radius:999px;background:#0f172a;border:1px solid #334155;margin:2px 4px 2px 0;color:#cbd5e1}.neighbor-link,.search-item{display:block;padding:5px 8px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.neighbor-link{padding:3px 6px;margin:3px 0;border-left:3px solid #333}.neighbor-link:hover,.search-item:hover,.legend-item:hover{background:#2a2a4e}.legend-item{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;border-radius:4px;font-size:12px}.legend-item.dimmed{opacity:.35}.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}.legend-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.legend-count{color:#777;font-size:11px}
 </style>`;
 }
 function buildScript(nodes: unknown[], edges: unknown[], legend: unknown[], mayaData: MayaPanelData) {
@@ -519,10 +581,14 @@ const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
 });
 let clustersCollapsed = false;
 let focusedMacroId = '';
+let currentView = MAYA_DATA.defaultView || 'architecture';
 function getMacroNodes(){ return RAW_NODES.filter(n => n._status === 'macro' && Array.isArray(n._absorbedNodes) && n._absorbedNodes.length); }
 function getMacroClusterNodeIds(macro){ const vertexIds = macro._absorbedNodes || []; const branchIds = vertexIds.flatMap(id => [id + '::__left', id + '::__right']).filter(id => nodesDS.get(id)); return [...vertexIds, ...branchIds]; }
 function applyMacroClusterLayout(){ getMacroNodes().forEach((macro, macroIndex) => { const macroPos = network.getPositions([macro.id])[macro.id]; if(!macroPos) return; const absorbed = (macro._absorbedNodes || []).map(id => nodesDS.get(id)).filter(Boolean); const total = Math.max(absorbed.length, 1); const radius = 90 + Math.min(total * 8, 48); absorbed.forEach((node, index) => { const angle = ((Math.PI * 2) / total) * index - Math.PI / 2 + macroIndex * 0.15; const x = macroPos.x + Math.cos(angle) * radius; const y = macroPos.y + Math.sin(angle) * radius; network.moveNode(node.id, x, y); const leftId = node.id + '::__left'; const rightId = node.id + '::__right'; if(nodesDS.get(leftId)) network.moveNode(leftId, x - 38, y - 28); if(nodesDS.get(rightId)) network.moveNode(rightId, x + 38, y + 28); }); }); }
-function setMacroClusterCollapsed(collapsed){ clustersCollapsed = collapsed; getMacroNodes().forEach(macro => { const hidden = collapsed; const ids = getMacroClusterNodeIds(macro); nodesDS.update(ids.map(id => ({ id, hidden }))); }); const button = document.getElementById('toggle-clusters'); if(button) button.textContent = collapsed ? 'Expand Macro Clusters' : 'Collapse Macro Clusters'; }
+function isNodeHiddenByCurrentView(node){ return currentView === 'architecture' && Boolean(node?._baseHidden); }
+function isEdgeHiddenByCurrentView(edge){ return currentView === 'architecture' && Boolean(edge?._baseHidden); }
+function setGraphView(view){ currentView = view === 'leaf' ? 'leaf' : 'architecture'; nodesDS.update(RAW_NODES.map(node => ({ id: node.id, hidden: hiddenCommunities.has(node._community) || isNodeHiddenByCurrentView(node) }))); edgesDS.update(RAW_EDGES.map(edge => ({ id: edge.id, hidden: isEdgeHiddenByCurrentView(edge) }))); document.querySelectorAll('.view-toggle').forEach(button => button.classList.toggle('active', button.dataset.view === currentView)); }
+function setMacroClusterCollapsed(collapsed){ clustersCollapsed = collapsed; getMacroNodes().forEach(macro => { const ids = getMacroClusterNodeIds(macro); nodesDS.update(ids.map(id => { const raw = RAW_NODES.find(node => node.id === id); return { id, hidden: collapsed || hiddenCommunities.has(raw?._community) || isNodeHiddenByCurrentView(raw) }; })); }); const button = document.getElementById('toggle-clusters'); if(button) button.textContent = collapsed ? 'Expand Macro Clusters' : 'Collapse Macro Clusters'; }
 function withAlpha(color, alpha){ if(!color) return color; if(color.startsWith('#')){ const hex = color.slice(1); const expanded = hex.length === 3 ? hex.split('').map(ch => ch + ch).join('') : hex.slice(0,6); const normalized = Math.max(0, Math.min(1, alpha)); const alphaHex = Math.round(normalized * 255).toString(16).padStart(2,'0'); return '#' + expanded + alphaHex; } if(color.startsWith('rgb(')){ return color.replace('rgb(', 'rgba(').replace(')', ',' + alpha + ')'); } if(color.startsWith('rgba(')){ return color.replace(/rgba\(([^)]+),[^,]+\)$/, 'rgba($1,' + alpha + ')'); } return color; }
 function getMacroById(macroId){ return getMacroNodes().find(node => node.id === macroId); }
 function getFocusedMacroIdForNode(nodeId){ const node = nodesDS.get(nodeId); if(!node) return ''; if(node._status === 'macro') return node.id; return node._macroOwner || ''; }
@@ -530,7 +596,7 @@ function getFeatureFingerprintForNode(nodeId){ const node = nodesDS.get(nodeId);
 function renderMayaStrip(sequence){ if(!Array.isArray(sequence) || !sequence.length) return '<span class="empty">None</span>'; const cells = sequence.map(v => '<div class="maya-cell ' + (v ? 'black' : 'white') + '"><span class="maya-pebble"></span></div>').join(''); const bits = sequence.map(v => '<div class="maya-bit">' + esc(v) + '</div>').join(''); return '<div class="maya-strip">' + cells + '</div><div class="maya-bitline">' + bits + '</div>'; }
 function renderMayaFingerprint(data, interactive){ if(!data) return '<span class="empty">No Maya fingerprint available</span>'; const partition = Array.isArray(data.partition) && data.partition.length ? data.partition.map(v => '<span class="maya-pill">' + esc(v) + '</span>').join('') : '<span class="empty">[]</span>'; const sequence = Array.isArray(data.sequence) && data.sequence.length ? data.sequence.map(v => '<span class="maya-pill">' + esc(v) + '</span>').join('') : '<span class="empty">[]</span>'; const nodes = Array.isArray(data.normalizedNodeIds) && data.normalizedNodeIds.length ? data.normalizedNodeIds.map(id => interactive ? '<span class="maya-node" onclick="focusNode(' + JSON.stringify(id).replace(/"/g,'&quot;') + ')">' + esc(id) + '</span>' : '<span class="maya-pill">' + esc(id) + '</span>').join('') : '<span class="empty">None</span>'; return '<div class="maya-grid">' + '<div class="maya-line"><span class="maya-key">Scope</span><br>' + esc(data.title) + '</div>' + '<div class="maya-line"><span class="maya-key">Maya-ID</span><br><span class="pill">' + esc(data.hash) + '</span></div>' + '<div class="maya-line"><span class="maya-key">Young Partition</span><div class="maya-pills">' + partition + '</div></div>' + '<div class="maya-line"><span class="maya-key">Maya Strip</span>' + renderMayaStrip(data.sequence) + '</div>' + '<div class="maya-line"><span class="maya-key">Maya Sequence</span><div class="maya-pills">' + sequence + '</div></div>' + '<div class="maya-line"><span class="maya-key">Normalized Fragment</span><div class="maya-node-list">' + nodes + '</div></div>' + '</div>'; }
 function showMaya(nodeId){ const panel = document.getElementById('maya-feature'); if(!panel) return; panel.innerHTML = renderMayaFingerprint(getFeatureFingerprintForNode(nodeId), true); }
-function applyMacroFocus(macroId){ focusedMacroId = macroId || ''; const macro = focusedMacroId ? getMacroById(focusedMacroId) : null; const focusSet = new Set(macro ? [macro.id, ...getMacroClusterNodeIds(macro)] : []); nodesDS.update(RAW_NODES.map(node => { const inFocus = !macro || focusSet.has(node.id); const baseColor = node.color || {}; return { id: node.id, color: { background: inFocus ? baseColor.background : withAlpha(baseColor.background, 0.18), border: inFocus ? baseColor.border : withAlpha(baseColor.border, 0.2), highlight: baseColor.highlight }, font: { ...(node.font || {}), color: inFocus ? '#f8fafc' : 'rgba(248,250,252,0.18)' } }; })); edgesDS.update(RAW_EDGES.map(edge => { const connected = !macro || (focusSet.has(edge.from) && focusSet.has(edge.to)); return { id: edge.id, color: { ...(edge.color || {}), opacity: connected ? (edge.color?.opacity ?? 1) : 0.08 }, hidden: false, width: connected ? edge.width : Math.max((edge.width || 1) * 0.5, 1) }; })); }
+function applyMacroFocus(macroId){ focusedMacroId = macroId || ''; const macro = focusedMacroId ? getMacroById(focusedMacroId) : null; const focusSet = new Set(macro ? [macro.id, ...getMacroClusterNodeIds(macro)] : []); nodesDS.update(RAW_NODES.map(node => { const inFocus = !macro || focusSet.has(node.id); const baseColor = node.color || {}; return { id: node.id, color: { background: inFocus ? baseColor.background : withAlpha(baseColor.background, 0.18), border: inFocus ? baseColor.border : withAlpha(baseColor.border, 0.2), highlight: baseColor.highlight }, font: { ...(node.font || {}), color: inFocus ? '#f8fafc' : 'rgba(248,250,252,0.18)' } }; })); edgesDS.update(RAW_EDGES.map(edge => { const connected = !macro || (focusSet.has(edge.from) && focusSet.has(edge.to)); return { id: edge.id, color: { ...(edge.color || {}), opacity: connected ? (edge.color?.opacity ?? 1) : 0.08 }, hidden: isEdgeHiddenByCurrentView(edge), width: connected ? edge.width : Math.max((edge.width || 1) * 0.5, 1) }; })); }
 function drawMacroClusterHull(ctx, macro){ const ids = [macro.id, ...getMacroClusterNodeIds(macro)].filter(id => !nodesDS.get(id)?.hidden); if(ids.length <= 1) return; const positions = network.getPositions(ids); const points = ids.map(id => positions[id]).filter(Boolean); if(points.length === 0) return; const minX = Math.min(...points.map(p => p.x)); const maxX = Math.max(...points.map(p => p.x)); const minY = Math.min(...points.map(p => p.y)); const maxY = Math.max(...points.map(p => p.y)); const pad = 44; const radius = 26; const color = macro._macroColor || '#f43f5e'; const x = minX - pad; const y = minY - pad; const width = (maxX - minX) + pad * 2; const height = (maxY - minY) + pad * 2; ctx.save(); ctx.beginPath(); ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y); ctx.quadraticCurveTo(x + width, y, x + width, y + radius); ctx.lineTo(x + width, y + height - radius); ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height); ctx.lineTo(x + radius, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - radius); ctx.lineTo(x, y + radius); ctx.quadraticCurveTo(x, y, x + radius, y); ctx.closePath(); ctx.fillStyle = color + '14'; ctx.strokeStyle = color + 'bb'; ctx.lineWidth = 2.5; ctx.setLineDash([9,6]); ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fill(); ctx.stroke(); ctx.restore(); }
 network.once('stabilizationIterationsDone', () => { applyMacroClusterLayout(); network.setOptions({ physics: { enabled: false } }); });
 network.on('afterDrawing', function(ctx){ getMacroNodes().forEach(macro => drawMacroClusterHull(ctx, macro)); RAW_NODES.filter(n => (n._status === 'new' || n._status === 'macro') && (n._kind === 'vertex' || n._kind === 'macro')).forEach(n => { const pos = network.getPositions([n.id])[n.id]; if(!pos) return; ctx.save(); ctx.beginPath(); ctx.arc(pos.x, pos.y, n._status === 'macro' ? 54 : 48, 0, Math.PI * 2); ctx.strokeStyle = n._macroColor ? n._macroColor + 'cc' : (n._status === 'macro' ? 'rgba(244,63,94,.65)' : 'rgba(56,189,248,.65)'); ctx.lineWidth = 4; ctx.shadowColor = n._macroColor || (n._status === 'macro' ? '#f43f5e' : '#38bdf8'); ctx.shadowBlur = 24; ctx.stroke(); ctx.restore(); }); });
@@ -539,8 +605,10 @@ function focusNode(nodeId){ const macroId = getFocusedMacroIdForNode(nodeId); ap
 function showInfo(nodeId){ const n = nodesDS.get(nodeId); if(!n) return; const ownerId = n._triadOwner || n.id; const owner = nodesDS.get(ownerId) || n; const left = nodesDS.get(ownerId + '::__left'); const right = nodesDS.get(ownerId + '::__right'); const neighborIds = network.getConnectedNodes(nodeId); const neighborItems = neighborIds.map(nid => { const nb = nodesDS.get(nid); const color = nb?.color?.background ?? '#555'; return '<span class="neighbor-link" style="border-left-color:' + esc(color) + '" onclick="focusNode(' + JSON.stringify(nid).replace(/"/g,'&quot;') + ')">' + esc(nb ? nb.label : nid) + '</span>'; }).join(''); const demand = Array.isArray(n._demand) && n._demand.length ? n._demand.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>'; const answer = Array.isArray(n._answer) && n._answer.length ? n._answer.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>'; const absorbed = Array.isArray(n._absorbedNodes) && n._absorbedNodes.length ? n._absorbedNodes.map(x => '<span class="pill" onclick="focusNode(' + JSON.stringify(x).replace(/"/g,'&quot;') + ')" style="cursor:pointer">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>'; const ownerDemand = Array.isArray(owner._demand) && owner._demand.length ? owner._demand.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>'; const ownerAnswer = Array.isArray(owner._answer) && owner._answer.length ? owner._answer.map(x => '<span class="pill">' + esc(x) + '</span>').join('') : '<span class="empty">None</span>'; document.getElementById('info-content').innerHTML = '<div class="field"><b>' + esc(n.label) + '</b></div>' + '<div class="field">Triad Kind: <span class="pill">' + esc(n._kind) + '</span></div>' + '<div class="field">Triad Owner: <span class="pill" onclick="focusNode(' + JSON.stringify(ownerId).replace(/"/g,'&quot;') + ')" style="cursor:pointer">' + esc(ownerId) + '</span></div>' + '<div class="field">Status: <span class="pill">' + esc(n._status) + '</span></div>' + '<div class="field">Community: ' + esc(n._community_name) + '</div>' + '<div class="field">Source: ' + esc(n._sourcePath || '-') + '</div>' + '<div class="field">Role: ' + esc(n._branchTitle || '-') + '</div>' + '<div class="field">Problem: ' + esc(n._problem || '-') + '</div>' + '<div class="field">Demand: ' + demand + '</div>' + '<div class="field">Answer: ' + answer + '</div>' + (n._kind === 'macro' ? '<div class="field">Absorbed Nodes: ' + absorbed + '</div><div class="field">Rationale: ' + esc(n._rationale || '-') + '</div>' : '') + '<div class="triad-card"><div class="triad-col triad-left" onclick="focusNode(' + JSON.stringify(left?.id || ownerId).replace(/"/g,'&quot;') + ')"><b>Left</b><small>dynamic branch</small><span>' + esc(owner._problem || '-') + '</span></div><div class="triad-col triad-vertex" onclick="focusNode(' + JSON.stringify(ownerId).replace(/"/g,'&quot;') + ')"><b>Vertex</b><small>feature wrapper</small><span>' + esc(owner.label || ownerId) + '</span></div><div class="triad-col triad-right" onclick="focusNode(' + JSON.stringify(right?.id || ownerId).replace(/"/g,'&quot;') + ')"><b>Right</b><small>static contract</small><span>Demand: ' + ownerDemand + '</span><span>Answer: ' + ownerAnswer + '</span></div></div><div class="field">Degree: ' + esc(n._degree) + '</div>' + (neighborIds.length ? '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors (' + neighborIds.length + ')</div>' + neighborItems : ''); }
 let hoveredNodeId = null; network.on('hoverNode', params => { hoveredNodeId = params.node; container.style.cursor = 'pointer'; }); network.on('blurNode', () => { hoveredNodeId = null; container.style.cursor = 'default'; }); network.on('click', params => { if (params.nodes.length > 0) { showInfo(params.nodes[0]); showMaya(params.nodes[0]); } else if (hoveredNodeId === null) { applyMacroFocus(''); document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>'; document.getElementById('maya-feature').innerHTML = '<span class="empty">Click a vertex or macro node to inspect its Young partition and Maya stones</span>'; } });
 const searchInput = document.getElementById('search'); const searchResults = document.getElementById('search-results'); searchInput.addEventListener('input', () => { const q = searchInput.value.toLowerCase().trim(); searchResults.innerHTML = ''; if (!q) { searchResults.style.display = 'none'; return; } const matches = RAW_NODES.filter(n => n.label.toLowerCase().includes(q)).slice(0,20); if (!matches.length) { searchResults.style.display = 'none'; return; } searchResults.style.display = 'block'; matches.forEach(n => { const el = document.createElement('div'); el.className = 'search-item'; el.textContent = n.label; el.style.borderLeft = '3px solid ' + (n.color?.border ?? '#555'); el.onclick = () => { focusNode(n.id); searchResults.style.display = 'none'; searchInput.value = ''; }; searchResults.appendChild(el); }); });
-const hiddenCommunities = new Set(); const legendEl = document.getElementById('legend'); LEGEND.forEach(c => { const item = document.createElement('div'); item.className = 'legend-item'; item.innerHTML = '<div class="legend-dot" style="background:' + esc(c.color) + '"></div><span class="legend-label">' + esc(c.label) + '</span><span class="legend-count">' + esc(c.count) + '</span>'; item.onclick = () => { if (hiddenCommunities.has(c.cid)) { hiddenCommunities.delete(c.cid); item.classList.remove('dimmed'); } else { hiddenCommunities.add(c.cid); item.classList.add('dimmed'); } nodesDS.update(RAW_NODES.filter(n => n._community === c.cid).map(n => ({ id:n.id, hidden:hiddenCommunities.has(c.cid) }))); }; legendEl.appendChild(item); });
+const hiddenCommunities = new Set(); const legendEl = document.getElementById('legend'); LEGEND.forEach(c => { const item = document.createElement('div'); item.className = 'legend-item'; item.innerHTML = '<div class="legend-dot" style="background:' + esc(c.color) + '"></div><span class="legend-label">' + esc(c.label) + '</span><span class="legend-count">' + esc(c.count) + '</span>'; item.onclick = () => { if (hiddenCommunities.has(c.cid)) { hiddenCommunities.delete(c.cid); item.classList.remove('dimmed'); } else { hiddenCommunities.add(c.cid); item.classList.add('dimmed'); } nodesDS.update(RAW_NODES.filter(n => n._community === c.cid).map(n => ({ id:n.id, hidden:hiddenCommunities.has(c.cid) || isNodeHiddenByCurrentView(n) }))); }; legendEl.appendChild(item); });
 const toggleClustersButton = document.getElementById('toggle-clusters'); if (toggleClustersButton) { toggleClustersButton.addEventListener('click', () => setMacroClusterCollapsed(!clustersCollapsed)); }
+document.querySelectorAll('.view-toggle').forEach(button => button.addEventListener('click', () => { setGraphView(button.dataset.view); network.fit({ animation: true }); }));
+setGraphView(currentView);
 const firstFocus = RAW_NODES.find(n => n._status === 'new') || RAW_NODES.find(n => n._status === 'macro'); if (firstFocus) setTimeout(() => focusNode(firstFocus.id), 350);
 </script>`;
 }
@@ -616,7 +684,7 @@ function buildMayaPanelData(
         );
     });
 
-    return { project, byOwner, byMacro, fastMode: options.fastMode };
+    return { project, byOwner, byMacro, fastMode: options.fastMode, defaultView: options.defaultView };
 }
 
 function createMayaFingerprint(
@@ -777,19 +845,55 @@ function resolveProjectRootFromMapPath(mapPath: string) {
     return path.basename(parent).toLowerCase() === '.triadmind' ? path.dirname(parent) : parent;
 }
 
-function buildVisualizerOptions(config: ReturnType<typeof loadTriadConfig>, originalMap: TriadMapNode[], protocol: UpgradeProtocol): VisualizerOptions {
+function buildVisualizerOptions(
+    config: ReturnType<typeof loadTriadConfig>,
+    originalMap: TriadMapNode[],
+    protocol: UpgradeProtocol,
+    dashboardOptions: DashboardOptions
+): VisualizerOptions {
     const previewNodeCount = originalMap.length + protocol.actions.filter((action) => action.op === 'create_child').length;
     return {
         analyzer: {
             ignoreGenericContracts: config.parser.ignoreGenericContracts,
             genericContractIgnoreList: config.parser.genericContractIgnoreList
         },
-        maxContractEdges: config.visualizer.maxContractEdges,
-        fastMayaThreshold: config.visualizer.fastMayaThreshold,
+        defaultView: dashboardOptions.defaultView ?? config.visualizer.defaultView,
+        showIsolatedCapabilities:
+            dashboardOptions.showIsolatedCapabilities ?? config.visualizer.showIsolatedCapabilities,
+        maxContractEdges: dashboardOptions.fullContractEdges
+            ? Number.MAX_SAFE_INTEGER
+            : config.visualizer.maxPrimaryEdges || config.visualizer.maxContractEdges,
+        fastMayaThreshold: config.visualizer.fastFingerprintThreshold || config.visualizer.fastMayaThreshold,
         maxRenderNodes: config.visualizer.maxRenderNodes,
         compressExistingBranches: previewNodeCount > config.visualizer.maxRenderNodes,
         fastMode: previewNodeCount > config.visualizer.maxRenderNodes
     };
+}
+
+function isHideableIsolatedCapability(node: KnowledgeNode, nodeDegrees: Map<string, number>) {
+    if (node.kind !== 'vertex') {
+        return false;
+    }
+
+    const degree = nodeDegrees.get(node.id) ?? 0;
+    if (degree > 0) {
+        return false;
+    }
+
+    return !isImportantCapabilityNode(node);
+}
+
+function isPrimaryTopologyEdge(edge: KnowledgeEdge) {
+    return edge.type !== 'triad_left' && edge.type !== 'triad_right';
+}
+
+function isImportantCapabilityNode(node: KnowledgeNode) {
+    if (node.status === 'new' || node.status === 'modified' || node.status === 'macro') {
+        return true;
+    }
+
+    const text = `${node.id} ${node.problem} ${node.sourcePath}`.toLowerCase();
+    return /(api|route|endpoint|handler|controller|command|event|consumer|adapter|gateway|worker|tool|agent|execute|run|handle|dispatch)/i.test(text);
 }
 
 function collectHighlightedOwnerIds(protocol: UpgradeProtocol, renormalizeProtocol?: RenormalizeProtocol) {
