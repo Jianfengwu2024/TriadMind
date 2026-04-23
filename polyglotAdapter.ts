@@ -120,7 +120,8 @@ function createPolyglotAdapter(descriptor: LanguageDescriptor): LanguageAdapter 
         adapterPackage: descriptor.adapterPackage,
         status: 'stable',
         readTopologyIR: (projectRoot) => readPolyglotTopologyIR(descriptor.language, projectRoot),
-        parseTopology: (projectRoot, outputPath) => runPolyglotParser(descriptor.language, projectRoot, outputPath),
+        parseTopology: (projectRoot, outputPath, configOverride) =>
+            runPolyglotParser(descriptor.language, projectRoot, outputPath, configOverride),
         applyUpgradeProtocol: (projectRoot, protocolPath) =>
             applyPolyglotProtocol(descriptor.language, projectRoot, protocolPath),
         supportsRuntimeHealing: true
@@ -132,9 +133,9 @@ function readPolyglotTopologyIR(language: PolyglotLanguage, projectRoot: string)
     return buildTopologyIR(readTriadMap(paths.mapFile), language);
 }
 
-function runPolyglotParser(language: PolyglotLanguage, projectRoot: string, outputPath?: string): void {
+function runPolyglotParser(language: PolyglotLanguage, projectRoot: string, outputPath?: string, configOverride?: TriadConfig): void {
     const paths = getWorkspacePaths(projectRoot);
-    const config = loadTriadConfig(paths);
+    const config = configOverride ?? loadTriadConfig(paths);
     if (config.architecture.parserEngine !== 'native') {
         runTreeSitterParser(language, projectRoot, outputPath ?? paths.mapFile, config);
         return;

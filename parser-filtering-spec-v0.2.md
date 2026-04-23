@@ -78,6 +78,13 @@ Default path suppression applies to architecture/capability parsing, including:
 - isolated non-critical capability nodes are hidden by default
 - `leaf` remains available explicitly for debug and deep inspection
 
+## Output Separation
+
+- `.triadmind/leaf-map.json` stores the full leaf implementation map.
+- `.triadmind/triad-map.json` stores the promoted architecture/capability map.
+- parser flow is `buildCandidate -> classifyCandidate -> suppress/fold/promote -> write map`.
+- `sync --scan-mode leaf` is an explicit diagnostic override; default sync writes a capability main map.
+
 ## Current Implementation Mapping
 
 This spec is implemented through:
@@ -87,5 +94,7 @@ This spec is implemented through:
 - `treeSitterParser.ts`
 - `analyzer.ts`
 - `visualizer.ts`
+- `sync.ts`
+- `cli.ts`
 
 These defaults can still be overridden through project configuration when a repository needs narrower or broader visibility.

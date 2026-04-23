@@ -21,6 +21,8 @@ export interface TriadConfig {
         excludePathPatterns: string[];
         scanCategories: TriadCategory[];
         scanMode: TriadScanMode;
+        leafOutputFile: string;
+        capabilityOutputFile: string;
         capabilityThreshold: number;
         excludeTestFiles: boolean;
         excludeMagicMethods: boolean;
@@ -46,6 +48,7 @@ export interface TriadConfig {
         fastMayaThreshold: number;
         fastFingerprintThreshold: number;
         maxRenderNodes: number;
+        showFoldedLeaves: boolean;
     };
     protocol: {
         minConfidence: number;
@@ -98,6 +101,8 @@ const DEFAULT_CONFIG: TriadConfig = {
         ],
         scanCategories: ['frontend', 'backend'],
         scanMode: 'capability',
+        leafOutputFile: '.triadmind/leaf-map.json',
+        capabilityOutputFile: '.triadmind/triad-map.json',
         capabilityThreshold: 4,
         excludeTestFiles: true,
         excludeMagicMethods: true,
@@ -163,7 +168,8 @@ const DEFAULT_CONFIG: TriadConfig = {
         maxPrimaryEdges: 1500,
         fastMayaThreshold: 10,
         fastFingerprintThreshold: 8,
-        maxRenderNodes: 400
+        maxRenderNodes: 400,
+        showFoldedLeaves: false
     },
     protocol: {
         minConfidence: 0.6,
@@ -341,6 +347,14 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             ),
             scanCategories: normalizeScanCategories(value.parser?.scanCategories),
             scanMode: normalizeScanMode(value.parser?.scanMode),
+            leafOutputFile: normalizeRelativeOutputFile(
+                value.parser?.leafOutputFile,
+                DEFAULT_CONFIG.parser.leafOutputFile
+            ),
+            capabilityOutputFile: normalizeRelativeOutputFile(
+                value.parser?.capabilityOutputFile,
+                DEFAULT_CONFIG.parser.capabilityOutputFile
+            ),
             capabilityThreshold: normalizePositiveInteger(
                 value.parser?.capabilityThreshold,
                 DEFAULT_CONFIG.parser.capabilityThreshold
@@ -391,7 +405,8 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             maxRenderNodes: normalizePositiveInteger(
                 value.visualizer?.maxRenderNodes,
                 DEFAULT_CONFIG.visualizer.maxRenderNodes
-            )
+            ),
+            showFoldedLeaves: value.visualizer?.showFoldedLeaves ?? DEFAULT_CONFIG.visualizer.showFoldedLeaves
         },
         protocol: {
             minConfidence: value.protocol?.minConfidence ?? DEFAULT_CONFIG.protocol.minConfidence,
@@ -439,6 +454,14 @@ function normalizeScanMode(value: TriadScanMode | undefined) {
 
 function normalizeHelperVerbPolicy(value: HelperVerbPolicy | undefined) {
     return value === 'allow' || value === 'suppress' ? value : DEFAULT_CONFIG.parser.helperVerbPolicy;
+}
+
+function normalizeRelativeOutputFile(value: string | undefined, fallback: string) {
+    const normalized = normalizePath(String(value ?? '').trim());
+    if (!normalized || path.isAbsolute(normalized) || normalized.includes('..')) {
+        return fallback;
+    }
+    return normalized;
 }
 
 function mergeGenericContractIgnoreList(value: string[] | undefined) {

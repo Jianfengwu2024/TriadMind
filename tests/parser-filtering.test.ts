@@ -59,6 +59,8 @@ function createTestConfig(): TriadConfig {
             ],
             scanCategories: ['frontend', 'backend', 'core'],
             scanMode: 'capability',
+            leafOutputFile: '.triadmind/leaf-map.json',
+            capabilityOutputFile: '.triadmind/triad-map.json',
             capabilityThreshold: 4,
             excludeTestFiles: true,
             excludeMagicMethods: true,
@@ -104,6 +106,7 @@ function createTestConfig(): TriadConfig {
         visualizer: {
             defaultView: 'architecture',
             showIsolatedCapabilities: false,
+            showFoldedLeaves: false,
             maxContractEdges: 1200,
             maxPrimaryEdges: 1500,
             fastMayaThreshold: 10,
@@ -139,6 +142,18 @@ function parseFixture(files: Record<string, string>) {
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     runTreeSitterParser('python', projectRoot, outputPath, createTestConfig());
     return JSON.parse(fs.readFileSync(outputPath, 'utf-8')) as ParsedTriadNode[];
+}
+
+function parseFixtureMaps(files: Record<string, string>) {
+    const projectRoot = writeProjectFixture(files);
+    const outputPath = path.join(projectRoot, '.triadmind', 'triad-map.json');
+    const leafOutputPath = path.join(projectRoot, '.triadmind', 'leaf-map.json');
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    runTreeSitterParser('python', projectRoot, outputPath, createTestConfig());
+    return {
+        triadMap: JSON.parse(fs.readFileSync(outputPath, 'utf-8')) as ParsedTriadNode[],
+        leafMap: JSON.parse(fs.readFileSync(leafOutputPath, 'utf-8')) as ParsedTriadNode[]
+    };
 }
 
 test('file-level exclusion blocks test and spec files before parsing', () => {
@@ -241,4 +256,27 @@ def run_cache_gc(command: CacheCommand) -> CacheResult:
     });
 
     assert.deepEqual(nodes.map((node) => node.nodeId), ['CacheTools.run_cache_gc']);
+});
+
+test('leaf-map stores implementation detail while triad-map stores promoted capabilities', () => {
+    const { triadMap, leafMap } = parseFixtureMaps({
+        'src/backend/nodes/geo_recon_node.py': `
+class GeoReconNode:
+    def execute(self, job: ReconJob) -> ReconResult:
+        return self._load_manifest(job)
+
+    def _load_manifest(self, job: ReconJob) -> Manifest:
+        return job
+
+    def build_cache_key(self, manifest: Manifest) -> str:
+        return "cache"
+`
+    });
+
+    assert.deepEqual(triadMap.map((node) => node.nodeId), ['GeoReconNode.execute']);
+    assert.deepEqual(leafMap.map((node) => node.nodeId).sort(), [
+        'GeoReconNode._load_manifest',
+        'GeoReconNode.build_cache_key',
+        'GeoReconNode.execute'
+    ]);
 });

@@ -717,6 +717,22 @@
       "demand": [
         "WorkspacePaths (paths)",
         "[Generic] unknown (force)",
+        "[Ghost:Read] syncTriadMapWithOptions (syncTriadMapWithOptions)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Sync.syncTriadMapWithOptions",
+    "category": "core",
+    "sourcePath": "sync.ts",
+    "fission": {
+      "problem": "Workflow Capability: Coordinate Sync triad map with options workspace paths",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "{ force?: boolean; scanMode?: TriadScanMode } (options)",
         "[Ghost:Read] default (chalk)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] resolveAdapter (resolveAdapter)"

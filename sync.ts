@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { resolveAdapter } from './adapter';
-import { createSourcePathFilter, isIgnorableFsError, loadTriadConfig, shouldSkipWalkPath } from './config';
+import { createSourcePathFilter, isIgnorableFsError, loadTriadConfig, shouldSkipWalkPath, TriadScanMode } from './config';
 import { normalizePath, WorkspacePaths } from './workspace';
 
 interface SourceFileDigest {
@@ -20,11 +20,27 @@ interface SyncManifest {
 }
 
 export function syncTriadMap(paths: WorkspacePaths, force = false) {
+    return syncTriadMapWithOptions(paths, { force });
+}
+
+export function syncTriadMapWithOptions(
+    paths: WorkspacePaths,
+    options: { force?: boolean; scanMode?: TriadScanMode } = {}
+) {
     fs.mkdirSync(paths.cacheDir, { recursive: true });
     const config = loadTriadConfig(paths);
-    const currentManifest = buildManifest(paths);
+    const effectiveConfig = options.scanMode
+        ? {
+              ...config,
+              parser: {
+                  ...config.parser,
+                  scanMode: options.scanMode
+              }
+          }
+        : config;
+    const currentManifest = buildManifest(paths, effectiveConfig);
     const previousManifest = readManifest(paths);
-    const changed = force || !previousManifest || !isSameManifest(previousManifest, currentManifest);
+    const changed = Boolean(options.force) || !previousManifest || !isSameManifest(previousManifest, currentManifest);
 
     if (!changed) {
         console.log(chalk.gray('   - [Sync] triad-map is up to date; no source changes detected.'));
@@ -35,10 +51,10 @@ export function syncTriadMap(paths: WorkspacePaths, force = false) {
     }
 
     console.log(chalk.gray('   - [Sync] source changes detected; rebuilding triad-map...'));
-    resolveAdapter(paths).parseTopology(paths.projectRoot);
+    resolveAdapter(paths).parseTopology(paths.projectRoot, paths.mapFile, effectiveConfig);
     const nextManifest: SyncManifest = {
         ...currentManifest,
-        parserEngine: config.architecture.parserEngine,
+        parserEngine: effectiveConfig.architecture.parserEngine,
         generatedAt: new Date().toISOString()
     };
     fs.writeFileSync(paths.syncCacheFile, JSON.stringify(nextManifest, null, 2), 'utf-8');
@@ -92,8 +108,7 @@ export function watchTriadMap(paths: WorkspacePaths) {
     });
 }
 
-function buildManifest(paths: WorkspacePaths): SyncManifest {
-    const config = loadTriadConfig(paths);
+function buildManifest(paths: WorkspacePaths, config = loadTriadConfig(paths)): SyncManifest {
     const files = collectSourceFiles(paths)
         .map((filePath) => ({
             path: filePath,

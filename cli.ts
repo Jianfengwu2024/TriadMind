@@ -6,13 +6,13 @@ import * as path from 'path';
 import { spawn } from 'child_process';
 import chalk from 'chalk';
 import { getAvailableAdapters, resolveAdapter } from './adapter';
-import { loadTriadConfig, TriadLanguage } from './config';
+import { loadTriadConfig, TriadLanguage, TriadScanMode } from './config';
 import { generateDashboard } from './visualizer';
 import { assertProtocolShape, readJsonFile, readTriadMap, UpgradeProtocol } from './protocol';
 import { prepareHealingArtifacts } from './healing';
 import { installAlwaysOnRules } from './rules';
 import { collectProtocolSnapshotFiles, createSnapshot, listSnapshots, restoreSnapshot } from './snapshot';
-import { syncTriadMap, watchTriadMap } from './sync';
+import { syncTriadMap, syncTriadMapWithOptions, watchTriadMap } from './sync';
 import { writeSelfBootstrapProtocol, writeSelfBootstrapReport } from './bootstrap';
 import { calculateBlastRadius, detectCycles, detectTopologicalDrift, generateRenormalizeProtocol } from './analyzer';
 import { LanguageAdapter } from './languageAdapter';
@@ -188,10 +188,11 @@ program
     .command('sync')
     .description('Incrementally synchronize triad-map using cached file hashes')
     .option('--force', 'Force a full triad-map rebuild')
-    .action((options: { force?: boolean }) => {
+    .option('--scan-mode <leaf|capability|module|domain>', 'Temporarily override parser scan mode for this sync')
+    .action((options: { force?: boolean; scanMode?: string }) => {
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
-        syncProjectTopology(paths, Boolean(options.force));
+        syncProjectTopology(paths, Boolean(options.force), normalizeScanModeOption(options.scanMode));
     });
 
 program
@@ -657,8 +658,8 @@ function executeApply(projectRoot: string) {
     }
 }
 
-function syncProjectTopology(paths: ReturnType<typeof getWorkspacePaths>, force = false) {
-    return syncTriadMap(paths, force);
+function syncProjectTopology(paths: ReturnType<typeof getWorkspacePaths>, force = false, scanMode?: TriadScanMode) {
+    return scanMode ? syncTriadMapWithOptions(paths, { force, scanMode }) : syncTriadMap(paths, force);
 }
 
 function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {
@@ -678,6 +679,13 @@ function normalizeDashboardView(value?: string): DashboardView | undefined {
         return value;
     }
 
+    return undefined;
+}
+
+function normalizeScanModeOption(value?: string): TriadScanMode | undefined {
+    if (value === 'leaf' || value === 'capability' || value === 'module' || value === 'domain') {
+        return value;
+    }
     return undefined;
 }
 

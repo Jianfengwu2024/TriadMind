@@ -1,4 +1,4 @@
-import { TriadLanguage, TriadParserEngine } from './config';
+import { TriadConfig, TriadLanguage, TriadParserEngine } from './config';
 import { TriadTopologyIR } from './ir';
 
 export interface LanguageAdapter {
@@ -8,7 +8,7 @@ export interface LanguageAdapter {
     adapterPackage: string;
     status: 'stable' | 'planned';
     readTopologyIR(projectRoot: string): TriadTopologyIR;
-    parseTopology(projectRoot: string, outputPath?: string): void;
+    parseTopology(projectRoot: string, outputPath?: string, configOverride?: TriadConfig): void;
     applyUpgradeProtocol(projectRoot: string, protocolPath?: string): { changedFiles: string[] };
     supportsRuntimeHealing: boolean;
 }

@@ -14,6 +14,7 @@ export interface WorkspacePaths {
     cursorRuleFile: string;
     configFile: string;
     mapFile: string;
+    leafMapFile: string;
     draftFile: string;
     macroSplitFile: string;
     mesoSplitFile: string;
@@ -70,6 +71,7 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         cursorRuleFile: path.join(projectRoot, '.cursor', 'rules', 'triadmind.mdc'),
         configFile: path.join(triadDir, 'config.json'),
         mapFile: path.join(triadDir, 'triad-map.json'),
+        leafMapFile: path.join(triadDir, 'leaf-map.json'),
         draftFile: path.join(triadDir, 'draft-protocol.json'),
         macroSplitFile: path.join(triadDir, 'macro-split.json'),
         mesoSplitFile: path.join(triadDir, 'meso-split.json'),

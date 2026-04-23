@@ -106,9 +106,13 @@ export function runTreeSitterParser(
     const parser = new Parser();
     parser.setLanguage(TREE_SITTER_LANGUAGES[language]);
 
-    const triadGraph: TriadNode[] = [];
+    const leafGraph: TriadNode[] = [];
+    const capabilityGraph: TriadNode[] = [];
     const files = collectSourceFiles(language, targetDir, config);
     const parsedFiles: ParsedSourceFile[] = [];
+    const leafConfig = withScanMode(config, 'leaf');
+    const architectureScanMode = config.parser.scanMode === 'leaf' ? 'capability' : config.parser.scanMode;
+    const architectureConfig = withScanMode(config, architectureScanMode);
 
     for (const filePath of files) {
         let source: string;
@@ -132,7 +136,7 @@ export function runTreeSitterParser(
 
     for (const parsedFile of parsedFiles) {
         const category = resolveCategoryFromConfig(parsedFile.sourcePath, config);
-        triadGraph.push(
+        leafGraph.push(
             ...collectLanguageNodes(
                 language,
                 parsedFile.rootNode,
@@ -140,15 +144,42 @@ export function runTreeSitterParser(
                 parsedFile.filePath,
                 parsedFile.sourcePath,
                 category,
-                config,
+                leafConfig,
+                parsedFiles
+            )
+        );
+        capabilityGraph.push(
+            ...collectLanguageNodes(
+                language,
+                parsedFile.rootNode,
+                parsedFile.source,
+                parsedFile.filePath,
+                parsedFile.sourcePath,
+                category,
+                architectureConfig,
                 parsedFiles
             )
         );
     }
 
-    const deduped = dedupeNodes(triadGraph).sort((left, right) => left.nodeId.localeCompare(right.nodeId));
-    const projected = aggregateNodesForScanMode(deduped, config).sort((left, right) => left.nodeId.localeCompare(right.nodeId));
-    fs.writeFileSync(outputPath, JSON.stringify(projected, null, 2), 'utf-8');
+    const leafNodes = dedupeNodes(leafGraph).sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+    const capabilityNodes = dedupeNodes(capabilityGraph).sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+    const projected =
+        config.parser.scanMode === 'leaf'
+            ? leafNodes
+            : aggregateNodesForScanMode(capabilityNodes, architectureConfig).sort((left, right) =>
+                  left.nodeId.localeCompare(right.nodeId)
+              );
+    const leafOutputPath = resolveParserOutputPath(targetDir, config.parser.leafOutputFile);
+    const capabilityOutputPath = resolveParserOutputPath(targetDir, config.parser.capabilityOutputFile);
+    fs.mkdirSync(path.dirname(leafOutputPath), { recursive: true });
+    fs.mkdirSync(path.dirname(capabilityOutputPath), { recursive: true });
+    fs.writeFileSync(leafOutputPath, JSON.stringify(leafNodes, null, 2), 'utf-8');
+    fs.writeFileSync(capabilityOutputPath, JSON.stringify(projected, null, 2), 'utf-8');
+    if (normalizePath(path.resolve(outputPath)) !== normalizePath(path.resolve(capabilityOutputPath))) {
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        fs.writeFileSync(outputPath, JSON.stringify(projected, null, 2), 'utf-8');
+    }
     const scanUnit =
         config.parser.scanMode === 'leaf'
             ? 'leaf nodes'
@@ -157,10 +188,28 @@ export function runTreeSitterParser(
               : config.parser.scanMode === 'domain'
                 ? 'domain capability nodes'
                 : 'capability nodes';
-    console.log(chalk.gray(`   - [Parser] tree-sitter scan complete, extracted ${projected.length} ${scanUnit}.`));
+    console.log(
+        chalk.gray(
+            `   - [Parser] tree-sitter scan complete, extracted ${projected.length} ${scanUnit}; leaf-map has ${leafNodes.length} leaf nodes.`
+        )
+    );
     if (config.parser.scanMode === 'capability' && projected.length > 300) {
         console.log(chalk.yellow('   - [Parser] capability graph is still dense; consider module/domain view for overview.'));
     }
+}
+
+function withScanMode(config: TriadConfig, scanMode: TriadConfig['parser']['scanMode']): TriadConfig {
+    return {
+        ...config,
+        parser: {
+            ...config.parser,
+            scanMode
+        }
+    };
+}
+
+function resolveParserOutputPath(projectRoot: string, outputFile: string) {
+    return path.resolve(projectRoot, outputFile);
 }
 
 export function runTreeSitterTypeScriptParser(targetDir: string, outputPath: string, config: TriadConfig) {

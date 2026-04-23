@@ -1,4 +1,4 @@
-import { loadTriadConfig } from './config';
+import { loadTriadConfig, TriadConfig } from './config';
 import { buildTopologyIR, TriadTopologyIR } from './ir';
 import { LanguageAdapter } from './languageAdapter';
 import { readTriadMap } from './protocol';
@@ -34,9 +34,9 @@ export function readTopologyIR(projectRoot: string): TriadTopologyIR {
  * TriadMind 自动生成骨架
  * 职责：执行 parseTopology 流程
  */
-export function parseTopology(projectRoot: string, outputPath?: string): void {
+export function parseTopology(projectRoot: string, outputPath?: string, configOverride?: TriadConfig): void {
     const paths = getWorkspacePaths(projectRoot);
-    const config = loadTriadConfig(paths);
+    const config = configOverride ?? loadTriadConfig(paths);
 
     if (config.architecture.parserEngine === 'native') {
         runTypeScriptParser(projectRoot, outputPath);

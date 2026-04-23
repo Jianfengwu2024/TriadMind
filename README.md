@@ -35,6 +35,13 @@ Default capability retention now favors:
 - execution / operator entrypoints
 - adapter / gateway boundaries
 
+Topology outputs are now split by default:
+
+- `.triadmind/leaf-map.json` keeps the full leaf-level implementation map for drill-down/debugging.
+- `.triadmind/triad-map.json` keeps the architecture/capability map consumed by plan/apply/visualizer.
+- `triadmind sync --scan-mode leaf` can still explicitly generate a leaf main map for diagnostics.
+- `triadmind sync --scan-mode capability` restores the default architecture map.
+
 Reference: `parser-filtering-spec-v0.2.md`
 
 ## 核心理念

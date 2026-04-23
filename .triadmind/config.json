@@ -1,4 +1,4 @@
-﻿{
+{
   "schemaVersion": "1.1",
   "architecture": {
     "language": "typescript",
@@ -70,6 +70,8 @@
       "backend"
     ],
     "scanMode": "capability",
+    "leafOutputFile": ".triadmind/leaf-map.json",
+    "capabilityOutputFile": ".triadmind/triad-map.json",
     "capabilityThreshold": 4,
     "excludeTestFiles": true,
     "excludeMagicMethods": true,
@@ -135,7 +137,8 @@
     "maxPrimaryEdges": 1500,
     "fastMayaThreshold": 10,
     "fastFingerprintThreshold": 8,
-    "maxRenderNodes": 400
+    "maxRenderNodes": 400,
+    "showFoldedLeaves": false
   },
   "protocol": {
     "minConfidence": 0.6,
@@ -148,6 +151,3 @@
     "snapshotStrategy": "manual"
   }
 }
-
-
-
