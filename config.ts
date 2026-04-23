@@ -6,6 +6,7 @@ import { TriadCategory } from './protocol';
 export type TriadLanguage = 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'cpp' | 'java';
 export type TriadParserEngine = 'native' | 'tree-sitter';
 export type TriadScanMode = 'leaf' | 'capability' | 'module' | 'domain';
+export type HelperVerbPolicy = 'suppress' | 'allow';
 
 export interface TriadConfig {
     schemaVersion: string;
@@ -21,6 +22,11 @@ export interface TriadConfig {
         scanCategories: TriadCategory[];
         scanMode: TriadScanMode;
         capabilityThreshold: number;
+        excludeTestFiles: boolean;
+        excludeMagicMethods: boolean;
+        excludePrivateMethods: boolean;
+        helperVerbPolicy: HelperVerbPolicy;
+        foldHelpersIntoOwner: boolean;
         entryMethodNames: string[];
         excludeNodeNamePatterns: string[];
         ignoreGenericContracts: boolean;
@@ -93,6 +99,11 @@ const DEFAULT_CONFIG: TriadConfig = {
         scanCategories: ['frontend', 'backend'],
         scanMode: 'capability',
         capabilityThreshold: 4,
+        excludeTestFiles: true,
+        excludeMagicMethods: true,
+        excludePrivateMethods: true,
+        helperVerbPolicy: 'suppress',
+        foldHelpersIntoOwner: true,
         entryMethodNames: [
             'execute',
             'run',
@@ -108,7 +119,6 @@ const DEFAULT_CONFIG: TriadConfig = {
         excludeNodeNamePatterns: [
             '^(__.*__|_(?!_).*)$',
             '^(test_.+)$',
-            '^(get|set|build|parse|format|normalize|sanitize|validate|ensure|create|load|save|list|collect|resolve|prepare|read|write|convert|sync|merge|filter|check|infer|guess)_.+$',
             '^__.*__$',
             '^(upgrade|downgrade)$'
         ],
@@ -217,6 +227,12 @@ const HARD_EXCLUDE_SEGMENTS = new Set([
 ]);
 
 const HARD_EXCLUDE_BASENAME_PATTERNS = [/^\.env(\..+)?$/i, /^diagnostic\.data$/i];
+const HARD_EXCLUDE_SOURCE_FILE_PATTERNS = [
+    /^test_.*\.py$/i,
+    /^.*_test\.py$/i,
+    /^.*\.(spec|test)\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/i,
+    /^.*_test\.go$/i
+];
 
 export function ensureTriadConfig(paths: WorkspacePaths, force = false) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
@@ -260,6 +276,10 @@ export function resolveCategoryFromConfig(sourcePath: string, config: TriadConfi
 export function shouldExcludeSourcePath(sourcePath: string, config: TriadConfig) {
     const normalizedPath = normalizePath(sourcePath).toLowerCase();
     if (isHardExcludedSourcePath(normalizedPath)) {
+        return true;
+    }
+
+    if (config.parser.excludeTestFiles && isHardExcludedSourceFile(normalizedPath)) {
         return true;
     }
 
@@ -325,6 +345,11 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
                 value.parser?.capabilityThreshold,
                 DEFAULT_CONFIG.parser.capabilityThreshold
             ),
+            excludeTestFiles: value.parser?.excludeTestFiles ?? DEFAULT_CONFIG.parser.excludeTestFiles,
+            excludeMagicMethods: value.parser?.excludeMagicMethods ?? DEFAULT_CONFIG.parser.excludeMagicMethods,
+            excludePrivateMethods: value.parser?.excludePrivateMethods ?? DEFAULT_CONFIG.parser.excludePrivateMethods,
+            helperVerbPolicy: normalizeHelperVerbPolicy(value.parser?.helperVerbPolicy),
+            foldHelpersIntoOwner: value.parser?.foldHelpersIntoOwner ?? DEFAULT_CONFIG.parser.foldHelpersIntoOwner,
             entryMethodNames: mergeStringList(value.parser?.entryMethodNames, DEFAULT_CONFIG.parser.entryMethodNames),
             excludeNodeNamePatterns: mergeStringList(
                 value.parser?.excludeNodeNamePatterns,
@@ -412,6 +437,10 @@ function normalizeScanMode(value: TriadScanMode | undefined) {
     return DEFAULT_CONFIG.parser.scanMode;
 }
 
+function normalizeHelperVerbPolicy(value: HelperVerbPolicy | undefined) {
+    return value === 'allow' || value === 'suppress' ? value : DEFAULT_CONFIG.parser.helperVerbPolicy;
+}
+
 function mergeGenericContractIgnoreList(value: string[] | undefined) {
     return mergeStringList(value, DEFAULT_CONFIG.parser.genericContractIgnoreList);
 }
@@ -443,6 +472,12 @@ function matchesSourcePathPattern(normalizedPath: string, pattern: string) {
 
 function isRegexLikePattern(value: string) {
     return /[\\^$|()[\]{}+?]/.test(value);
+}
+
+function isHardExcludedSourceFile(sourcePath: string) {
+    const normalizedPath = normalizeScopePath(sourcePath);
+    const basename = normalizedPath.split('/').filter(Boolean).pop() ?? normalizedPath;
+    return HARD_EXCLUDE_SOURCE_FILE_PATTERNS.some((pattern) => pattern.test(basename));
 }
 
 function mergeStringList(value: string[] | undefined, fallback: string[]) {
@@ -576,7 +611,7 @@ function detectProjectLanguage(projectRoot: string): TriadLanguage {
 
     walkProject(projectRoot, (filePath) => {
         const normalized = normalizePath(path.relative(projectRoot, filePath)).toLowerCase();
-        if (shouldSkipWalkPath(normalized)) {
+        if (shouldSkipWalkPath(normalized) || isHardExcludedSourceFile(normalized)) {
             return;
         }
 
@@ -662,6 +697,7 @@ export function shouldSkipWalkPath(value: string) {
         segments.some((segment) => HARD_EXCLUDE_SEGMENTS.has(segment)) ||
         basename === '.git' ||
         basename === '.triadmind' ||
+        isHardExcludedSourceFile(normalized) ||
         HARD_EXCLUDE_BASENAME_PATTERNS.some((pattern) => pattern.test(basename))
     );
 }

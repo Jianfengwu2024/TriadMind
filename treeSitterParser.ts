@@ -30,6 +30,9 @@ interface TriadNode {
         demand: string[];
         answer: string[];
     };
+    topology?: {
+        foldedLeaves?: string[];
+    };
 }
 
 interface ParsedSourceFile {
@@ -1252,9 +1255,9 @@ function collectTypeScriptCapabilityNodes(
     const topLevelRecords = rootNode.descendantsOfType('export_statement')
         .map((exportNode) => buildTypeScriptExportCapabilityRecord(exportNode, moduleName, ghostContext, source, config))
         .filter((record): record is TypeScriptExecutableRecord => Boolean(record));
-    const promotableTopLevel = topLevelRecords.filter((record) => !isTypeScriptNoiseCapability(record.name, config));
+    const promotableTopLevel = topLevelRecords.filter((record) => !isTypeScriptNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
-        shouldPromoteTypeScriptCapability(record.name, undefined, record.isExported, config, record)
+        shouldPromoteTypeScriptCapability(record.name, sourcePath, undefined, record.isExported, config, record)
     );
 
     for (const record of promotedTopLevel) {
@@ -1324,27 +1327,29 @@ function collectTypeScriptClassCapabilityNodes(
         )
         .map((entry) => buildTypeScriptExecutableRecord(entry.node, ghostContext, classPropertyTypes));
 
-    const promotable = records.filter((record) => !isTypeScriptNoiseCapability(record.name, config));
+    const promotable = records.filter((record) => !isTypeScriptNoiseCapability(record.name, config, sourcePath, record));
     if (promotable.length === 0) {
         return [];
     }
 
     const entrypoint = promotable.find((record) => isTypeScriptPrimaryCapabilityMethod(record.name, config));
     if (entrypoint) {
+        const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, TYPESCRIPT_MAGIC_METHODS);
         return [
             createTriadNode(
-                `${className}.${entrypoint.name}_pipeline`,
+                `${className}.${entrypoint.name}`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${className} capability pipeline`
+                mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                `execute ${className} capability pipeline`,
+                buildFoldedLeafIds(className, foldedRecords)
             )
         ];
     }
 
     const capabilityMethods = promotable.filter((record) =>
-        shouldPromoteTypeScriptCapability(record.name, className, false, config, record)
+        shouldPromoteTypeScriptCapability(record.name, sourcePath, className, false, config, record)
     );
 
     if (capabilityMethods.length > 0) {
@@ -1361,14 +1366,16 @@ function collectTypeScriptClassCapabilityNodes(
     }
 
     if (isTypeScriptCapabilityContainer(className)) {
+        const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, TYPESCRIPT_MAGIC_METHODS);
         return [
             createTriadNode(
                 `${className}.capability`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${className} aggregate capability`
+                mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                `execute ${className} aggregate capability`,
+                buildFoldedLeafIds(className, foldedRecords)
             )
         ];
     }
@@ -1438,9 +1445,9 @@ function collectJavaScriptCapabilityNodes(
     const topLevelRecords = topLevelNodes.flatMap((node) =>
         collectJavaScriptTopLevelCapabilityRecords(node, moduleName, ghostContext)
     );
-    const promotableTopLevel = topLevelRecords.filter((record) => !isJavaScriptNoiseCapability(record.name, config));
+    const promotableTopLevel = topLevelRecords.filter((record) => !isJavaScriptNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
-        shouldPromoteJavaScriptCapability(record.name, undefined, record.isExported, config, record)
+        shouldPromoteJavaScriptCapability(record.name, sourcePath, undefined, record.isExported, config, record)
     );
 
     for (const record of promotedTopLevel) {
@@ -1491,27 +1498,29 @@ function collectJavaScriptClassCapabilityNodes(
         .map((methodNode) => buildJavaScriptExecutableRecord(methodNode, ghostContext, className, classPropertyTypes))
         .filter((record) => record.name !== 'constructor');
 
-    const promotable = records.filter((record) => !isJavaScriptNoiseCapability(record.name, config));
+    const promotable = records.filter((record) => !isJavaScriptNoiseCapability(record.name, config, sourcePath, record));
     if (promotable.length === 0) {
         return [];
     }
 
     const entrypoint = promotable.find((record) => isJavaScriptPrimaryCapabilityMethod(record.name, config));
     if (entrypoint) {
+        const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, JAVASCRIPT_MAGIC_METHODS);
         return [
             createTriadNode(
-                `${className}.${entrypoint.name}_pipeline`,
+                `${className}.${entrypoint.name}`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${className} capability pipeline`
+                mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                `execute ${className} capability pipeline`,
+                buildFoldedLeafIds(className, foldedRecords)
             )
         ];
     }
 
     const capabilityMethods = promotable.filter((record) =>
-        shouldPromoteJavaScriptCapability(record.name, className, record.isExported, config, record)
+        shouldPromoteJavaScriptCapability(record.name, sourcePath, className, record.isExported, config, record)
     );
 
     if (capabilityMethods.length > 0) {
@@ -1528,14 +1537,16 @@ function collectJavaScriptClassCapabilityNodes(
     }
 
     if (isJavaScriptCapabilityContainer(className)) {
+        const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, JAVASCRIPT_MAGIC_METHODS);
         return [
             createTriadNode(
                 `${className}.capability`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${className} aggregate capability`
+                mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                `execute ${className} aggregate capability`,
+                buildFoldedLeafIds(className, foldedRecords)
             )
         ];
     }
@@ -1733,8 +1744,18 @@ type CapabilityCandidateRecord = {
     decorators?: string[];
 };
 
+type SourceCapabilityPolicy = 'api' | 'services' | 'nodes' | 'tasks' | 'utils' | 'types' | 'migrations' | 'tests' | 'other';
+type HelperVerbClass = 'hard' | 'conditional' | 'none';
+
 const CAPABILITY_ACTION_PREFIXES = ['submit', 'export', 'import', 'reconcile'];
 const CAPABILITY_DECORATOR_PATTERN = /\b(route|get|post|put|delete|patch|task|workflow|tool|step|action|consumer|handler|command|event|rpc)\b/i;
+const HARD_SUPPRESSED_HELPER_PREFIXES = [
+    'set', 'build', 'parse', 'format', 'normalize', 'sanitize', 'validate', 'collect', 'resolve', 'prepare', 'infer',
+    'guess', 'convert', 'merge', 'filter', 'check'
+];
+const CONDITIONAL_HELPER_PREFIXES = ['get', 'list', 'create', 'load', 'save', 'ensure', 'read', 'write', 'sync'];
+const UTILS_ALLOWED_CAPABILITY_PREFIXES = ['run', 'detect', 'analyze', 'apply'];
+const NODE_ENTRYPOINT_PREFIXES = ['execute', 'run', 'process'];
 
 function isConfiguredNoiseCapability(name: string, config?: TriadConfig) {
     const trimmedName = name.trim();
@@ -1765,16 +1786,160 @@ function isConfiguredPrimaryCapabilityMethod(name: string, config?: TriadConfig)
     return entries.some((entryName) => hasNamePrefix(name, entryName) || name.trim().toLowerCase() === entryName.toLowerCase());
 }
 
+function inferSourceCapabilityPolicy(sourcePath = ''): SourceCapabilityPolicy {
+    const normalizedPath = normalizePath(String(sourcePath ?? '')).toLowerCase();
+    const segments = normalizedPath.split('/').filter(Boolean);
+    if (segments.some((segment) => segment === 'test' || segment === 'tests' || segment === '__tests__')) {
+        return 'tests';
+    }
+    if (segments.some((segment) => segment === 'migration' || segment === 'migrations' || segment === 'alembic')) {
+        return 'migrations';
+    }
+    if (segments.some((segment) => ['types', 'schemas', 'schema', 'models', 'model', 'entities', 'entity', 'dto', 'vo'].includes(segment))) {
+        return 'types';
+    }
+    if (segments.includes('api')) {
+        return 'api';
+    }
+    if (segments.includes('services') || segments.includes('service')) {
+        return 'services';
+    }
+    if (segments.includes('nodes') || segments.includes('node')) {
+        return 'nodes';
+    }
+    if (segments.includes('tasks') || segments.includes('task') || segments.includes('workflows') || segments.includes('workflow')) {
+        return 'tasks';
+    }
+    if (segments.includes('utils') || segments.includes('util')) {
+        return 'utils';
+    }
+    return 'other';
+}
+
+function classifyHelperVerb(name: string): HelperVerbClass {
+    if (!name.trim()) {
+        return 'none';
+    }
+    if (HARD_SUPPRESSED_HELPER_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) {
+        return 'hard';
+    }
+    if (CONDITIONAL_HELPER_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) {
+        return 'conditional';
+    }
+    return 'none';
+}
+
+function hasCapabilityDecorator(record?: CapabilityCandidateRecord) {
+    return (record?.decorators ?? []).some((decorator) => CAPABILITY_DECORATOR_PATTERN.test(decorator));
+}
+
+function isPrivateCapabilityName(name: string, config?: TriadConfig) {
+    return (config?.parser.excludePrivateMethods ?? true) && /^_/.test(name.trim());
+}
+
+function isMagicCapabilityName(name: string, magicMethods: Set<string>, config?: TriadConfig) {
+    const trimmedName = name.trim();
+    return (config?.parser.excludeMagicMethods ?? true) && (magicMethods.has(trimmedName) || /^__.*__$/.test(trimmedName));
+}
+
+function isConditionalHelperCapabilityAllowed(
+    name: string,
+    sourcePath: string,
+    record: CapabilityCandidateRecord | undefined,
+    isPrimary: boolean,
+    config?: TriadConfig
+) {
+    if ((config?.parser.helperVerbPolicy ?? 'suppress') === 'allow') {
+        return true;
+    }
+
+    const policy = inferSourceCapabilityPolicy(sourcePath);
+    if (policy === 'api') {
+        return hasCapabilityDecorator(record) || isPrimary || Boolean(record?.isExported);
+    }
+    if (policy === 'nodes') {
+        return NODE_ENTRYPOINT_PREFIXES.some((prefix) => hasNamePrefix(name, prefix)) && isPrimary;
+    }
+    if (policy === 'tasks') {
+        return isPrimary || hasCapabilityDecorator(record) || isWorkflowLikeName(name);
+    }
+    if (policy === 'utils') {
+        return UTILS_ALLOWED_CAPABILITY_PREFIXES.some((prefix) => hasNamePrefix(name, prefix));
+    }
+    if (policy === 'services') {
+        return hasDomainContract(record?.demand ?? [], config) || hasDomainContract(record?.answer ?? [], config);
+    }
+    return isPrimary || hasCapabilityDecorator(record) || Boolean(record?.isExported);
+}
+
+function isSuppressedCapabilityCandidate(
+    name: string,
+    sourcePath: string,
+    config: TriadConfig | undefined,
+    record: CapabilityCandidateRecord | undefined,
+    isPrimary: boolean,
+    magicMethods: Set<string>
+) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+        return true;
+    }
+
+    const sourcePolicy = inferSourceCapabilityPolicy(sourcePath);
+    if (sourcePolicy === 'tests' || sourcePolicy === 'types' || sourcePolicy === 'migrations') {
+        return true;
+    }
+
+    if (isPrivateCapabilityName(trimmedName, config)) {
+        return true;
+    }
+    if (isMagicCapabilityName(trimmedName, magicMethods, config)) {
+        return true;
+    }
+    if (isConfiguredNoiseCapability(trimmedName, config)) {
+        return true;
+    }
+
+    const helperClass = classifyHelperVerb(trimmedName);
+    if (helperClass === 'hard') {
+        return true;
+    }
+    if (helperClass === 'conditional' && !isConditionalHelperCapabilityAllowed(trimmedName, sourcePath, record, isPrimary, config)) {
+        return true;
+    }
+
+    if (sourcePolicy === 'api' && !hasCapabilityDecorator(record) && !isPrimary && !record?.isExported) {
+        return true;
+    }
+    if (sourcePolicy === 'nodes' && !NODE_ENTRYPOINT_PREFIXES.some((prefix) => hasNamePrefix(trimmedName, prefix))) {
+        return true;
+    }
+    if (sourcePolicy === 'tasks' && !isPrimary && !hasCapabilityDecorator(record) && !isWorkflowLikeName(trimmedName)) {
+        return true;
+    }
+    if (
+        sourcePolicy === 'utils' &&
+        !UTILS_ALLOWED_CAPABILITY_PREFIXES.some((prefix) => hasNamePrefix(trimmedName, prefix)) &&
+        !hasCapabilityDecorator(record)
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
 function shouldPromoteCapabilityByScore(
     name: string,
+    sourcePath: string,
     className: string | undefined,
     record: CapabilityCandidateRecord | undefined,
     config: TriadConfig | undefined,
     isContainer: boolean,
     isPrimary: boolean,
-    isExported = false
+    isExported = false,
+    magicMethods: Set<string> = new Set<string>()
 ) {
-    if (isConfiguredNoiseCapability(name, config)) {
+    if (isSuppressedCapabilityCandidate(name, sourcePath, config, record, isPrimary, magicMethods)) {
         return false;
     }
 
@@ -1782,15 +1947,22 @@ function shouldPromoteCapabilityByScore(
     const decorators = record?.decorators ?? [];
     const demand = record?.demand ?? [];
     const answer = record?.answer ?? [];
+    const sourcePolicy = inferSourceCapabilityPolicy(sourcePath);
+    const helperClass = classifyHelperVerb(name);
 
     if (isExported || record?.isExported) score += 3;
-    if (decorators.some((decorator) => CAPABILITY_DECORATOR_PATTERN.test(decorator))) score += 3;
-    if (isPrimary) score += 3;
-    if (isWorkflowLikeName(name) || (className && isWorkflowLikeName(className))) score += 3;
+    if (decorators.some((decorator) => CAPABILITY_DECORATOR_PATTERN.test(decorator))) score += 4;
+    if (isPrimary) score += 4;
+    if (isWorkflowLikeName(name) || (className && isWorkflowLikeName(className))) score += 2;
     if (isContainer) score += 2;
     if (CAPABILITY_ACTION_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 2;
     if (hasDomainContract(demand, config) || hasDomainContract(answer, config)) score += 2;
     if (demand.some((entry) => /^\[Ghost/i.test(String(entry ?? '').trim()))) score += 2;
+    if (sourcePolicy === 'api' && hasCapabilityDecorator(record)) score += 3;
+    if ((sourcePolicy === 'tasks' || sourcePolicy === 'nodes') && isPrimary) score += 3;
+    if (sourcePolicy === 'services' && (isPrimary || isContainer)) score += 2;
+    if (sourcePolicy === 'utils' && UTILS_ALLOWED_CAPABILITY_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 2;
+    if (helperClass === 'conditional') score -= 2;
     if (hasOnlyGenericContracts([...demand, ...answer], config)) score -= 2;
 
     return score >= (config?.parser.capabilityThreshold ?? 4);
@@ -1835,38 +2007,26 @@ function isIgnoredContractType(value: string, config?: TriadConfig) {
     return configured.has(compact) || isGenericContractType(value);
 }
 
-function isJavaScriptNoiseCapability(name: string, config?: TriadConfig) {
-    if (isConfiguredNoiseCapability(name, config)) {
-        return true;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-        return true;
-    }
-
-    if (JAVASCRIPT_MAGIC_METHODS.has(trimmedName)) {
-        return true;
-    }
-
-    return JAVASCRIPT_HELPER_PREFIXES.some((prefix) => hasNamePrefix(trimmedName, prefix));
+function isJavaScriptNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
+    return isSuppressedCapabilityCandidate(
+        name,
+        sourcePath,
+        config,
+        record,
+        isJavaScriptPrimaryCapabilityMethod(name, config),
+        JAVASCRIPT_MAGIC_METHODS
+    );
 }
 
-function isTypeScriptNoiseCapability(name: string, config?: TriadConfig) {
-    if (isConfiguredNoiseCapability(name, config)) {
-        return true;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-        return true;
-    }
-
-    if (TYPESCRIPT_MAGIC_METHODS.has(trimmedName)) {
-        return true;
-    }
-
-    return TYPESCRIPT_HELPER_PREFIXES.some((prefix) => hasNamePrefix(trimmedName, prefix));
+function isTypeScriptNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
+    return isSuppressedCapabilityCandidate(
+        name,
+        sourcePath,
+        config,
+        record,
+        isTypeScriptPrimaryCapabilityMethod(name, config),
+        TYPESCRIPT_MAGIC_METHODS
+    );
 }
 
 function isTypeScriptPrimaryCapabilityMethod(name: string, config?: TriadConfig) {
@@ -1882,23 +2042,26 @@ function isTypeScriptCapabilityContainer(className: string) {
 
 function shouldPromoteTypeScriptCapability(
     name: string,
+    sourcePath: string,
     className?: string,
     isExported = false,
     config?: TriadConfig,
     record?: CapabilityCandidateRecord
 ) {
-    if (isTypeScriptNoiseCapability(name, config)) {
+    if (isTypeScriptNoiseCapability(name, config, sourcePath, record)) {
         return false;
     }
 
     return shouldPromoteCapabilityByScore(
         name,
+        sourcePath,
         className,
         record,
         config,
         Boolean(className && isTypeScriptCapabilityContainer(className)),
         isTypeScriptPrimaryCapabilityMethod(name, config),
-        isExported
+        isExported,
+        TYPESCRIPT_MAGIC_METHODS
     );
 }
 
@@ -1915,41 +2078,38 @@ function isJavaScriptCapabilityContainer(className: string) {
 
 function shouldPromoteJavaScriptCapability(
     name: string,
+    sourcePath: string,
     className?: string,
     isExported = false,
     config?: TriadConfig,
     record?: CapabilityCandidateRecord
 ) {
-    if (isJavaScriptNoiseCapability(name, config)) {
+    if (isJavaScriptNoiseCapability(name, config, sourcePath, record)) {
         return false;
     }
 
     return shouldPromoteCapabilityByScore(
         name,
+        sourcePath,
         className,
         record,
         config,
         Boolean(className && isJavaScriptCapabilityContainer(className)),
         isJavaScriptPrimaryCapabilityMethod(name, config),
-        isExported
+        isExported,
+        JAVASCRIPT_MAGIC_METHODS
     );
 }
 
-function isJavaNoiseCapability(name: string, config?: TriadConfig) {
-    if (isConfiguredNoiseCapability(name, config)) {
-        return true;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-        return true;
-    }
-
-    if (JAVA_MAGIC_METHODS.has(trimmedName)) {
-        return true;
-    }
-
-    return JAVA_HELPER_PREFIXES.some((prefix) => hasNamePrefix(trimmedName, prefix));
+function isJavaNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
+    return isSuppressedCapabilityCandidate(
+        name,
+        sourcePath,
+        config,
+        record,
+        isJavaPrimaryCapabilityMethod(name, config),
+        JAVA_MAGIC_METHODS
+    );
 }
 
 function isJavaPrimaryCapabilityMethod(name: string, config?: TriadConfig) {
@@ -1963,32 +2123,33 @@ function isJavaCapabilityContainer(className: string) {
     return JAVA_CAPABILITY_CLASS_SUFFIXES.some((suffix) => className.endsWith(suffix));
 }
 
-function shouldPromoteJavaCapability(name: string, className?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
-    if (isJavaNoiseCapability(name, config)) {
+function shouldPromoteJavaCapability(name: string, sourcePath: string, className?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
+    if (isJavaNoiseCapability(name, config, sourcePath, record)) {
         return false;
     }
 
     return shouldPromoteCapabilityByScore(
         name,
+        sourcePath,
         className,
         record,
         config,
         Boolean(className && isJavaCapabilityContainer(className)),
-        isJavaPrimaryCapabilityMethod(name, config)
+        isJavaPrimaryCapabilityMethod(name, config),
+        false,
+        JAVA_MAGIC_METHODS
     );
 }
 
-function isGoNoiseCapability(name: string, config?: TriadConfig) {
-    if (isConfiguredNoiseCapability(name, config)) {
-        return true;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-        return true;
-    }
-
-    return GO_HELPER_PREFIXES.some((prefix) => hasNamePrefix(trimmedName, prefix));
+function isGoNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
+    return isSuppressedCapabilityCandidate(
+        name,
+        sourcePath,
+        config,
+        record,
+        isGoPrimaryCapabilityMethod(name, config),
+        new Set<string>()
+    );
 }
 
 function isGoPrimaryCapabilityMethod(name: string, config?: TriadConfig) {
@@ -2002,13 +2163,14 @@ function isGoCapabilityContainer(typeName?: string) {
     return Boolean(typeName) && GO_CAPABILITY_TYPE_SUFFIXES.some((suffix) => typeName!.endsWith(suffix));
 }
 
-function shouldPromoteGoCapability(name: string, typeName?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
-    if (isGoNoiseCapability(name, config)) {
+function shouldPromoteGoCapability(name: string, sourcePath: string, typeName?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
+    if (isGoNoiseCapability(name, config, sourcePath, record)) {
         return false;
     }
 
     return shouldPromoteCapabilityByScore(
         name,
+        sourcePath,
         typeName,
         record,
         config,
@@ -2017,21 +2179,15 @@ function shouldPromoteGoCapability(name: string, typeName?: string, config?: Tri
     );
 }
 
-function isRustNoiseCapability(name: string, config?: TriadConfig) {
-    if (isConfiguredNoiseCapability(name, config)) {
-        return true;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-        return true;
-    }
-
-    if (trimmedName.startsWith('_')) {
-        return true;
-    }
-
-    return RUST_HELPER_PREFIXES.some((prefix) => trimmedName.startsWith(prefix));
+function isRustNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
+    return isSuppressedCapabilityCandidate(
+        name,
+        sourcePath,
+        config,
+        record,
+        isRustPrimaryCapabilityMethod(name, config),
+        new Set<string>()
+    );
 }
 
 function isRustPrimaryCapabilityMethod(name: string, config?: TriadConfig) {
@@ -2045,13 +2201,14 @@ function isRustCapabilityContainer(typeName?: string) {
     return Boolean(typeName) && RUST_CAPABILITY_TYPE_SUFFIXES.some((suffix) => typeName!.endsWith(suffix));
 }
 
-function shouldPromoteRustCapability(name: string, typeName?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
-    if (isRustNoiseCapability(name, config)) {
+function shouldPromoteRustCapability(name: string, sourcePath: string, typeName?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
+    if (isRustNoiseCapability(name, config, sourcePath, record)) {
         return false;
     }
 
     return shouldPromoteCapabilityByScore(
         name,
+        sourcePath,
         typeName,
         record,
         config,
@@ -2060,21 +2217,15 @@ function shouldPromoteRustCapability(name: string, typeName?: string, config?: T
     );
 }
 
-function isCppNoiseCapability(name: string, config?: TriadConfig) {
-    if (isConfiguredNoiseCapability(name, config)) {
-        return true;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-        return true;
-    }
-
-    if (CPP_MAGIC_METHODS.has(trimmedName)) {
-        return true;
-    }
-
-    return CPP_HELPER_PREFIXES.some((prefix) => hasNamePrefix(trimmedName, prefix));
+function isCppNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
+    return isSuppressedCapabilityCandidate(
+        name,
+        sourcePath,
+        config,
+        record,
+        isCppPrimaryCapabilityMethod(name, config),
+        CPP_MAGIC_METHODS
+    );
 }
 
 function isCppPrimaryCapabilityMethod(name: string, config?: TriadConfig) {
@@ -2088,18 +2239,21 @@ function isCppCapabilityContainer(typeName?: string) {
     return Boolean(typeName) && CPP_CAPABILITY_TYPE_SUFFIXES.some((suffix) => typeName!.endsWith(suffix));
 }
 
-function shouldPromoteCppCapability(name: string, typeName?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
-    if (isCppNoiseCapability(name, config)) {
+function shouldPromoteCppCapability(name: string, sourcePath: string, typeName?: string, config?: TriadConfig, record?: CapabilityCandidateRecord) {
+    if (isCppNoiseCapability(name, config, sourcePath, record)) {
         return false;
     }
 
     return shouldPromoteCapabilityByScore(
         name,
+        sourcePath,
         typeName,
         record,
         config,
         Boolean(isCppCapabilityContainer(typeName)),
-        isCppPrimaryCapabilityMethod(name, config)
+        isCppPrimaryCapabilityMethod(name, config),
+        false,
+        CPP_MAGIC_METHODS
     );
 }
 
@@ -2138,9 +2292,9 @@ function collectPythonCapabilityNodes(
         .filter((node): node is Parser.SyntaxNode => Boolean(node))
         .map((node) => buildPythonExecutableRecord(node, ghostContext, moduleName));
 
-    const promotableTopLevel = topLevelRecords.filter((record) => !isPythonNoiseCapability(record.name, config));
+    const promotableTopLevel = topLevelRecords.filter((record) => !isPythonNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
-        shouldPromotePythonCapability(record.name, undefined, record.decorators, config, record)
+        shouldPromotePythonCapability(record.name, sourcePath, undefined, record.decorators, config, record)
     );
 
     for (const record of promotedTopLevel) {
@@ -2190,27 +2344,29 @@ function collectPythonClassCapabilityNodes(
         .map((methodNode) => buildPythonExecutableRecord(methodNode, ghostContext, className, classPropertyTypes))
         .filter((record) => record.name !== '__init__');
 
-    const promotable = records.filter((record) => !isPythonNoiseCapability(record.name, config));
+    const promotable = records.filter((record) => !isPythonNoiseCapability(record.name, config, sourcePath, record));
     if (promotable.length === 0) {
         return [];
     }
 
     const entrypoint = promotable.find((record) => isPythonPrimaryCapabilityMethod(record.name, config));
     if (entrypoint) {
+        const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, PYTHON_MAGIC_METHODS);
         return [
             createTriadNode(
-                `${className}.${entrypoint.name}_pipeline`,
+                `${className}.${entrypoint.name}`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${className} capability pipeline`
+                mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                `execute ${className} capability pipeline`,
+                buildFoldedLeafIds(className, foldedRecords)
             )
         ];
     }
 
     const capabilityMethods = promotable.filter((record) =>
-        shouldPromotePythonCapability(record.name, className, record.decorators, config, record)
+        shouldPromotePythonCapability(record.name, sourcePath, className, record.decorators, config, record)
     );
 
     if (capabilityMethods.length > 0) {
@@ -2227,14 +2383,16 @@ function collectPythonClassCapabilityNodes(
     }
 
     if (isPythonCapabilityContainer(className)) {
+        const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, PYTHON_MAGIC_METHODS);
         return [
             createTriadNode(
                 `${className}.capability`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${className} aggregate capability`
+                mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                `execute ${className} aggregate capability`,
+                buildFoldedLeafIds(className, foldedRecords)
             )
         ];
     }
@@ -2365,21 +2523,15 @@ const PYTHON_CAPABILITY_CLASS_SUFFIXES = [
     'Manager'
 ];
 
-function isPythonNoiseCapability(name: string, config?: TriadConfig) {
-    if (isConfiguredNoiseCapability(name, config)) {
-        return true;
-    }
-
-    const lowerName = name.trim().toLowerCase();
-    if (!lowerName) {
-        return true;
-    }
-
-    if (PYTHON_MAGIC_METHODS.has(name) || /^__.*__$/.test(name)) {
-        return true;
-    }
-
-    return PYTHON_HELPER_PREFIXES.some((prefix) => lowerName.startsWith(prefix));
+function isPythonNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
+    return isSuppressedCapabilityCandidate(
+        name,
+        sourcePath,
+        config,
+        record,
+        isPythonPrimaryCapabilityMethod(name, config),
+        PYTHON_MAGIC_METHODS
+    );
 }
 
 function isPythonPrimaryCapabilityMethod(name: string, config?: TriadConfig) {
@@ -2396,22 +2548,26 @@ function isPythonCapabilityContainer(className: string) {
 
 function shouldPromotePythonCapability(
     name: string,
+    sourcePath: string,
     className?: string,
     decorators: string[] = [],
     config?: TriadConfig,
     record?: CapabilityCandidateRecord
 ) {
-    if (isPythonNoiseCapability(name, config)) {
+    if (isPythonNoiseCapability(name, config, sourcePath, { ...record, decorators })) {
         return false;
     }
 
     return shouldPromoteCapabilityByScore(
         name,
+        sourcePath,
         className,
         { ...record, decorators },
         config,
         Boolean(className && isPythonCapabilityContainer(className)),
-        isPythonPrimaryCapabilityMethod(name, config)
+        isPythonPrimaryCapabilityMethod(name, config),
+        false,
+        PYTHON_MAGIC_METHODS
     );
 }
 
@@ -3151,27 +3307,29 @@ function collectGoCapabilityNodes(
             continue;
         }
 
-        const promotable = records.filter((record) => !isGoNoiseCapability(record.name, config));
+        const promotable = records.filter((record) => !isGoNoiseCapability(record.name, config, sourcePath, record));
         if (promotable.length === 0) {
             continue;
         }
 
         const entrypoint = promotable.find((record) => isGoPrimaryCapabilityMethod(record.name, config));
         if (entrypoint) {
+            const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, new Set<string>());
             triadGraph.push(
                 createTriadNode(
-                    `${receiverType}.${entrypoint.name}_pipeline`,
+                    `${receiverType}.${entrypoint.name}`,
                     category,
                     sourcePath,
-                    mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                    mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                    `execute ${receiverType} capability pipeline`
+                    mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                    mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                    `execute ${receiverType} capability pipeline`,
+                    buildFoldedLeafIds(receiverType, foldedRecords)
                 )
             );
             continue;
         }
 
-        const capabilityMethods = promotable.filter((record) => shouldPromoteGoCapability(record.name, receiverType, config, record));
+        const capabilityMethods = promotable.filter((record) => shouldPromoteGoCapability(record.name, sourcePath, receiverType, config, record));
         if (capabilityMethods.length > 0) {
             triadGraph.push(
                 ...capabilityMethods.map((record) =>
@@ -3193,15 +3351,16 @@ function collectGoCapabilityNodes(
                 `${receiverType}.capability`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${receiverType} aggregate capability`
+                mergeCapabilityDemand(getFoldableCapabilityRecords(records, promotable, config, new Set<string>()).map((record) => record.demand)),
+                mergeCapabilityAnswer(getFoldableCapabilityRecords(records, promotable, config, new Set<string>()).map((record) => record.answer)),
+                `execute ${receiverType} aggregate capability`,
+                buildFoldedLeafIds(receiverType, getFoldableCapabilityRecords(records, promotable, config, new Set<string>()))
             )
         );
     }
 
-    const promotableTopLevel = topLevelRecords.filter((record) => !isGoNoiseCapability(record.name, config));
-    const promotedTopLevel = promotableTopLevel.filter((record) => shouldPromoteGoCapability(record.name, undefined, config, record));
+    const promotableTopLevel = topLevelRecords.filter((record) => !isGoNoiseCapability(record.name, config, sourcePath, record));
+    const promotedTopLevel = promotableTopLevel.filter((record) => shouldPromoteGoCapability(record.name, sourcePath, undefined, config, record));
     for (const record of promotedTopLevel) {
         triadGraph.push(
             createTriadNode(
@@ -4141,27 +4300,29 @@ function collectCppCapabilityNodes(
             continue;
         }
 
-        const promotable = records.filter((record) => !isCppNoiseCapability(record.name, config));
+        const promotable = records.filter((record) => !isCppNoiseCapability(record.name, config, sourcePath, record));
         if (promotable.length === 0) {
             continue;
         }
 
         const entrypoint = promotable.find((record) => isCppPrimaryCapabilityMethod(record.name, config));
         if (entrypoint) {
+            const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, CPP_MAGIC_METHODS);
             triadGraph.push(
                 createTriadNode(
-                    `${className}.${entrypoint.name}_pipeline`,
+                    `${className}.${entrypoint.name}`,
                     category,
                     sourcePath,
-                    mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                    mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                    `execute ${className} capability pipeline`
+                    mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                    mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                    `execute ${className} capability pipeline`,
+                    buildFoldedLeafIds(className, foldedRecords)
                 )
             );
             continue;
         }
 
-        const capabilityMethods = promotable.filter((record) => shouldPromoteCppCapability(record.name, className, config, record));
+        const capabilityMethods = promotable.filter((record) => shouldPromoteCppCapability(record.name, sourcePath, className, config, record));
         if (capabilityMethods.length > 0) {
             triadGraph.push(
                 ...capabilityMethods.map((record) =>
@@ -4183,18 +4344,19 @@ function collectCppCapabilityNodes(
                 `${className}.capability`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${className} aggregate capability`
+                mergeCapabilityDemand(getFoldableCapabilityRecords(records, promotable, config, CPP_MAGIC_METHODS).map((record) => record.demand)),
+                mergeCapabilityAnswer(getFoldableCapabilityRecords(records, promotable, config, CPP_MAGIC_METHODS).map((record) => record.answer)),
+                `execute ${className} aggregate capability`,
+                buildFoldedLeafIds(className, getFoldableCapabilityRecords(records, promotable, config, CPP_MAGIC_METHODS))
             )
         );
     }
 
-    const promotableTopLevel = topLevelRecords.filter((record) => !isCppNoiseCapability(record.name, config));
+    const promotableTopLevel = topLevelRecords.filter((record) => !isCppNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter(
         (record) =>
             (!record.ownerName || !isSuppressedCapabilityContainerName(record.ownerName, config)) &&
-            shouldPromoteCppCapability(record.name, record.ownerName, config, record)
+            shouldPromoteCppCapability(record.name, sourcePath, record.ownerName, config, record)
     );
     for (const record of promotedTopLevel) {
         triadGraph.push(
@@ -4287,27 +4449,29 @@ function collectRustCapabilityNodes(
             continue;
         }
 
-        const promotable = records.filter((record) => !isRustNoiseCapability(record.name, config));
+        const promotable = records.filter((record) => !isRustNoiseCapability(record.name, config, sourcePath, record));
         if (promotable.length === 0) {
             continue;
         }
 
         const entrypoint = promotable.find((record) => isRustPrimaryCapabilityMethod(record.name, config));
         if (entrypoint) {
+            const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, new Set<string>());
             triadGraph.push(
                 createTriadNode(
-                    `${implType}.${entrypoint.name}_pipeline`,
+                    `${implType}.${entrypoint.name}`,
                     category,
                     sourcePath,
-                    mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                    mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                    `execute ${implType} capability pipeline`
+                    mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                    mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                    `execute ${implType} capability pipeline`,
+                    buildFoldedLeafIds(implType, foldedRecords)
                 )
             );
             continue;
         }
 
-        const capabilityMethods = promotable.filter((record) => shouldPromoteRustCapability(record.name, implType, config, record));
+        const capabilityMethods = promotable.filter((record) => shouldPromoteRustCapability(record.name, sourcePath, implType, config, record));
         if (capabilityMethods.length > 0) {
             triadGraph.push(
                 ...capabilityMethods.map((record) =>
@@ -4329,15 +4493,16 @@ function collectRustCapabilityNodes(
                 `${implType}.capability`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(promotable.map((record) => record.demand)),
-                mergeCapabilityAnswer(promotable.map((record) => record.answer)),
-                `execute ${implType} aggregate capability`
+                mergeCapabilityDemand(getFoldableCapabilityRecords(records, promotable, config, new Set<string>()).map((record) => record.demand)),
+                mergeCapabilityAnswer(getFoldableCapabilityRecords(records, promotable, config, new Set<string>()).map((record) => record.answer)),
+                `execute ${implType} aggregate capability`,
+                buildFoldedLeafIds(implType, getFoldableCapabilityRecords(records, promotable, config, new Set<string>()))
             )
         );
     }
 
-    const promotableTopLevel = topLevelRecords.filter((record) => !isRustNoiseCapability(record.name, config));
-    const promotedTopLevel = promotableTopLevel.filter((record) => shouldPromoteRustCapability(record.name, undefined, config, record));
+    const promotableTopLevel = topLevelRecords.filter((record) => !isRustNoiseCapability(record.name, config, sourcePath, record));
+    const promotedTopLevel = promotableTopLevel.filter((record) => shouldPromoteRustCapability(record.name, sourcePath, undefined, config, record));
     for (const record of promotedTopLevel) {
         triadGraph.push(
             createTriadNode(
@@ -4389,7 +4554,7 @@ function collectJavaCapabilityNodes(
         const records = classBody.namedChildren
             .filter((child) => child.type === 'method_declaration')
             .map((methodNode) => buildJavaExecutableRecord(methodNode, ghostContext, classPropertyTypes))
-            .filter((record) => !isJavaNoiseCapability(record.name, config));
+            .filter((record) => !isJavaNoiseCapability(record.name, config, sourcePath, record));
 
         if (records.length === 0) {
             continue;
@@ -4397,20 +4562,22 @@ function collectJavaCapabilityNodes(
 
         const entrypoint = records.find((record) => isJavaPrimaryCapabilityMethod(record.name, config));
         if (entrypoint) {
+            const foldedRecords = getFoldableCapabilityRecords(records, records, config, JAVA_MAGIC_METHODS);
             triadGraph.push(
                 createTriadNode(
-                    `${className}.${entrypoint.name}_pipeline`,
+                    `${className}.${entrypoint.name}`,
                     category,
                     sourcePath,
-                    mergeCapabilityDemand(records.map((record) => record.demand)),
-                    mergeCapabilityAnswer(records.map((record) => record.answer)),
-                    `execute ${className} capability pipeline`
+                    mergeCapabilityDemand(foldedRecords.map((record) => record.demand)),
+                    mergeCapabilityAnswer(foldedRecords.map((record) => record.answer)),
+                    `execute ${className} capability pipeline`,
+                    buildFoldedLeafIds(className, foldedRecords)
                 )
             );
             continue;
         }
 
-        const capabilityMethods = records.filter((record) => shouldPromoteJavaCapability(record.name, className, config, record));
+        const capabilityMethods = records.filter((record) => shouldPromoteJavaCapability(record.name, sourcePath, className, config, record));
         if (capabilityMethods.length > 0) {
             triadGraph.push(
                 ...capabilityMethods.map((record) =>
@@ -4432,11 +4599,12 @@ function collectJavaCapabilityNodes(
                 `${className}.capability`,
                 category,
                 sourcePath,
-                mergeCapabilityDemand(records.map((record) => record.demand)),
-                mergeCapabilityAnswer(records.map((record) => record.answer)),
+                mergeCapabilityDemand(getFoldableCapabilityRecords(records, records, config, JAVA_MAGIC_METHODS).map((record) => record.demand)),
+                mergeCapabilityAnswer(getFoldableCapabilityRecords(records, records, config, JAVA_MAGIC_METHODS).map((record) => record.answer)),
                 isJavaCapabilityContainer(className)
                     ? `execute ${className} aggregate capability`
-                    : `execute ${className} class capability`
+                    : `execute ${className} class capability`,
+                buildFoldedLeafIds(className, getFoldableCapabilityRecords(records, records, config, JAVA_MAGIC_METHODS))
             )
         );
     }
@@ -4874,13 +5042,41 @@ function stripQuotedLiteral(value: string) {
     return value.replace(/^['"`]|['"`]$/g, '');
 }
 
+function buildFoldedLeafIds(ownerName: string, records: Array<{ name?: string }>) {
+    return Array.from(
+        new Set(
+            records
+                .map((record) => record.name?.trim())
+                .filter((name): name is string => Boolean(name))
+                .map((name) => `${ownerName}.${name}`)
+        )
+    );
+}
+
+function getFoldableCapabilityRecords<T extends { name?: string }>(
+    records: T[],
+    promotable: T[],
+    config: TriadConfig,
+    magicMethods: Set<string>
+) {
+    if (!config.parser.foldHelpersIntoOwner) {
+        return promotable;
+    }
+
+    return records.filter((record) => {
+        const name = record.name?.trim() ?? '';
+        return Boolean(name) && !isMagicCapabilityName(name, magicMethods, config);
+    });
+}
+
 function createTriadNode(
     nodeId: string,
     category: string,
     sourcePath: string,
     demand: string[],
     answer: string[],
-    problem?: string
+    problem?: string,
+    foldedLeaves: string[] = []
 ): TriadNode {
     const methodName = nodeId.split('.').pop() ?? 'execute';
     return {
@@ -4891,7 +5087,8 @@ function createTriadNode(
             problem: deriveCapabilityProblem(nodeId, sourcePath, demand, answer, problem ?? `execute ${methodName} flow`),
             demand: demand.length > 0 ? demand : ['None'],
             answer: answer.length > 0 ? answer : ['void']
-        }
+        },
+        topology: foldedLeaves.length > 0 ? { foldedLeaves } : undefined
     };
 }
 

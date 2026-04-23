@@ -43,7 +43,8 @@
     "handoff": "tsx cli.ts handoff",
     "master": "tsx cli.ts master",
     "apply": "tsx cli.ts apply",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "keywords": [
     "ai",

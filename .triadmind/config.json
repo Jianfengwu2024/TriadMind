@@ -71,6 +71,11 @@
     ],
     "scanMode": "capability",
     "capabilityThreshold": 4,
+    "excludeTestFiles": true,
+    "excludeMagicMethods": true,
+    "excludePrivateMethods": true,
+    "helperVerbPolicy": "suppress",
+    "foldHelpersIntoOwner": true,
     "entryMethodNames": [
       "execute",
       "run",
@@ -86,7 +91,6 @@
     "excludeNodeNamePatterns": [
       "^(__.*__|_(?!_).*)$",
       "^(test_.+)$",
-      "^(get|set|build|parse|format|normalize|sanitize|validate|ensure|create|load|save|list|collect|resolve|prepare|read|write|convert|sync|merge|filter|check|infer|guess)_.+$",
       "^__.*__$",
       "^(upgrade|downgrade)$"
     ],
