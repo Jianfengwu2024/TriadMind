@@ -42,6 +42,8 @@ interface MayaFingerprint {
     key: string;
     title: string;
     scope: 'project' | 'feature' | 'macro';
+    mode: 'strict' | 'fallback';
+    reason: string;
     nodeIds: string[];
     normalizedNodeIds: string[];
     partition: number[];
@@ -56,6 +58,8 @@ interface MayaPanelData {
     byMacro: Record<string, MayaFingerprint>;
     fastMode: boolean;
     defaultView: 'architecture' | 'leaf';
+    skippedOwnerCount: number;
+    strictFingerprintSkipped: boolean;
 }
 
 interface VisualizerOptions {
@@ -64,6 +68,10 @@ interface VisualizerOptions {
     showIsolatedCapabilities: boolean;
     maxContractEdges: number;
     fastMayaThreshold: number;
+    strictFingerprint: boolean;
+    maxFingerprintNodes: number;
+    maxFingerprintOwners: number;
+    fingerprintTimeoutMs: number;
     maxRenderNodes: number;
     compressExistingBranches: boolean;
     fastMode: boolean;
@@ -73,6 +81,8 @@ export interface DashboardOptions {
     defaultView?: 'architecture' | 'leaf';
     showIsolatedCapabilities?: boolean;
     fullContractEdges?: boolean;
+    fastMode?: boolean;
+    strictFingerprint?: boolean;
 }
 
 interface KnowledgeNode {
@@ -120,6 +130,7 @@ const COMMUNITY_COLORS: Record<string, string> = {
 
 const MACRO_CLUSTER_PALETTE = ['#f43f5e', '#38bdf8', '#f59e0b', '#22c55e', '#a78bfa', '#14b8a6'];
 export function generateDashboard(mapPath: string, protocolPath: string, outputPath: string, dashboardOptions: DashboardOptions = {}) {
+    const startedAt = Date.now();
     if (!fs.existsSync(mapPath) || !fs.existsSync(protocolPath)) {
         throw new Error(`Cannot find required TriadMind files. Map: ${mapPath}, Protocol: ${protocolPath}`);
     }
@@ -134,6 +145,13 @@ export function generateDashboard(mapPath: string, protocolPath: string, outputP
     const previewMap = buildPreviewTopology(originalMap, protocol);
     const mayaData = buildMayaPanelData(previewMap, protocol, renormalizeProtocol, options);
     fs.writeFileSync(outputPath, buildHtml(graph, protocol, mayaData, renormalizeProtocol), 'utf-8');
+    if (mayaData.strictFingerprintSkipped) {
+        console.log('[TriadMind] Strict fingerprint skipped: fallback mode enabled');
+    }
+    if (mayaData.skippedOwnerCount > 0) {
+        console.log(`[TriadMind] Fingerprint owners skipped: ${mayaData.skippedOwnerCount}`);
+    }
+    console.log(`[TriadMind] Dashboard generated in ${((Date.now() - startedAt) / 1000).toFixed(2)}s`);
 }
 
 function readRenormalizeProtocol(mapPath: string, outputPath: string) {
@@ -484,7 +502,8 @@ function buildHtml(
         `view: ${mayaData.defaultView}`,
         graph.stats.branchCompression ? 'fast-render: compressed branch nodes' : '',
         graph.stats.cappedContractEdges > 0 ? `contract edges capped: +${graph.stats.cappedContractEdges} hidden` : '',
-        mayaData.fastMode ? 'maya: fast fallback enabled' : ''
+        mayaData.fastMode ? 'maya: fast fallback enabled' : '',
+        mayaData.skippedOwnerCount > 0 ? `fingerprint owners skipped: ${mayaData.skippedOwnerCount}` : ''
     ]
         .filter(Boolean)
         .join(' · ');
@@ -594,7 +613,7 @@ function getMacroById(macroId){ return getMacroNodes().find(node => node.id === 
 function getFocusedMacroIdForNode(nodeId){ const node = nodesDS.get(nodeId); if(!node) return ''; if(node._status === 'macro') return node.id; return node._macroOwner || ''; }
 function getFeatureFingerprintForNode(nodeId){ const node = nodesDS.get(nodeId); if(!node) return null; if(node._status === 'macro') return MAYA_DATA.byMacro[node.id] || null; const ownerId = node._triadOwner || node.id; return MAYA_DATA.byOwner[ownerId] || null; }
 function renderMayaStrip(sequence){ if(!Array.isArray(sequence) || !sequence.length) return '<span class="empty">None</span>'; const cells = sequence.map(v => '<div class="maya-cell ' + (v ? 'black' : 'white') + '"><span class="maya-pebble"></span></div>').join(''); const bits = sequence.map(v => '<div class="maya-bit">' + esc(v) + '</div>').join(''); return '<div class="maya-strip">' + cells + '</div><div class="maya-bitline">' + bits + '</div>'; }
-function renderMayaFingerprint(data, interactive){ if(!data) return '<span class="empty">No Maya fingerprint available</span>'; const partition = Array.isArray(data.partition) && data.partition.length ? data.partition.map(v => '<span class="maya-pill">' + esc(v) + '</span>').join('') : '<span class="empty">[]</span>'; const sequence = Array.isArray(data.sequence) && data.sequence.length ? data.sequence.map(v => '<span class="maya-pill">' + esc(v) + '</span>').join('') : '<span class="empty">[]</span>'; const nodes = Array.isArray(data.normalizedNodeIds) && data.normalizedNodeIds.length ? data.normalizedNodeIds.map(id => interactive ? '<span class="maya-node" onclick="focusNode(' + JSON.stringify(id).replace(/"/g,'&quot;') + ')">' + esc(id) + '</span>' : '<span class="maya-pill">' + esc(id) + '</span>').join('') : '<span class="empty">None</span>'; return '<div class="maya-grid">' + '<div class="maya-line"><span class="maya-key">Scope</span><br>' + esc(data.title) + '</div>' + '<div class="maya-line"><span class="maya-key">Maya-ID</span><br><span class="pill">' + esc(data.hash) + '</span></div>' + '<div class="maya-line"><span class="maya-key">Young Partition</span><div class="maya-pills">' + partition + '</div></div>' + '<div class="maya-line"><span class="maya-key">Maya Strip</span>' + renderMayaStrip(data.sequence) + '</div>' + '<div class="maya-line"><span class="maya-key">Maya Sequence</span><div class="maya-pills">' + sequence + '</div></div>' + '<div class="maya-line"><span class="maya-key">Normalized Fragment</span><div class="maya-node-list">' + nodes + '</div></div>' + '</div>'; }
+function renderMayaFingerprint(data, interactive){ if(!data) return '<span class="empty">Fingerprint skipped in fast mode; enable strictFingerprint to precompute this local fragment.</span>'; const partition = Array.isArray(data.partition) && data.partition.length ? data.partition.map(v => '<span class="maya-pill">' + esc(v) + '</span>').join('') : '<span class="empty">[]</span>'; const sequence = Array.isArray(data.sequence) && data.sequence.length ? data.sequence.map(v => '<span class="maya-pill">' + esc(v) + '</span>').join('') : '<span class="empty">[]</span>'; const nodes = Array.isArray(data.normalizedNodeIds) && data.normalizedNodeIds.length ? data.normalizedNodeIds.map(id => interactive ? '<span class="maya-node" onclick="focusNode(' + JSON.stringify(id).replace(/"/g,'&quot;') + ')">' + esc(id) + '</span>' : '<span class="maya-pill">' + esc(id) + '</span>').join('') : '<span class="empty">None</span>'; return '<div class="maya-grid">' + '<div class="maya-line"><span class="maya-key">Scope</span><br>' + esc(data.title) + '</div>' + '<div class="maya-line"><span class="maya-key">Mode</span><br><span class="pill">' + esc(data.mode || 'fallback') + '</span> ' + esc(data.reason || '') + '</div>' + '<div class="maya-line"><span class="maya-key">Maya-ID</span><br><span class="pill">' + esc(data.hash) + '</span></div>' + '<div class="maya-line"><span class="maya-key">Young Partition</span><div class="maya-pills">' + partition + '</div></div>' + '<div class="maya-line"><span class="maya-key">Maya Strip</span>' + renderMayaStrip(data.sequence) + '</div>' + '<div class="maya-line"><span class="maya-key">Maya Sequence</span><div class="maya-pills">' + sequence + '</div></div>' + '<div class="maya-line"><span class="maya-key">Normalized Fragment</span><div class="maya-node-list">' + nodes + '</div></div>' + '</div>'; }
 function showMaya(nodeId){ const panel = document.getElementById('maya-feature'); if(!panel) return; panel.innerHTML = renderMayaFingerprint(getFeatureFingerprintForNode(nodeId), true); }
 function applyMacroFocus(macroId){ focusedMacroId = macroId || ''; const macro = focusedMacroId ? getMacroById(focusedMacroId) : null; const focusSet = new Set(macro ? [macro.id, ...getMacroClusterNodeIds(macro)] : []); nodesDS.update(RAW_NODES.map(node => { const inFocus = !macro || focusSet.has(node.id); const baseColor = node.color || {}; return { id: node.id, color: { background: inFocus ? baseColor.background : withAlpha(baseColor.background, 0.18), border: inFocus ? baseColor.border : withAlpha(baseColor.border, 0.2), highlight: baseColor.highlight }, font: { ...(node.font || {}), color: inFocus ? '#f8fafc' : 'rgba(248,250,252,0.18)' } }; })); edgesDS.update(RAW_EDGES.map(edge => { const connected = !macro || (focusSet.has(edge.from) && focusSet.has(edge.to)); return { id: edge.id, color: { ...(edge.color || {}), opacity: connected ? (edge.color?.opacity ?? 1) : 0.08 }, hidden: isEdgeHiddenByCurrentView(edge), width: connected ? edge.width : Math.max((edge.width || 1) * 0.5, 1) }; })); }
 function drawMacroClusterHull(ctx, macro){ const ids = [macro.id, ...getMacroClusterNodeIds(macro)].filter(id => !nodesDS.get(id)?.hidden); if(ids.length <= 1) return; const positions = network.getPositions(ids); const points = ids.map(id => positions[id]).filter(Boolean); if(points.length === 0) return; const minX = Math.min(...points.map(p => p.x)); const maxX = Math.max(...points.map(p => p.x)); const minY = Math.min(...points.map(p => p.y)); const maxY = Math.max(...points.map(p => p.y)); const pad = 44; const radius = 26; const color = macro._macroColor || '#f43f5e'; const x = minX - pad; const y = minY - pad; const width = (maxX - minX) + pad * 2; const height = (maxY - minY) + pad * 2; ctx.save(); ctx.beginPath(); ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y); ctx.quadraticCurveTo(x + width, y, x + width, y + radius); ctx.lineTo(x + width, y + height - radius); ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height); ctx.lineTo(x + radius, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - radius); ctx.lineTo(x, y + radius); ctx.quadraticCurveTo(x, y, x + radius, y); ctx.closePath(); ctx.fillStyle = color + '14'; ctx.strokeStyle = color + 'bb'; ctx.lineWidth = 2.5; ctx.setLineDash([9,6]); ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fill(); ctx.stroke(); ctx.restore(); }
@@ -657,17 +676,27 @@ function buildMayaPanelData(
     const { outgoing, incoming, nodeMap } = buildContractNeighborhood(previewMap, options.analyzer);
     const byOwner: Record<string, MayaFingerprint> = {};
     const focusOwnerIds = collectHighlightedOwnerIds(protocol, renormalizeProtocol);
-    const ownerIds =
-        options.fastMode && focusOwnerIds.size > 0
+    const allOwnerIds =
+        options.fastMode
             ? Array.from(focusOwnerIds).filter((nodeId) => nodeMap.has(nodeId))
             : previewMap.map((node) => node.nodeId);
+    const ownerIds = allOwnerIds.slice(0, options.maxFingerprintOwners);
+    const skippedOwnerCount = Math.max(0, allOwnerIds.length - ownerIds.length) + (options.fastMode ? previewMap.length - allOwnerIds.length : 0);
+    const fingerprintCache = new Map<string, MayaFingerprint>();
 
     ownerIds.forEach((ownerId) => {
         const neighborIds = new Set<string>([ownerId, ...(outgoing.get(ownerId) ?? []), ...(incoming.get(ownerId) ?? [])]);
         const fragment = Array.from(neighborIds)
             .map((nodeId) => nodeMap.get(nodeId))
             .filter((item): item is TriadMapNode => Boolean(item));
-        byOwner[ownerId] = createMayaFingerprint(`feature::${ownerId}`, ownerId, 'feature', fragment, options);
+        byOwner[ownerId] = createCachedMayaFingerprint(
+            fingerprintCache,
+            `feature::${ownerId}`,
+            ownerId,
+            'feature',
+            fragment,
+            options
+        );
     });
 
     const byMacro: Record<string, MayaFingerprint> = {};
@@ -675,7 +704,8 @@ function buildMayaPanelData(
         const fragment = action.absorbed_nodes
             .map((nodeId) => nodeMap.get(nodeId))
             .filter((item): item is TriadMapNode => Boolean(item));
-        byMacro[action.macro_node_id] = createMayaFingerprint(
+        byMacro[action.macro_node_id] = createCachedMayaFingerprint(
+            fingerprintCache,
             `macro::${action.macro_node_id}`,
             `${action.macro_node_id} macro cluster`,
             'macro',
@@ -684,7 +714,37 @@ function buildMayaPanelData(
         );
     });
 
-    return { project, byOwner, byMacro, fastMode: options.fastMode, defaultView: options.defaultView };
+    return {
+        project,
+        byOwner,
+        byMacro,
+        fastMode: options.fastMode,
+        defaultView: options.defaultView,
+        skippedOwnerCount,
+        strictFingerprintSkipped: options.fastMode || !options.strictFingerprint || project.mode === 'fallback'
+    };
+}
+
+function createCachedMayaFingerprint(
+    cache: Map<string, MayaFingerprint>,
+    key: string,
+    title: string,
+    scope: 'project' | 'feature' | 'macro',
+    nodes: TriadMapNode[],
+    options: VisualizerOptions
+) {
+    const cacheKey = nodes
+        .map((node) => node.nodeId)
+        .sort()
+        .join('|');
+    const cached = cache.get(cacheKey);
+    if (cached) {
+        return { ...cached, key, title, scope };
+    }
+
+    const fingerprint = createMayaFingerprint(key, title, scope, nodes, options);
+    cache.set(cacheKey, fingerprint);
+    return fingerprint;
 }
 
 function createMayaFingerprint(
@@ -696,14 +756,29 @@ function createMayaFingerprint(
 ): MayaFingerprint {
     let normalized: TriadMapNode[];
     let partition: number[];
+    let mode: MayaFingerprint['mode'] = 'strict';
+    let reason = 'strict canonical normalization';
 
     try {
+        if (options.fastMode || !options.strictFingerprint) {
+            throw new Error('fallback mode enabled');
+        }
+        if (nodes.length > options.maxFingerprintNodes) {
+            throw new Error(`fragment has ${nodes.length} nodes, max strict nodes is ${options.maxFingerprintNodes}`);
+        }
         if (nodes.length > options.fastMayaThreshold) {
             throw new Error('Use stable fallback for larger visualizer fragments');
         }
+        const startedAt = Date.now();
         normalized = normalizeSubgraph(nodes) as TriadMapNode[];
         partition = mapTopologyToYoungPartition(nodes);
-    } catch {
+        const elapsedMs = Date.now() - startedAt;
+        if (elapsedMs > options.fingerprintTimeoutMs) {
+            throw new Error(`strict fingerprint exceeded ${options.fingerprintTimeoutMs}ms`);
+        }
+    } catch (error) {
+        mode = 'fallback';
+        reason = error instanceof Error ? error.message : 'strict fingerprint unavailable';
         normalized = nodes
             .slice()
             .sort((left, right) => left.nodeId.localeCompare(right.nodeId))
@@ -716,6 +791,8 @@ function createMayaFingerprint(
         key,
         title,
         scope,
+        mode,
+        reason,
         nodeIds: nodes.map((node) => node.nodeId),
         normalizedNodeIds: normalized.map((node) => node.nodeId),
         partition,
@@ -749,6 +826,7 @@ function renderMayaFingerprintMarkup(fingerprint: MayaFingerprint) {
 
     return `<div class="maya-grid">
   <div class="maya-line"><span class="maya-key">Scope</span><br>${escapeHtml(fingerprint.title)}</div>
+  <div class="maya-line"><span class="maya-key">Mode</span><br><span class="pill">${escapeHtml(fingerprint.mode)}</span> ${escapeHtml(fingerprint.reason)}</div>
   <div class="maya-line"><span class="maya-key">Maya-ID</span><br><span class="pill">${escapeHtml(fingerprint.hash)}</span></div>
   <div class="maya-line"><span class="maya-key">Young Partition</span><div class="maya-pills">${partition}</div></div>
   <div class="maya-line"><span class="maya-key">Maya Strip</span>${renderMayaStripMarkup(fingerprint.sequence)}</div>
@@ -866,10 +944,14 @@ function buildVisualizerOptions(
         maxContractEdges: dashboardOptions.fullContractEdges
             ? Number.MAX_SAFE_INTEGER
             : config.visualizer.maxPrimaryEdges || config.visualizer.maxContractEdges,
-        fastMayaThreshold: config.visualizer.fastFingerprintThreshold || config.visualizer.fastMayaThreshold,
+        fastMayaThreshold: config.visualizer.fastFingerprintThreshold ?? config.visualizer.fastMayaThreshold,
+        strictFingerprint: dashboardOptions.strictFingerprint ?? config.visualizer.strictFingerprint,
+        maxFingerprintNodes: config.visualizer.maxFingerprintNodes,
+        maxFingerprintOwners: config.visualizer.maxFingerprintOwners,
+        fingerprintTimeoutMs: config.visualizer.fingerprintTimeoutMs,
         maxRenderNodes: config.visualizer.maxRenderNodes,
         compressExistingBranches: previewNodeCount > config.visualizer.maxRenderNodes,
-        fastMode: previewNodeCount > config.visualizer.maxRenderNodes
+        fastMode: dashboardOptions.fastMode ?? (config.visualizer.fastMode || previewNodeCount > config.visualizer.maxRenderNodes)
     };
 }
 

@@ -109,8 +109,13 @@ function createTestConfig(): TriadConfig {
             showFoldedLeaves: false,
             maxContractEdges: 1200,
             maxPrimaryEdges: 1500,
-            fastMayaThreshold: 10,
-            fastFingerprintThreshold: 8,
+            fastMode: true,
+            strictFingerprint: false,
+            fastMayaThreshold: 0,
+            fastFingerprintThreshold: 0,
+            maxFingerprintNodes: 8,
+            maxFingerprintOwners: 100,
+            fingerprintTimeoutMs: 50,
             maxRenderNodes: 400
         },
         protocol: {

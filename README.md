@@ -291,7 +291,7 @@ TriadMind Core 现在的正确理解不是：
 - 扫描容错内置化：递归扫描默认跳过 `node_modules`、`.next`、`venv`、`.venv`、`__pycache__`、`.pytest_cache`、`logs`、`uploads`、`fastgpt_data`，并对 `EACCES` / `EPERM` / `ENOENT` 直接 `skip`。
 - 默认能力粒度：`parser.scanMode` 默认改为 `capability`，并补充支持 `module`。
 - 通用类型降噪：新增 `parser.genericContractIgnoreList`，默认忽略 `str`、`string`、`int`、`bool`、`dict`、`any`、`Dict[str,Any]`、`Optional[str]` 这类低语义契约边。
-- 可视化性能保护：新增 `visualizer.maxContractEdges`、`visualizer.fastMayaThreshold`、`visualizer.maxRenderNodes`，用于大图快速模式、契约边限流和 Maya fallback。
+- 可视化性能保护：新增 `visualizer.fastMode`、`visualizer.strictFingerprint`、`visualizer.maxFingerprintOwners`、`visualizer.maxFingerprintNodes`、`visualizer.fingerprintTimeoutMs`，默认跳过同步 per-owner 严格 Maya 指纹，避免大图生成卡死。
 - 默认主视图：`visualizer.defaultView` 现在默认是 `architecture`，默认隐藏左右分支和非关键孤立 capability。
 - 配置先于扫描：`.triadmind/config.json` 的排除和降噪配置，现在会在语言探测、manifest 构建、parser walk、polyglot walk 中统一生效。
 
@@ -322,13 +322,25 @@ TriadMind Core 现在的正确理解不是：
     "defaultView": "architecture",
     "showIsolatedCapabilities": false,
     "maxPrimaryEdges": 1500,
-    "fastFingerprintThreshold": 8,
     "maxContractEdges": 1200,
-    "fastMayaThreshold": 10,
+    "fastMode": true,
+    "strictFingerprint": false,
+    "fastFingerprintThreshold": 0,
+    "fastMayaThreshold": 0,
+    "maxFingerprintNodes": 8,
+    "maxFingerprintOwners": 100,
+    "fingerprintTimeoutMs": 50,
     "maxRenderNodes": 400
   }
 }
 ```
+
+Visualizer performance defaults:
+
+- `fastMode: true` keeps HTML generation on the quick path.
+- `strictFingerprint: false` skips expensive per-owner canonical Maya normalization by default.
+- `maxFingerprintOwners` and `maxFingerprintNodes` cap local fragment work.
+- Skipped feature fingerprints show a fast-mode message in the side panel instead of blocking HTML output.
 
 ---
 
@@ -416,7 +428,12 @@ The default configuration now exposes:
     "defaultView": "architecture",
     "showIsolatedCapabilities": false,
     "maxPrimaryEdges": 1500,
-    "fastFingerprintThreshold": 8
+    "fastMode": true,
+    "strictFingerprint": false,
+    "fastFingerprintThreshold": 0,
+    "maxFingerprintNodes": 8,
+    "maxFingerprintOwners": 100,
+    "fingerprintTimeoutMs": 50
   }
 }
 ```

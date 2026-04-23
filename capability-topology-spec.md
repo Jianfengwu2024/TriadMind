@@ -218,7 +218,12 @@ Default:
     "defaultView": "architecture",
     "showIsolatedCapabilities": false,
     "maxPrimaryEdges": 1500,
-    "fastFingerprintThreshold": 8
+    "fastMode": true,
+    "strictFingerprint": false,
+    "fastFingerprintThreshold": 0,
+    "maxFingerprintNodes": 8,
+    "maxFingerprintOwners": 100,
+    "fingerprintTimeoutMs": 50
   }
 }
 ```

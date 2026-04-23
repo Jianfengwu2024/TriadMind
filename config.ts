@@ -45,8 +45,13 @@ export interface TriadConfig {
         showIsolatedCapabilities: boolean;
         maxContractEdges: number;
         maxPrimaryEdges: number;
+        fastMode: boolean;
+        strictFingerprint: boolean;
         fastMayaThreshold: number;
         fastFingerprintThreshold: number;
+        maxFingerprintNodes: number;
+        maxFingerprintOwners: number;
+        fingerprintTimeoutMs: number;
         maxRenderNodes: number;
         showFoldedLeaves: boolean;
     };
@@ -166,8 +171,13 @@ const DEFAULT_CONFIG: TriadConfig = {
         showIsolatedCapabilities: false,
         maxContractEdges: 1200,
         maxPrimaryEdges: 1500,
-        fastMayaThreshold: 10,
-        fastFingerprintThreshold: 8,
+        fastMode: true,
+        strictFingerprint: false,
+        fastMayaThreshold: 0,
+        fastFingerprintThreshold: 0,
+        maxFingerprintNodes: 8,
+        maxFingerprintOwners: 100,
+        fingerprintTimeoutMs: 50,
         maxRenderNodes: 400,
         showFoldedLeaves: false
     },
@@ -394,13 +404,27 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
                 value.visualizer?.maxPrimaryEdges ?? value.visualizer?.maxContractEdges,
                 DEFAULT_CONFIG.visualizer.maxPrimaryEdges
             ),
-            fastMayaThreshold: normalizePositiveInteger(
+            fastMode: value.visualizer?.fastMode ?? DEFAULT_CONFIG.visualizer.fastMode,
+            strictFingerprint: value.visualizer?.strictFingerprint ?? DEFAULT_CONFIG.visualizer.strictFingerprint,
+            fastMayaThreshold: normalizeNonNegativeInteger(
                 value.visualizer?.fastMayaThreshold ?? value.visualizer?.fastFingerprintThreshold,
                 DEFAULT_CONFIG.visualizer.fastMayaThreshold
             ),
-            fastFingerprintThreshold: normalizePositiveInteger(
+            fastFingerprintThreshold: normalizeNonNegativeInteger(
                 value.visualizer?.fastFingerprintThreshold ?? value.visualizer?.fastMayaThreshold,
                 DEFAULT_CONFIG.visualizer.fastFingerprintThreshold
+            ),
+            maxFingerprintNodes: normalizePositiveInteger(
+                value.visualizer?.maxFingerprintNodes,
+                DEFAULT_CONFIG.visualizer.maxFingerprintNodes
+            ),
+            maxFingerprintOwners: normalizePositiveInteger(
+                value.visualizer?.maxFingerprintOwners,
+                DEFAULT_CONFIG.visualizer.maxFingerprintOwners
+            ),
+            fingerprintTimeoutMs: normalizePositiveInteger(
+                value.visualizer?.fingerprintTimeoutMs,
+                DEFAULT_CONFIG.visualizer.fingerprintTimeoutMs
             ),
             maxRenderNodes: normalizePositiveInteger(
                 value.visualizer?.maxRenderNodes,
@@ -510,6 +534,14 @@ function mergeStringList(value: string[] | undefined, fallback: string[]) {
 
 function normalizePositiveInteger(value: number | undefined, fallback: number) {
     if (Number.isFinite(value) && (value as number) > 0) {
+        return Math.floor(value as number);
+    }
+
+    return fallback;
+}
+
+function normalizeNonNegativeInteger(value: number | undefined, fallback: number) {
+    if (Number.isFinite(value) && (value as number) >= 0) {
         return Math.floor(value as number);
     }
 

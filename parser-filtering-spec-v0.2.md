@@ -77,6 +77,17 @@ Default path suppression applies to architecture/capability parsing, including:
 - default visualizer view: `architecture`
 - isolated non-critical capability nodes are hidden by default
 - `leaf` remains available explicitly for debug and deep inspection
+- visualizer fingerprinting defaults to fast fallback mode, with per-owner strict Maya fingerprints skipped unless explicitly enabled
+
+## Visualizer Performance Guardrails
+
+- `visualizer.fastMode` defaults to `true`.
+- `visualizer.strictFingerprint` defaults to `false`.
+- `visualizer.fastMayaThreshold` and `visualizer.fastFingerprintThreshold` default to `0`.
+- `visualizer.maxFingerprintNodes` defaults to `8`.
+- `visualizer.maxFingerprintOwners` defaults to `100`.
+- `visualizer.fingerprintTimeoutMs` defaults to `50`.
+- Dashboard generation must write HTML even when local fingerprint work is skipped or downgraded.
 
 ## Output Separation
 
