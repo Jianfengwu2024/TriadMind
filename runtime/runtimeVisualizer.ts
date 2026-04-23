@@ -64,69 +64,88 @@ function renderRuntimeDashboard(
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
   <style>
-    :root { color-scheme: dark; --bg:#090f1f; --panel:#111a30; --panel2:#15203a; --line:#29385f; --text:#e9f0ff; --muted:#91a4c8; --accent:#69b7ff; font-family: Inter, Segoe UI, Arial, sans-serif; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden; }
-    .app { display: grid; grid-template-columns: 1fr 390px; grid-template-rows: auto 1fr; height: 100vh; }
-    .toolbar { grid-column: 1 / 3; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #0d162b; }
-    .toolbar h1 { font-size: 16px; margin: 0 12px 0 0; white-space: nowrap; }
-    .toolbar input, .toolbar select, .toolbar button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
-    .toolbar input { width: 280px; }
-    .toolbar button { cursor: pointer; }
-    .toolbar button:hover { border-color: var(--accent); }
-    .graph-wrap { position: relative; min-width: 0; min-height: 0; }
-    .graph { width: 100%; height: 100%; display: block; background: radial-gradient(circle at 20% 10%, #132447 0, transparent 32%), #090f1f; cursor: grab; }
+    :root { color-scheme: dark; --bg:#0f0f1a; --panel:#1a1a2e; --panel2:#0f172a; --line:#2a2a4e; --line2:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+    .app { display: flex; flex: 1; min-width: 0; }
+    .graph-wrap { position: relative; flex: 1; min-width: 0; background: radial-gradient(circle at 22% 12%, rgba(56,189,248,.16) 0, transparent 34%), #0f0f1a; }
+    .graph { width: 100%; height: 100%; display: block; cursor: grab; }
     .graph.dragging { cursor: grabbing; }
-    .sidebar { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 14px; }
-    .section { border: 1px solid var(--line); background: rgba(255,255,255,0.025); border-radius: 12px; padding: 10px; margin-bottom: 12px; }
-    .section h2, .section h3 { margin: 0 0 8px; font-size: 14px; }
+    .toolbar { position: absolute; top: 14px; left: 14px; z-index: 20; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: rgba(15,23,42,.92); border: 1px solid var(--line2); border-radius: 12px; padding: 10px; box-shadow: 0 12px 28px rgba(0,0,0,.28); max-width: calc(100% - 28px); }
+    .toolbar h1 { font-size: 12px; color: #7dd3fc; letter-spacing: .04em; text-transform: uppercase; margin-right: 6px; white-space: nowrap; }
+    .toolbar input, .toolbar select, .toolbar button { background: #111827; color: var(--text); border: 1px solid var(--line2); border-radius: 999px; padding: 7px 10px; font-size: 12px; }
+    .toolbar input { width: 240px; border-radius: 8px; }
+    .toolbar button { cursor: pointer; }
+    .toolbar button:hover, .toolbar input:focus, .toolbar select:focus { border-color: var(--accent); outline: none; }
+    .sidebar { width: 390px; background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; overflow: auto; }
+    .section { padding: 14px; border-bottom: 1px solid var(--line); }
+    .section h2 { font-size: 18px; margin-bottom: 8px; color: #f8fafc; }
+    .section h3 { font-size: 12px; color: #a5b4fc; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .05em; }
+    .eyebrow { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+    .desc { color: #cbd5e1; font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
     .summary { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { background: var(--panel2); border: 1px solid var(--line); color: var(--muted); padding: 5px 8px; border-radius: 999px; font-size: 12px; }
-    .filters { display: grid; gap: 6px; max-height: 220px; overflow: auto; }
-    .check { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
-    .detail-kv { display: grid; grid-template-columns: 92px 1fr; gap: 5px; font-size: 12px; line-height: 1.45; }
+    .chip { background: #111827; border: 1px solid var(--line2); color: var(--muted); padding: 4px 8px; border-radius: 999px; font-size: 11px; }
+    .filters { display: grid; gap: 6px; max-height: 210px; overflow: auto; }
+    .check { display: flex; align-items: center; gap: 6px; color: #cbd5e1; font-size: 12px; line-height: 1.4; }
+    .check input { accent-color: var(--accent); }
+    .status-row { display: flex; align-items: center; gap: 8px; color: #cbd5e1; font-size: 12px; padding: 3px 0; line-height: 1.45; }
+    .status-dot { width: 12px; height: 12px; border-radius: 999px; display: inline-block; border: 2px solid currentColor; flex-shrink: 0; }
+    .status-selected { color: #38bdf8; background: #082f49; box-shadow: 0 0 14px rgba(56,189,248,.5); }
+    .status-hop { color: #f8fafc; background: #1f2937; }
+    .status-trace { color: #facc15; background: #3f2b0a; box-shadow: 0 0 14px rgba(250,204,21,.38); }
+    .legend-hint { color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 8px; }
+    .legend-item { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #cbd5e1; }
+    .legend-item:hover { background: rgba(71,85,105,.24); }
+    .legend-item.dimmed { opacity: .45; }
+    .legend-item input { margin: 0; accent-color: var(--accent); }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(226,232,240,.45); flex-shrink: 0; }
+    .legend-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .legend-count { color: #94a3b8; font-size: 11px; }
+    .detail-kv { display: grid; grid-template-columns: 92px 1fr; gap: 6px; font-size: 12px; line-height: 1.45; }
     .detail-kv b { color: var(--muted); font-weight: 500; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #0b1224; border: 1px solid var(--line); border-radius: 8px; padding: 8px; color: #dce8ff; font-size: 12px; max-height: 260px; overflow: auto; }
-    .node-shape { stroke-width: 1.5; cursor: pointer; filter: drop-shadow(0 4px 8px rgba(0,0,0,.25)); }
-    .node-label { fill: #eff6ff; font-size: 11px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
-    .node-sub { fill: #a8b8d8; font-size: 9px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
-    .edge-line { fill: none; stroke-width: 2; marker-end: url(#arrow); cursor: pointer; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #0b1224; border: 1px solid var(--line2); border-radius: 8px; padding: 8px; color: #dce8ff; font-size: 12px; max-height: 250px; overflow: auto; margin-top: 6px; }
+    .node-shape { stroke-width: 1.4; cursor: pointer; filter: drop-shadow(0 3px 8px rgba(0,0,0,.28)); }
+    .node-label { fill: #eff6ff; font-size: 11px; font-weight: 600; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+    .node-sub { fill: #dbeafe; font-size: 9px; pointer-events: none; text-anchor: middle; dominant-baseline: central; opacity: .8; }
+    .edge-line { fill: none; stroke-width: 1.8; marker-end: url(#arrow); cursor: pointer; opacity: .88; }
     .edge-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
-    .edge-label { fill: #c7d7f5; font-size: 9px; pointer-events: none; text-anchor: middle; paint-order: stroke; stroke: #081020; stroke-width: 3px; }
+    .edge-label { fill: #e2e8f0; font-size: 9px; pointer-events: none; text-anchor: middle; paint-order: stroke; stroke: #020617; stroke-width: 4px; }
     .dim { opacity: .12; }
-    .highlight .node-shape { stroke: #ffffff; stroke-width: 3; }
+    .highlight .node-shape { stroke: #f8fafc; stroke-width: 3; }
     .trace .node-shape { stroke: #facc15; stroke-width: 3; }
     .selected .node-shape { stroke: #38bdf8; stroke-width: 4; }
-    .edge-highlight { stroke-width: 4; }
-    .edge-trace { stroke: #facc15 !important; stroke-width: 4; }
-    .notice { position: absolute; left: 14px; bottom: 14px; background: rgba(10,18,34,.86); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; color: var(--muted); font-size: 12px; max-width: 560px; }
-    @media (max-width: 1100px) { .app { grid-template-columns: 1fr; } .toolbar { grid-column: 1; } .sidebar { display: none; } }
+    .edge-highlight { stroke-width: 3.6; opacity: 1; }
+    .edge-trace { stroke: #facc15 !important; stroke-width: 4; opacity: 1; }
+    .notice { position: absolute; left: 14px; bottom: 14px; background: rgba(15,23,42,.92); border: 1px solid var(--line2); border-radius: 10px; padding: 8px 10px; color: var(--muted); font-size: 12px; max-width: min(560px, calc(100% - 28px)); line-height: 1.45; }
+    @media (max-width: 1100px) { .sidebar { display: none; } .toolbar { right: 14px; } .toolbar input { width: 180px; } }
   </style>
 </head>
 <body>
   <div class="app" data-runtime-visualizer-version="2">
-    <div class="toolbar" id="runtime-toolbar">
-      <h1>${escapeHtml(runtimeMap.project)} runtime graph</h1>
-      <input id="search-input" placeholder="Search id / label / type / sourcePath" />
-      <label>Layout <select id="layout-select"><option value="dagre">dagre</option><option value="force">force</option></select></label>
-      <label>Depth <input id="trace-depth" type="number" min="1" max="8" value="${options.traceDepth}" style="width:64px" /></label>
-      <button id="trace-upstream">Upstream</button>
-      <button id="trace-downstream">Downstream</button>
-      <button id="trace-both">Both</button>
-      <label class="check"><input id="hide-isolated" type="checkbox" ${options.hideIsolated ? 'checked' : ''}/> Hide isolated</label>
-      <button id="reset-view">Reset</button>
-      <button id="fit-view">Fit</button>
-    </div>
     <main class="graph-wrap">
+      <div class="toolbar" id="runtime-toolbar">
+        <h1>Runtime Graph</h1>
+        <input id="search-input" placeholder="Search id / label / type / sourcePath" />
+        <label class="check">Layout <select id="layout-select"><option value="dagre">dagre</option><option value="force">force</option></select></label>
+        <label class="check">Depth <input id="trace-depth" type="number" min="1" max="8" value="${options.traceDepth}" style="width:64px" /></label>
+        <button id="trace-upstream">Upstream</button>
+        <button id="trace-downstream">Downstream</button>
+        <button id="trace-both">Both</button>
+        <label class="check"><input id="hide-isolated" type="checkbox" ${options.hideIsolated ? 'checked' : ''}/> Hide isolated</label>
+        <button id="reset-view">Reset</button>
+        <button id="fit-view">Fit</button>
+      </div>
       <svg id="runtime-graph" class="graph" role="img" aria-label="Interactive runtime topology graph">
         <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#7aa2df"></path></marker></defs>
         <g id="viewport"><g id="edges-layer"></g><g id="edge-labels-layer"></g><g id="nodes-layer"></g></g>
       </svg>
-      <div class="notice" id="graph-notice">Interactive runtime topology v2. Drag canvas to pan, wheel to zoom, click nodes/edges to inspect, double-click a node to lock its 1-hop subgraph.</div>
+      <div class="notice" id="graph-notice">Runtime visualizer v2: drag to pan, scroll to zoom, click node/edge to inspect, double-click node to lock 1-hop subgraph.</div>
     </main>
     <aside class="sidebar">
       <div class="section">
-        <h2>Runtime Map</h2>
+        <div class="eyebrow">TriadMind Runtime Topology</div>
+        <h2>${escapeHtml(runtimeMap.project)}</h2>
+        <p class="desc">Leaf-style review panel for runtime flows. Use filters to narrow API -> Service -> Worker -> Resource chains.</p>
         <div class="summary">
           <span class="chip">view: ${escapeHtml(runtimeMap.view ?? 'full')}</span>
           <span class="chip">nodes: ${runtimeMap.nodes.length}</span>
@@ -136,12 +155,20 @@ function renderRuntimeDashboard(
         </div>
       </div>
       <div class="section">
+        <h3>Graph Status</h3>
+        <div class="status-row"><span class="status-dot status-selected"></span><span>Selected node / edge</span></div>
+        <div class="status-row"><span class="status-dot status-hop"></span><span>1-hop neighborhood highlight</span></div>
+        <div class="status-row"><span class="status-dot status-trace"></span><span>Trace path (upstream / downstream / both)</span></div>
+      </div>
+      <div class="section">
         <h3>Node Types</h3>
         <div id="node-type-filters" class="filters"></div>
+        <p class="legend-hint">Toggle node domains to match leaf-view style focus.</p>
       </div>
       <div class="section">
         <h3>Edge Types</h3>
         <div id="edge-type-filters" class="filters"></div>
+        <p class="legend-hint">Keep only key relation types for cleaner chain reading.</p>
       </div>
       <div class="section">
         <h3 id="detail-title">Select a node or edge</h3>
@@ -175,6 +202,8 @@ const normalized = normalizeRuntimeMap(runtimeMap);
 const index = buildIndex(normalized);
 const allNodeTypes = Array.from(new Set(normalized.nodes.map(node => node.type))).sort();
 const allEdgeTypes = Array.from(new Set(normalized.edges.map(edge => edge.type))).sort();
+const nodeTypeCounts = buildCountMap(normalized.nodes.map(node => node.type));
+const edgeTypeCounts = buildCountMap(normalized.edges.map(edge => edge.type));
 allNodeTypes.forEach(type => state.activeNodeTypes.add(type));
 allEdgeTypes.forEach(type => state.activeEdgeTypes.add(type));
 setupControls();
@@ -205,21 +234,40 @@ function setupControls() {
   document.getElementById('trace-both').addEventListener('click', () => runTrace('both'));
   document.getElementById('reset-view').addEventListener('click', () => { state.selectedNodeId = null; state.selectedEdgeId = null; state.focusNodeId = null; state.trace = null; state.layoutDirty = true; showWelcome(); render(); });
   document.getElementById('fit-view').addEventListener('click', fitView);
-  buildFilterControls('node-type-filters', allNodeTypes, state.activeNodeTypes);
-  buildFilterControls('edge-type-filters', allEdgeTypes, state.activeEdgeTypes);
+  buildFilterControls('node-type-filters', allNodeTypes, state.activeNodeTypes, type => NODE_COLORS[type] || '#64748b', nodeTypeCounts);
+  buildFilterControls('edge-type-filters', allEdgeTypes, state.activeEdgeTypes, type => EDGE_COLORS[type] || '#7aa2df', edgeTypeCounts);
   setupPanZoom();
 }
-function buildFilterControls(containerId, items, activeSet) {
+function buildFilterControls(containerId, items, activeSet, colorResolver, counts) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
   items.forEach(item => {
     const id = containerId + '-' + item;
     const label = document.createElement('label');
-    label.className = 'check';
-    label.innerHTML = '<input id="' + escAttr(id) + '" type="checkbox" checked /> <span>' + esc(item) + '</span>';
-    label.querySelector('input').addEventListener('change', event => { event.target.checked ? activeSet.add(item) : activeSet.delete(item); state.layoutDirty = true; render(); });
+    label.className = 'legend-item';
+    label.innerHTML = '<input id="' + escAttr(id) + '" type="checkbox" checked />' +
+      '<span class="legend-dot" style="background:' + escAttr(colorResolver(item)) + '"></span>' +
+      '<span class="legend-label">' + esc(item) + '</span>' +
+      '<span class="legend-count">' + String(counts.get(item) || 0) + '</span>';
+    const input = label.querySelector('input');
+    input.addEventListener('change', event => {
+      if (event.target.checked) {
+        activeSet.add(item);
+        label.classList.remove('dimmed');
+      } else {
+        activeSet.delete(item);
+        label.classList.add('dimmed');
+      }
+      state.layoutDirty = true;
+      render();
+    });
     container.appendChild(label);
   });
+}
+function buildCountMap(values) {
+  const map = new Map();
+  values.forEach(value => map.set(value, (map.get(value) || 0) + 1));
+  return map;
 }
 function currentDepth() { return Math.max(1, Math.min(8, Number(document.getElementById('trace-depth').value || dashboardOptions.traceDepth || 2))); }
 function runTrace(direction) {
@@ -309,13 +357,15 @@ function renderNode(node, highlighted) {
   g.setAttribute('class', 'runtime-node' + (isSelected ? ' selected' : '') + (isTrace ? ' trace' : '') + (isHighlight ? ' highlight' : '') + (highlighted.hasFocus && !isHighlight && !isTrace ? ' dim' : ''));
   g.setAttribute('transform', 'translate(' + pos.x + ',' + pos.y + ')');
   g.dataset.nodeId = node.id;
+  const nodeWidth = 160;
+  const nodeHeight = 52;
   const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   rect.setAttribute('class', 'node-shape');
-  rect.setAttribute('x', '-70'); rect.setAttribute('y', '-24'); rect.setAttribute('rx', '12'); rect.setAttribute('width', '140'); rect.setAttribute('height', '48');
+  rect.setAttribute('x', String(-nodeWidth / 2)); rect.setAttribute('y', String(-nodeHeight / 2)); rect.setAttribute('rx', '13'); rect.setAttribute('width', String(nodeWidth)); rect.setAttribute('height', String(nodeHeight));
   rect.setAttribute('fill', NODE_COLORS[node.type] || '#64748b');
   rect.setAttribute('stroke', '#1e293b');
   const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  label.setAttribute('class', 'node-label'); label.setAttribute('y', '-5'); label.textContent = truncate(node.label || node.id, 24);
+  label.setAttribute('class', 'node-label'); label.setAttribute('y', '-6'); label.textContent = truncate(node.label || node.id, 28);
   const sub = document.createElementNS('http://www.w3.org/2000/svg', 'text');
   sub.setAttribute('class', 'node-sub'); sub.setAttribute('y', '12'); sub.textContent = node.type;
   g.append(rect, label, sub);
@@ -346,7 +396,7 @@ function renderEdge(edge, highlighted) {
 }
 function edgePoints(from, to) {
   const dx = to.x - from.x; const dy = to.y - from.y; const len = Math.max(1, Math.sqrt(dx*dx + dy*dy));
-  const ox = dx / len * 72; const oy = dy / len * 28;
+  const ox = dx / len * 82; const oy = dy / len * 30;
   return { x1: from.x + ox, y1: from.y + oy, x2: to.x - ox, y2: to.y - oy };
 }
 function selectNode(nodeId) {
@@ -365,7 +415,7 @@ function showNodeDetail(node) {
 }
 function showEdgeDetail(edge) {
   if (!edge) return;
-  detailTitle.textContent = edge.type + ': ' + edge.from + ' → ' + edge.to;
+  detailTitle.textContent = edge.type + ': ' + edge.from + ' -> ' + edge.to;
   detailBody.innerHTML = kv({ id: edge.id, from: edge.from, to: edge.to, type: edge.type, confidence: edge.confidence ?? '-', label: edge.label || '-' }) + '<h3>Evidence</h3>' + renderEvidence(edge.evidence || []) + '<h3>Metadata</h3><pre>' + esc(JSON.stringify(edge.metadata || {}, null, 2)) + '</pre>';
 }
 function renderEvidence(evidence) {
@@ -442,7 +492,7 @@ function fitView() {
   const k = Math.max(0.15, Math.min(1.5, Math.min(rect.width / Math.max(1, maxX-minX), rect.height / Math.max(1, maxY-minY))));
   state.transform.k = k; state.transform.x = (rect.width - (minX + maxX) * k) / 2; state.transform.y = (rect.height - (minY + maxY) * k) / 2; applyTransform();
 }
-function truncate(value, max) { value = String(value || ''); return value.length > max ? value.slice(0, max - 1) + '…' : value; }
+function truncate(value, max) { value = String(value || ''); return value.length > max ? value.slice(0, max - 3) + '...' : value; }
 function esc(value) { return String(value ?? '').replace(/[&<>"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[char])); }
 function escAttr(value) { return esc(value).replace(/'/g, '&#39;'); }
 `;
