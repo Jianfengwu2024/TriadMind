@@ -1,0 +1,139 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { generateRuntimeDashboard } from '../runtime/runtimeVisualizer';
+
+function writeRuntimeFixture(root: string) {
+    const triadDir = path.join(root, '.triadmind');
+    fs.mkdirSync(triadDir, { recursive: true });
+    const runtimeMapPath = path.join(triadDir, 'runtime-map.json');
+    fs.writeFileSync(
+        runtimeMapPath,
+        JSON.stringify(
+            {
+                schemaVersion: '1.0',
+                project: 'runtime-v2-test',
+                generatedAt: new Date().toISOString(),
+                view: 'full',
+                nodes: [
+                    {
+                        id: 'FrontendEntry.frontend/src/pages/items.tsx',
+                        type: 'FrontendEntry',
+                        label: 'items page',
+                        sourcePath: 'frontend/src/pages/items.tsx'
+                    },
+                    {
+                        id: 'ApiRoute.POST./items/{id}/run',
+                        type: 'ApiRoute',
+                        label: 'POST /items/{id}/run',
+                        sourcePath: 'backend/api/items.py'
+                    },
+                    {
+                        id: 'Service.ItemService.run',
+                        type: 'Service',
+                        label: 'ItemService.run',
+                        sourcePath: 'backend/services/item_service.py'
+                    }
+                ],
+                edges: [
+                    {
+                        from: 'FrontendEntry.frontend/src/pages/items.tsx',
+                        to: 'ApiRoute.POST./items/{id}/run',
+                        type: 'calls',
+                        confidence: 0.6,
+                        evidence: [{ sourcePath: 'frontend/src/pages/items.tsx', line: 3, kind: 'call', text: 'fetch(...)' }]
+                    },
+                    {
+                        from: 'ApiRoute.POST./items/{id}/run',
+                        to: 'Service.ItemService.run',
+                        type: 'invokes',
+                        confidence: 0.9,
+                        evidence: [{ sourcePath: 'backend/api/items.py', line: 5, kind: 'call', text: 'service.run_item(id)' }]
+                    }
+                ]
+            },
+            null,
+            2
+        ),
+        'utf-8'
+    );
+    return {
+        triadDir,
+        runtimeMapPath,
+        runtimeVisualizerPath: path.join(triadDir, 'runtime-visualizer.html')
+    };
+}
+
+test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-runtime-v2-'));
+    const fixture = writeRuntimeFixture(root);
+
+    generateRuntimeDashboard(fixture.runtimeMapPath, fixture.runtimeVisualizerPath, {
+        layout: 'force',
+        traceDepth: 3,
+        hideIsolated: true,
+        interactive: true
+    });
+
+    const html = fs.readFileSync(fixture.runtimeVisualizerPath, 'utf-8');
+    assert.match(html, /data-runtime-visualizer-version="2"/);
+    assert.match(html, /id="runtime-toolbar"/);
+    assert.match(html, /id="runtime-graph"/);
+    assert.match(html, /trace-upstream/);
+    assert.match(html, /const runtimeMap = /);
+    assert.match(html, /layout":"force"/);
+    assert.match(html, /"traceDepth":3/);
+    assert.match(html, /"hideIsolated":true/);
+});
+
+test('cli runtime --visualize smoke test writes interactive visualizer html', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-runtime-cli-'));
+    fs.mkdirSync(path.join(root, 'backend'), { recursive: true });
+    fs.writeFileSync(
+        path.join(root, 'backend', 'app.py'),
+        `
+from fastapi import APIRouter
+router = APIRouter()
+
+@router.post("/items/{id}/run")
+async def run_item(id: str):
+    service.run_item(id)
+`,
+        'utf-8'
+    );
+
+    const repoRoot = path.resolve(__dirname, '..');
+    const cliPath = path.join(repoRoot, 'cli.ts');
+    const tsxLoader = pathToFileURL(require.resolve('tsx')).href;
+    const result = spawnSync(
+        process.execPath,
+        [
+            '--import',
+            tsxLoader,
+            cliPath,
+            'runtime',
+            '--visualize',
+            '--layout',
+            'dagre',
+            '--trace-depth',
+            '2',
+            '--hide-isolated'
+        ],
+        {
+            cwd: root,
+            encoding: 'utf-8'
+        }
+    );
+
+    assert.equal(result.status, 0, `runtime cli failed: ${result.stderr || result.stdout}`);
+    const outputPath = path.join(root, '.triadmind', 'runtime-visualizer.html');
+    assert.equal(fs.existsSync(outputPath), true);
+    const html = fs.readFileSync(outputPath, 'utf-8');
+    assert.match(html, /data-runtime-visualizer-version="2"/);
+    assert.match(html, /id="runtime-toolbar"/);
+    assert.match(html, /id="runtime-graph"/);
+});

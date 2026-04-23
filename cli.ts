@@ -222,12 +222,20 @@ program
     .option('--include-frontend', 'Enable frontend API call extraction')
     .option('--include-infra', 'Enable docker/env/deployment extraction')
     .option('--framework <name>', 'Hint framework extractor, e.g. fastapi, express, celery')
+    .option('--interactive', 'Generate interactive runtime topology visualizer', true)
+    .option('--layout <force|dagre>', 'Runtime visualizer layout', 'dagre')
+    .option('--trace-depth <n>', 'Default runtime trace depth', '2')
+    .option('--hide-isolated', 'Hide isolated runtime nodes in the visualizer')
     .action(async (options: {
         visualize?: boolean;
         view?: string;
         includeFrontend?: boolean;
         includeInfra?: boolean;
         framework?: string;
+        interactive?: boolean;
+        layout?: string;
+        traceDepth?: string;
+        hideIsolated?: boolean;
     }) => {
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
@@ -250,7 +258,12 @@ program
         console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
 
         if (options.visualize) {
-            generateRuntimeDashboard(paths.runtimeMapFile, paths.runtimeVisualizerFile);
+            generateRuntimeDashboard(paths.runtimeMapFile, paths.runtimeVisualizerFile, {
+                interactive: options.interactive !== false,
+                layout: options.layout === 'force' ? 'force' : 'dagre',
+                traceDepth: normalizePositiveCliInteger(options.traceDepth, 2),
+                hideIsolated: Boolean(options.hideIsolated)
+            });
             console.log(chalk.green(`✅ Runtime visualizer written: ${paths.runtimeVisualizerFile}`));
         }
     });
@@ -805,6 +818,14 @@ function normalizeScanModeOption(value?: string): TriadScanMode | undefined {
         return value;
     }
     return undefined;
+}
+
+function normalizePositiveCliInteger(value: string | undefined, fallback: number) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+    }
+    return fallback;
 }
 
 function sniffProjectLanguage(projectRoot: string): TriadLanguage {
