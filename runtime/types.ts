@@ -89,6 +89,7 @@ export interface RuntimeDiagnostic {
     message: string;
     sourcePath?: string;
     extractor?: string;
+    code?: string;
 }
 
 export interface RuntimeMap {
@@ -156,5 +157,7 @@ export interface RuntimeConfig {
     frameworkHints: string[];
     excludePathPatterns: string[];
     maxSourceFileBytes: number;
+    maxScannedFiles: number;
+    failOnExtractorError: boolean;
     minConfidence: number;
 }

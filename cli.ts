@@ -62,12 +62,11 @@ program
         console.log(chalk.cyan('🧭 [TriadMind] 正在初始化工作区...'));
         ensureTriadSpec(paths);
         syncProjectTopology(paths, true);
-        await writeRuntimeTopologyArtifacts(paths, {});
+        const runtimeResult = await writeRuntimeTopologyArtifacts(paths, {}, true);
         assertNoTopologicalDegradation(paths, previousMap, 'init');
         installAlwaysOnRules(paths);
         writeMasterPrompt(paths);
-        console.log(chalk.green(`Runtime map written: ${paths.runtimeMapFile}`));
-        console.log(chalk.green(`Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
+        reportRuntimeArtifactStatus(paths, runtimeResult);
 
         console.log(chalk.green(`✅ triad-map 已同步到 ${paths.mapFile}`));
         console.log(chalk.green(`✅ triad.md 已写入 ${paths.triadSpecFile}`));
@@ -200,7 +199,8 @@ program
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
         syncProjectTopology(paths, Boolean(options.force), normalizeScanModeOption(options.scanMode));
-        await writeRuntimeTopologyArtifacts(paths, {});
+        const runtimeResult = await writeRuntimeTopologyArtifacts(paths, {}, true);
+        reportRuntimeArtifactStatus(paths, runtimeResult);
         console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
         console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
     });
@@ -720,11 +720,64 @@ async function writeRuntimeTopologyArtifacts(
         includeFrontend?: boolean;
         includeInfra?: boolean;
         frameworkHint?: string;
+    },
+    bestEffort = true
+) {
+    try {
+        const runtimeMap = await extractRuntimeTopology(paths.projectRoot, options);
+        writeRuntimeMapArtifacts(runtimeMap, paths.runtimeMapFile, paths.runtimeDiagnosticsFile);
+        return { runtimeMap, recovered: false };
+    } catch (error: any) {
+        if (!bestEffort) {
+            throw error;
+        }
+
+        const runtimeMap = {
+            schemaVersion: '1.0' as const,
+            project: path.basename(paths.projectRoot),
+            generatedAt: new Date().toISOString(),
+            view: options.view,
+            nodes: [],
+            edges: [],
+            diagnostics: [
+                {
+                    level: 'error' as const,
+                    code: 'RUNTIME_BEST_EFFORT_FAILURE',
+                    extractor: 'RuntimeOrchestrator',
+                    message: error?.message ? String(error.message) : String(error)
+                }
+            ]
+        };
+        writeRuntimeMapArtifacts(runtimeMap, paths.runtimeMapFile, paths.runtimeDiagnosticsFile);
+        return { runtimeMap, recovered: true };
+    }
+}
+
+function reportRuntimeArtifactStatus(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    result: {
+        runtimeMap: {
+            diagnostics?: Array<{ code?: string; level: 'info' | 'warning' | 'error'; message: string }>;
+        };
+        recovered: boolean;
     }
 ) {
-    const runtimeMap = await extractRuntimeTopology(paths.projectRoot, options);
-    writeRuntimeMapArtifacts(runtimeMap, paths.runtimeMapFile, paths.runtimeDiagnosticsFile);
-    return runtimeMap;
+    const diagnostics = result.runtimeMap.diagnostics ?? [];
+    const permissionSkips = diagnostics.filter((diagnostic) => diagnostic.code === 'RUNTIME_PERMISSION_SKIPPED').length;
+    const extractorErrors = diagnostics.filter((diagnostic) => diagnostic.code === 'RUNTIME_EXTRACTOR_FAILED').length;
+
+    if (permissionSkips > 0) {
+        console.log(chalk.yellow(`[TriadMind] runtime extraction skipped ${permissionSkips} paths due to permission restrictions`));
+    }
+    if (extractorErrors > 0) {
+        console.log(chalk.yellow(`[TriadMind] runtime extraction recorded ${extractorErrors} extractor error diagnostics`));
+    }
+    if (result.recovered) {
+        console.log(chalk.yellow('[TriadMind] runtime extraction degraded to diagnostics-only mode'));
+    }
+
+    console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
+    console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
 }
 
 function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {

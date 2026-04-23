@@ -1,15 +1,12 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { loadTriadConfig } from '../config';
-import { getWorkspacePaths, normalizePath } from '../workspace';
+import { getWorkspacePaths } from '../workspace';
 import { filterRuntimeMapByView } from './filterRuntimeMapByView';
 import {
     RuntimeDiagnostic,
     RuntimeExtractContext,
     RuntimeExtractOptions,
     RuntimeMap,
-    RuntimeSourceFile,
-    RuntimeSourceLanguage,
     RuntimeTopologyExtractor
 } from './types';
 import { mergeRuntimeEdges, mergeRuntimeNodes } from './runtimeUtils';
@@ -19,6 +16,7 @@ import { taskQueueExtractor } from './extractors/taskQueueExtractor';
 import { workflowRegistryExtractor } from './extractors/workflowRegistryExtractor';
 import { resourceAccessExtractor } from './extractors/resourceAccessExtractor';
 import { configInfraExtractor } from './extractors/configInfraExtractor';
+import { collectRuntimeSourceFiles } from './collectRuntimeSourceFiles';
 
 export async function extractRuntimeTopology(
     projectRoot: string,
@@ -40,12 +38,13 @@ export async function extractRuntimeTopology(
         includeFrontend,
         includeInfra,
         frameworkHint,
-        files: collectRuntimeSourceFiles(resolvedProjectRoot, config.runtime.excludePathPatterns, config.runtime.maxSourceFileBytes, diagnostics)
+        files: collectRuntimeSourceFiles(resolvedProjectRoot, config, diagnostics)
     };
 
     const extractors = options.extractors ?? getBuiltInRuntimeExtractors();
     const nodes = [];
     const edges = [];
+    let detectedExtractorCount = 0;
 
     for (const extractor of extractors) {
         try {
@@ -53,18 +52,33 @@ export async function extractRuntimeTopology(
             if (!detected) {
                 continue;
             }
+            detectedExtractorCount += 1;
 
             const patch = await extractor.extract(context);
             nodes.push(...(patch.nodes ?? []));
             edges.push(...(patch.edges ?? []));
             diagnostics.push(...(patch.diagnostics ?? []));
         } catch (error: any) {
-            diagnostics.push({
+            const diagnostic: RuntimeDiagnostic = {
                 level: 'error',
+                code: 'RUNTIME_EXTRACTOR_FAILED',
                 extractor: extractor.name,
                 message: error?.message ? String(error.message) : String(error)
-            });
+            };
+            diagnostics.push(diagnostic);
+            if (config.runtime.failOnExtractorError) {
+                throw new Error(`${extractor.name}: ${diagnostic.message}`);
+            }
         }
+    }
+
+    if (frameworkHint && detectedExtractorCount === 0) {
+        diagnostics.push({
+            level: 'info',
+            code: 'RUNTIME_FRAMEWORK_HINT_UNUSED',
+            extractor: 'RuntimeOrchestrator',
+            message: `Framework hint "${frameworkHint}" did not activate any runtime extractor`
+        });
     }
 
     const fullMap: RuntimeMap = {
@@ -89,140 +103,4 @@ export function getBuiltInRuntimeExtractors(): RuntimeTopologyExtractor[] {
         resourceAccessExtractor,
         configInfraExtractor
     ];
-}
-
-function collectRuntimeSourceFiles(
-    projectRoot: string,
-    excludePathPatterns: string[],
-    maxSourceFileBytes: number,
-    diagnostics: RuntimeDiagnostic[]
-) {
-    const files: RuntimeSourceFile[] = [];
-    walk(projectRoot, (absolutePath) => {
-        const relativePath = normalizePath(path.relative(projectRoot, absolutePath));
-        if (shouldSkipRuntimePath(relativePath, excludePathPatterns)) {
-            return;
-        }
-
-        const language = detectRuntimeLanguage(absolutePath);
-        if (language === 'unknown' && !isRuntimeUnknownConfigFile(relativePath)) {
-            return;
-        }
-
-        let stat: fs.Stats;
-        try {
-            stat = fs.statSync(absolutePath);
-        } catch (error: any) {
-            diagnostics.push({
-                level: 'warning',
-                message: `Could not stat source file: ${error?.message ?? String(error)}`,
-                sourcePath: relativePath,
-                extractor: 'RuntimeSourceCollector'
-            });
-            return;
-        }
-
-        if (stat.size > maxSourceFileBytes) {
-            diagnostics.push({
-                level: 'info',
-                message: `Skipped source file above runtime.maxSourceFileBytes (${stat.size} bytes)`,
-                sourcePath: relativePath,
-                extractor: 'RuntimeSourceCollector'
-            });
-            return;
-        }
-
-        try {
-            const content = fs.readFileSync(absolutePath, 'utf-8').replace(/^\uFEFF/, '');
-            if (content.includes('\0')) {
-                return;
-            }
-            files.push({
-                absolutePath,
-                relativePath,
-                language,
-                content
-            });
-        } catch (error: any) {
-            diagnostics.push({
-                level: 'warning',
-                message: `Could not read source file: ${error?.message ?? String(error)}`,
-                sourcePath: relativePath,
-                extractor: 'RuntimeSourceCollector'
-            });
-        }
-    });
-
-    return files;
-}
-
-function walk(currentPath: string, visit: (filePath: string) => void) {
-    if (!fs.existsSync(currentPath)) {
-        return;
-    }
-
-    const stat = fs.statSync(currentPath);
-    if (stat.isFile()) {
-        visit(currentPath);
-        return;
-    }
-
-    for (const entry of fs.readdirSync(currentPath)) {
-        walk(path.join(currentPath, entry), visit);
-    }
-}
-
-function detectRuntimeLanguage(filePath: string): RuntimeSourceLanguage {
-    const basename = path.basename(filePath).toLowerCase();
-    const extension = path.extname(filePath).toLowerCase();
-
-    if (basename === 'dockerfile' || basename.endsWith('.dockerfile')) {
-        return 'dockerfile';
-    }
-    if (extension === '.py') {
-        return 'python';
-    }
-    if (extension === '.ts' || extension === '.tsx' || extension === '.mts' || extension === '.cts') {
-        return 'typescript';
-    }
-    if (extension === '.js' || extension === '.jsx' || extension === '.mjs' || extension === '.cjs') {
-        return 'javascript';
-    }
-    if (extension === '.json') {
-        return 'json';
-    }
-    if (extension === '.yaml' || extension === '.yml') {
-        return 'yaml';
-    }
-    if (extension === '.toml') {
-        return 'toml';
-    }
-
-    return 'unknown';
-}
-
-function isRuntimeUnknownConfigFile(relativePath: string) {
-    const basename = relativePath.split('/').pop()?.toLowerCase() ?? '';
-    return /^\.env(\..+)?$/.test(basename);
-}
-
-function shouldSkipRuntimePath(relativePath: string, excludePathPatterns: string[]) {
-    const normalizedPath = normalizePath(relativePath).toLowerCase();
-    const segments = normalizedPath.split('/').filter(Boolean);
-    const basename = segments[segments.length - 1] ?? normalizedPath;
-
-    if (basename === '.git') {
-        return true;
-    }
-
-    return excludePathPatterns.some((pattern) => {
-        const normalizedPattern = normalizePath(pattern).replace(/^\.?\//, '').toLowerCase();
-        return (
-            normalizedPath === normalizedPattern ||
-            normalizedPath.startsWith(`${normalizedPattern}/`) ||
-            normalizedPath.endsWith(`/${normalizedPattern}`) ||
-            normalizedPath.includes(`/${normalizedPattern}/`) ||
-            segments.includes(normalizedPattern)
-        );
-    });
 }

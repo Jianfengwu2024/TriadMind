@@ -315,6 +315,8 @@ TypeScript 会保留显式业务类型，例如 `GeoTarget`、`GeoResult`；Java
 - `@triadmind runtime --view workflow`：聚焦 workflow / worker / queue 协作。
 - `@triadmind runtime --view resources`：聚焦 DB / Redis / ObjectStore / tool 依赖。
 - `@triadmind runtime --include-frontend --include-infra`：启用前端 API 调用与基础设施提取。
+- `@triadmind sync` / `@triadmind init`：runtime 提取默认走 best-effort，权限目录和超大文件会写入 `runtime-diagnostics.json`，不会拖垮主流程。
+- capability `visualizer.html`：默认使用 fast fallback；只有显式 strict 模式才会走重指纹路径。
 - `visualizer.html` 页面左上角现在自带 `Architecture / Leaf` 按钮，可随时切换。
 
 ### problem 语义命名

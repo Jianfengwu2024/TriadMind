@@ -140,7 +140,7 @@
     "fastMayaThreshold": 0,
     "fastFingerprintThreshold": 0,
     "maxFingerprintNodes": 8,
-    "maxFingerprintOwners": 100,
+    "maxFingerprintOwners": 50,
     "fingerprintTimeoutMs": 50,
     "maxRenderNodes": 400,
     "showFoldedLeaves": false
@@ -157,15 +157,22 @@
     "frameworkHints": [],
     "excludePathPatterns": [
       "node_modules",
+      ".git",
       ".triadmind",
       "venv",
       ".venv",
       "__pycache__",
+      ".pytest_cache",
       ".next",
       "dist",
       "build",
       "tests",
-      "test"
+      "test",
+      "logs",
+      "uploads",
+      "fastgpt_data",
+      ".run_state",
+      "tmp"
     ],
     "maxSourceFileBytes": 500000,
     "minConfidence": 0.4

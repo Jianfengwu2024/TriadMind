@@ -178,7 +178,7 @@ const DEFAULT_CONFIG: TriadConfig = {
         fastMayaThreshold: 0,
         fastFingerprintThreshold: 0,
         maxFingerprintNodes: 8,
-        maxFingerprintOwners: 100,
+        maxFingerprintOwners: 50,
         fingerprintTimeoutMs: 50,
         maxRenderNodes: 400,
         showFoldedLeaves: false
@@ -193,8 +193,28 @@ const DEFAULT_CONFIG: TriadConfig = {
         includeFrontend: true,
         includeInfra: true,
         frameworkHints: [],
-        excludePathPatterns: ['node_modules', '.triadmind', 'venv', '.venv', '__pycache__', '.next', 'dist', 'build', 'tests', 'test'],
+        excludePathPatterns: [
+            'node_modules',
+            '.git',
+            '.triadmind',
+            'venv',
+            '.venv',
+            '__pycache__',
+            '.pytest_cache',
+            '.next',
+            'dist',
+            'build',
+            'tests',
+            'test',
+            'logs',
+            'uploads',
+            'fastgpt_data',
+            '.run_state',
+            'tmp'
+        ],
         maxSourceFileBytes: 500000,
+        maxScannedFiles: 5000,
+        failOnExtractorError: false,
         minConfidence: 0.4
     },
     runtimeHealing: {
@@ -249,6 +269,8 @@ const HARD_EXCLUDE_SEGMENTS = new Set([
     'logs',
     'uploads',
     'fastgpt_data',
+    '.run_state',
+    'tmp',
     'dist',
     'build',
     'target'
@@ -332,6 +354,20 @@ export function createSourcePathFilter(projectRoot: string, config: TriadConfig)
             (pattern) => normalizedPath === pattern || normalizedPath.startsWith(`${pattern}/`)
         );
     };
+}
+
+export function shouldIncludeRuntimePath(sourcePath: string, config: TriadConfig) {
+    const normalizedPath = normalizePath(sourcePath).toLowerCase();
+    if (isHardExcludedSourcePath(normalizedPath) || isHardExcludedSourceFile(normalizedPath)) {
+        return false;
+    }
+
+    const configuredPatterns = [
+        ...(config.parser.excludePatterns ?? []),
+        ...(config.parser.excludePathPatterns ?? []),
+        ...(config.runtime.excludePathPatterns ?? [])
+    ];
+    return !configuredPatterns.some((pattern) => matchesSourcePathPattern(normalizedPath, pattern));
 }
 
 export function describeSourceScanScope(projectRoot: string, config: TriadConfig) {
@@ -462,6 +498,11 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
                 value.runtime?.maxSourceFileBytes,
                 DEFAULT_CONFIG.runtime.maxSourceFileBytes
             ),
+            maxScannedFiles: normalizePositiveInteger(
+                value.runtime?.maxScannedFiles,
+                DEFAULT_CONFIG.runtime.maxScannedFiles
+            ),
+            failOnExtractorError: value.runtime?.failOnExtractorError ?? DEFAULT_CONFIG.runtime.failOnExtractorError,
             minConfidence: normalizeConfidence(value.runtime?.minConfidence, DEFAULT_CONFIG.runtime.minConfidence)
         },
         runtimeHealing: {

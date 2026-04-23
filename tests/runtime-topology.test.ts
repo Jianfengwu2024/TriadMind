@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as nodeFs from 'node:fs';
 import { extractRuntimeTopology } from '../runtime/extractRuntimeTopology';
 import { RuntimeTopologyExtractor } from '../runtime/types';
 
@@ -149,4 +150,45 @@ def ok():
     const runtimeMap = await extractRuntimeTopology(root, { extractors: [brokenExtractor] });
     assert.equal(runtimeMap.schemaVersion, '1.0');
     assert.ok(runtimeMap.diagnostics?.some((diagnostic) => diagnostic.extractor === 'BrokenExtractor' && diagnostic.level === 'error'));
+});
+
+test('runtime source collection tolerates recoverable fs permission errors', async () => {
+    const root = writeFixture({
+        'backend/app.py': `
+def ok():
+    return 1
+`,
+        'backend/locked/secret.py': `
+def hidden():
+    return 2
+`
+    });
+
+    const originalStatSync = nodeFs.statSync;
+    const originalReaddirSync = nodeFs.readdirSync;
+    const classicFs = require('fs') as typeof nodeFs;
+    const originalClassicReaddirSync = classicFs.readdirSync;
+
+    const mockedReaddirSync = ((targetPath: any, options?: any) => {
+        const normalized = String(targetPath).replace(/\\/g, '/');
+        if (normalized.includes('/backend/locked')) {
+            const error = new Error('permission denied') as NodeJS.ErrnoException;
+            error.code = 'EACCES';
+            throw error;
+        }
+        return originalReaddirSync(targetPath as any, options);
+    }) as typeof nodeFs.readdirSync;
+
+    nodeFs.readdirSync = mockedReaddirSync;
+    classicFs.readdirSync = mockedReaddirSync;
+
+    try {
+        const runtimeMap = await extractRuntimeTopology(root);
+        assert.equal(runtimeMap.schemaVersion, '1.0');
+        assert.ok(runtimeMap.diagnostics?.some((diagnostic) => diagnostic.code === 'RUNTIME_PERMISSION_SKIPPED'));
+    } finally {
+        nodeFs.statSync = originalStatSync;
+        nodeFs.readdirSync = originalReaddirSync;
+        classicFs.readdirSync = originalClassicReaddirSync;
+    }
 });

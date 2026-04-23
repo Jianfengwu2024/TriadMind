@@ -13,6 +13,9 @@ export function generateRuntimeDashboard(runtimeMapPath: string, outputPath: str
 
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, html, 'utf-8');
+    console.log(
+        `[TriadMind] Runtime visualizer mode: lightweight flow fallback view=${runtimeMap.view ?? 'full'} nodes=${runtimeMap.nodes.length} edges=${runtimeMap.edges.length} diagnostics=${(runtimeMap.diagnostics ?? []).length}`
+    );
     console.log(`[TriadMind] Runtime dashboard generated in ${Date.now() - startedAt}ms`);
 }
 

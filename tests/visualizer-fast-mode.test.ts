@@ -26,7 +26,7 @@ test('visualizer fast mode skips per-owner strict fingerprints without blocking 
                     fastMayaThreshold: 0,
                     fastFingerprintThreshold: 0,
                     maxFingerprintNodes: 8,
-                    maxFingerprintOwners: 100,
+                    maxFingerprintOwners: 50,
                     fingerprintTimeoutMs: 50
                 }
             },
@@ -79,6 +79,7 @@ test('visualizer fast mode skips per-owner strict fingerprints without blocking 
     const html = fs.readFileSync(outputPath, 'utf-8');
     assert.match(html, /maya: fast fallback enabled/);
     assert.match(html, /Fingerprint skipped in fast mode/);
+    assert.ok(logs.some((line) => line.includes('Visualizer mode: view=architecture')));
     assert.ok(logs.some((line) => line.includes('Strict fingerprint skipped: fallback mode enabled')));
     assert.ok(logs.some((line) => line.includes('Fingerprint owners skipped: 3')));
     assert.ok(logs.some((line) => line.includes('Dashboard generated in')));

@@ -145,6 +145,9 @@ export function generateDashboard(mapPath: string, protocolPath: string, outputP
     const previewMap = buildPreviewTopology(originalMap, protocol);
     const mayaData = buildMayaPanelData(previewMap, protocol, renormalizeProtocol, options);
     fs.writeFileSync(outputPath, buildHtml(graph, protocol, mayaData, renormalizeProtocol), 'utf-8');
+    console.log(
+        `[TriadMind] Visualizer mode: view=${options.defaultView} strictFingerprint=${options.strictFingerprint} fastFallback=${mayaData.strictFingerprintSkipped} nodes=${graph.stats.nodes} edges=${graph.stats.edges}`
+    );
     if (mayaData.strictFingerprintSkipped) {
         console.log('[TriadMind] Strict fingerprint skipped: fallback mode enabled');
     }
@@ -677,11 +680,13 @@ function buildMayaPanelData(
     const byOwner: Record<string, MayaFingerprint> = {};
     const focusOwnerIds = collectHighlightedOwnerIds(protocol, renormalizeProtocol);
     const allOwnerIds =
-        options.fastMode
+        options.fastMode || !options.strictFingerprint
             ? Array.from(focusOwnerIds).filter((nodeId) => nodeMap.has(nodeId))
             : previewMap.map((node) => node.nodeId);
     const ownerIds = allOwnerIds.slice(0, options.maxFingerprintOwners);
-    const skippedOwnerCount = Math.max(0, allOwnerIds.length - ownerIds.length) + (options.fastMode ? previewMap.length - allOwnerIds.length : 0);
+    const skippedOwnerCount =
+        Math.max(0, allOwnerIds.length - ownerIds.length) +
+        (options.fastMode || !options.strictFingerprint ? previewMap.length - allOwnerIds.length : 0);
     const fingerprintCache = new Map<string, MayaFingerprint>();
 
     ownerIds.forEach((ownerId) => {
@@ -933,6 +938,9 @@ function buildVisualizerOptions(
     dashboardOptions: DashboardOptions
 ): VisualizerOptions {
     const previewNodeCount = originalMap.length + protocol.actions.filter((action) => action.op === 'create_child').length;
+    const strictFingerprint = dashboardOptions.strictFingerprint === true;
+    const fastMode =
+        dashboardOptions.fastMode ?? (!strictFingerprint || config.visualizer.fastMode || previewNodeCount > config.visualizer.maxRenderNodes);
     return {
         analyzer: {
             ignoreGenericContracts: config.parser.ignoreGenericContracts,
@@ -945,13 +953,13 @@ function buildVisualizerOptions(
             ? Number.MAX_SAFE_INTEGER
             : config.visualizer.maxPrimaryEdges || config.visualizer.maxContractEdges,
         fastMayaThreshold: config.visualizer.fastFingerprintThreshold ?? config.visualizer.fastMayaThreshold,
-        strictFingerprint: dashboardOptions.strictFingerprint ?? config.visualizer.strictFingerprint,
+        strictFingerprint,
         maxFingerprintNodes: config.visualizer.maxFingerprintNodes,
         maxFingerprintOwners: config.visualizer.maxFingerprintOwners,
         fingerprintTimeoutMs: config.visualizer.fingerprintTimeoutMs,
         maxRenderNodes: config.visualizer.maxRenderNodes,
         compressExistingBranches: previewNodeCount > config.visualizer.maxRenderNodes,
-        fastMode: dashboardOptions.fastMode ?? (config.visualizer.fastMode || previewNodeCount > config.visualizer.maxRenderNodes)
+        fastMode
     };
 }
 

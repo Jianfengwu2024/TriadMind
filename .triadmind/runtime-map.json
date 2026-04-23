@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "project": "triadmind-core",
-  "generatedAt": "2026-04-23T03:42:08.445Z",
+  "generatedAt": "2026-04-23T06:36:47.734Z",
   "view": "full",
   "nodes": [
     {
@@ -163,7 +163,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1176,
+          "line": 1229,
           "column": 19,
           "kind": "import",
           "text": "spawn(",
@@ -288,7 +288,7 @@
       "evidence": [
         {
           "sourcePath": "visualizer.ts",
-          "line": 627,
+          "line": 630,
           "column": 556,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -323,7 +323,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1170,
+          "line": 1223,
           "column": 7,
           "kind": "inferred",
           "text": "function openFile(",
@@ -358,7 +358,7 @@
       "evidence": [
         {
           "sourcePath": "visualizer.ts",
-          "line": 627,
+          "line": 630,
           "column": 556,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -525,7 +525,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1176,
+          "line": 1229,
           "column": 19,
           "kind": "call",
           "text": "spawn(",
@@ -620,7 +620,7 @@
       "evidence": [
         {
           "sourcePath": "visualizer.ts",
-          "line": 627,
+          "line": 630,
           "column": 556,
           "kind": "call",
           "text": "classList.add('dimmed'",

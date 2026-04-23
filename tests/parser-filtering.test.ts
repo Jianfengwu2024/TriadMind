@@ -114,7 +114,7 @@ function createTestConfig(): TriadConfig {
             fastMayaThreshold: 0,
             fastFingerprintThreshold: 0,
             maxFingerprintNodes: 8,
-            maxFingerprintOwners: 100,
+            maxFingerprintOwners: 50,
             fingerprintTimeoutMs: 50,
             maxRenderNodes: 400
         },
@@ -130,6 +130,8 @@ function createTestConfig(): TriadConfig {
             frameworkHints: [],
             excludePathPatterns: ['node_modules', '.triadmind', 'venv', '.venv', '__pycache__', '.next', 'dist', 'build', 'tests', 'test'],
             maxSourceFileBytes: 500000,
+            maxScannedFiles: 5000,
+            failOnExtractorError: false,
             minConfidence: 0.4
         },
         runtimeHealing: {

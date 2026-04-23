@@ -315,6 +315,25 @@
     }
   },
   {
+    "nodeId": "Config.shouldIncludeRuntimePath",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Config should include runtime path string",
+      "demand": [
+        "[Generic] string (sourcePath)",
+        "TriadConfig (config)",
+        "[Ghost:Read] isHardExcludedSourceFile (isHardExcludedSourceFile)",
+        "[Ghost:Read] isHardExcludedSourcePath (isHardExcludedSourcePath)",
+        "[Ghost:Read] matchesSourcePathPattern (matchesSourcePathPattern)",
+        "[Ghost:Read] normalizePath (normalizePath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
     "nodeId": "Config.shouldSkipWalkPath",
     "category": "core",
     "sourcePath": "config.ts",
@@ -894,6 +913,64 @@
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] listSnapshots (listSnapshots)",
         "[Ghost:Read] module (path)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "SourceWalker.safeWalkProject",
+    "category": "core",
+    "sourcePath": "sourceWalker.ts",
+    "fission": {
+      "problem": "System Capability: Provide Source walker safe walk project",
+      "demand": [
+        "SafeWalkProjectOptions (options)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] isIgnorableFsError (isIgnorableFsError)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] shouldSkipDirectory (shouldSkipDirectory)",
+        "[Ghost:Read] shouldSkipFile (shouldSkipFile)"
+      ],
+      "answer": [
+        "SafeWalkSummary"
+      ]
+    }
+  },
+  {
+    "nodeId": "SourceWalker.shouldSkipDirectory",
+    "category": "core",
+    "sourcePath": "sourceWalker.ts",
+    "fission": {
+      "problem": "System Capability: Provide Source walker should skip directory string",
+      "demand": [
+        "[Generic] string (relativePath)",
+        "TriadConfig (config)",
+        "SourceWalkMode (mode)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] Set (RUNTIME_SKIP_SEGMENTS)",
+        "[Ghost:Read] shouldSkipWalkPath (shouldSkipWalkPath)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "SourceWalker.shouldSkipFile",
+    "category": "core",
+    "sourcePath": "sourceWalker.ts",
+    "fission": {
+      "problem": "System Capability: Provide Source walker should skip file string",
+      "demand": [
+        "[Generic] string (relativePath)",
+        "TriadConfig (config)",
+        "SourceWalkMode (mode)",
+        "[Ghost:Read] unknown[] (GENERATED_OR_LOCK_FILE_PATTERNS)",
+        "[Ghost:Read] normalizePath (normalizePath)",
+        "[Ghost:Read] shouldIncludeRuntimePath (shouldIncludeRuntimePath)",
+        "[Ghost:Read] shouldSkipWalkPath (shouldSkipWalkPath)"
       ],
       "answer": [
         "void"
