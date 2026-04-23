@@ -44,7 +44,7 @@ AI 助手会按 TriadMind 工作流自动完成：
 
 | 命令 | 功能 |
 |---|---|
-| `@triadmind init` | 初始化当前项目的 `.triadmind/` 工作区 |
+| `@triadmind init` | 初始化当前项目的 `.triadmind/` 工作区，并默认生成 `triad-map.json` 与 `runtime-map.json` |
 | `@triadmind 你的需求` | 静默启动完整功能开发工作流 |
 | `@triadmind macro` | 做 Macro-Split，寻找挂载点并划分左右分支 |
 | `@triadmind meso` | 做 Meso-Split，把子功能拆成类和数据管道 |
@@ -53,7 +53,8 @@ AI 助手会按 TriadMind 工作流自动完成：
 | `@triadmind protocol` | 只生成协议草案，不直接落盘 |
 | `@triadmind plan` | 生成/刷新拓扑审核图 `visualizer.html` |
 | `@triadmind apply` | 执行协议，生成或修改代码 |
-| `@triadmind sync` | 重新扫描功能代码，刷新 `triad-map.json` |
+| `@triadmind sync` | 重新扫描功能代码，默认同时刷新 `triad-map.json` 与 `runtime-map.json` |
+| `@triadmind runtime` | 生成运行时拓扑 `runtime-map.json` / `runtime-diagnostics.json` |
 | `@triadmind renormalize` | 对旧代码做环折叠和宏节点重整化治理 |
 | `@triadmind renormalize --deep` | 预留递归重整化任务入口 |
 | `@triadmind converge` | `renormalize --deep` 的静默别名 |
@@ -205,9 +206,12 @@ TypeScript 会保留显式业务类型，例如 `GeoTarget`、`GeoResult`；Java
 | 文件 | 作用 |
 |---|---|
 | `.triadmind/triad-map.json` | 当前项目拓扑图 |
+| `.triadmind/runtime-map.json` | 运行时拓扑图 |
+| `.triadmind/runtime-diagnostics.json` | 运行时提取诊断 |
 | `.triadmind/draft-protocol.json` | 待执行协议 |
 | `.triadmind/last-approved-protocol.json` | 最近一次成功执行的协议 |
 | `.triadmind/visualizer.html` | 顶点三元拓扑审核图 |
+| `.triadmind/runtime-visualizer.html` | 运行时拓扑审核图 |
 | `.triadmind/implementation-prompt.md` | 实现阶段提示 |
 | `.triadmind/implementation-handoff.md` | 实现交接文件 |
 | `.triadmind/renormalize-task.md` | 旧代码治理任务书 |
@@ -307,6 +311,10 @@ TypeScript 会保留显式业务类型，例如 `GeoTarget`、`GeoResult`；Java
 - `@triadmind plan --show-isolated`：在 architecture 视图中保留孤立 capability。
 - `@triadmind plan --full-contract-edges`：关闭 contract edge 限流，适合深度排障。
 - `@triadmind invoke --apply --view leaf`：静默落盘前先生成 leaf 视图审核图。
+- `@triadmind runtime --visualize`：生成运行时 HTML 审核图。
+- `@triadmind runtime --view workflow`：聚焦 workflow / worker / queue 协作。
+- `@triadmind runtime --view resources`：聚焦 DB / Redis / ObjectStore / tool 依赖。
+- `@triadmind runtime --include-frontend --include-infra`：启用前端 API 调用与基础设施提取。
 - `visualizer.html` 页面左上角现在自带 `Architecture / Leaf` 按钮，可随时切换。
 
 ### problem 语义命名

@@ -15,6 +15,9 @@ export interface WorkspacePaths {
     configFile: string;
     mapFile: string;
     leafMapFile: string;
+    runtimeMapFile: string;
+    runtimeVisualizerFile: string;
+    runtimeDiagnosticsFile: string;
     draftFile: string;
     macroSplitFile: string;
     mesoSplitFile: string;
@@ -72,6 +75,9 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         configFile: path.join(triadDir, 'config.json'),
         mapFile: path.join(triadDir, 'triad-map.json'),
         leafMapFile: path.join(triadDir, 'leaf-map.json'),
+        runtimeMapFile: path.join(triadDir, 'runtime-map.json'),
+        runtimeVisualizerFile: path.join(triadDir, 'runtime-visualizer.html'),
+        runtimeDiagnosticsFile: path.join(triadDir, 'runtime-diagnostics.json'),
         draftFile: path.join(triadDir, 'draft-protocol.json'),
         macroSplitFile: path.join(triadDir, 'macro-split.json'),
         mesoSplitFile: path.join(triadDir, 'meso-split.json'),

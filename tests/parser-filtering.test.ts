@@ -122,6 +122,16 @@ function createTestConfig(): TriadConfig {
             minConfidence: 0.6,
             requireConfidence: false
         },
+        runtime: {
+            enabled: true,
+            defaultView: 'full',
+            includeFrontend: true,
+            includeInfra: true,
+            frameworkHints: [],
+            excludePathPatterns: ['node_modules', '.triadmind', 'venv', '.venv', '__pycache__', '.next', 'dist', 'build', 'tests', 'test'],
+            maxSourceFileBytes: 500000,
+            minConfidence: 0.4
+        },
         runtimeHealing: {
             enabled: true,
             maxAutoRetries: 3,

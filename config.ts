@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { WorkspacePaths, normalizePath } from './workspace';
 import { TriadCategory } from './protocol';
+import { RuntimeConfig, RuntimeView } from './runtime/types';
 
 export type TriadLanguage = 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'cpp' | 'java';
 export type TriadParserEngine = 'native' | 'tree-sitter';
@@ -59,6 +60,7 @@ export interface TriadConfig {
         minConfidence: number;
         requireConfidence: boolean;
     };
+    runtime: RuntimeConfig;
     runtimeHealing: {
         enabled: boolean;
         maxAutoRetries: number;
@@ -184,6 +186,16 @@ const DEFAULT_CONFIG: TriadConfig = {
     protocol: {
         minConfidence: 0.6,
         requireConfidence: false
+    },
+    runtime: {
+        enabled: true,
+        defaultView: 'full',
+        includeFrontend: true,
+        includeInfra: true,
+        frameworkHints: [],
+        excludePathPatterns: ['node_modules', '.triadmind', 'venv', '.venv', '__pycache__', '.next', 'dist', 'build', 'tests', 'test'],
+        maxSourceFileBytes: 500000,
+        minConfidence: 0.4
     },
     runtimeHealing: {
         enabled: true,
@@ -436,6 +448,22 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             minConfidence: value.protocol?.minConfidence ?? DEFAULT_CONFIG.protocol.minConfidence,
             requireConfidence: value.protocol?.requireConfidence ?? DEFAULT_CONFIG.protocol.requireConfidence
         },
+        runtime: {
+            enabled: value.runtime?.enabled ?? DEFAULT_CONFIG.runtime.enabled,
+            defaultView: normalizeRuntimeView(value.runtime?.defaultView),
+            includeFrontend: value.runtime?.includeFrontend ?? DEFAULT_CONFIG.runtime.includeFrontend,
+            includeInfra: value.runtime?.includeInfra ?? DEFAULT_CONFIG.runtime.includeInfra,
+            frameworkHints: mergeStringList(value.runtime?.frameworkHints, DEFAULT_CONFIG.runtime.frameworkHints),
+            excludePathPatterns: mergeStringList(
+                value.runtime?.excludePathPatterns,
+                DEFAULT_CONFIG.runtime.excludePathPatterns
+            ),
+            maxSourceFileBytes: normalizePositiveInteger(
+                value.runtime?.maxSourceFileBytes,
+                DEFAULT_CONFIG.runtime.maxSourceFileBytes
+            ),
+            minConfidence: normalizeConfidence(value.runtime?.minConfidence, DEFAULT_CONFIG.runtime.minConfidence)
+        },
         runtimeHealing: {
             enabled: value.runtimeHealing?.enabled ?? DEFAULT_CONFIG.runtimeHealing.enabled,
             maxAutoRetries: value.runtimeHealing?.maxAutoRetries ?? DEFAULT_CONFIG.runtimeHealing.maxAutoRetries,
@@ -474,6 +502,21 @@ function normalizeScanMode(value: TriadScanMode | undefined) {
     }
 
     return DEFAULT_CONFIG.parser.scanMode;
+}
+
+function normalizeRuntimeView(value: RuntimeView | undefined): RuntimeView {
+    if (
+        value === 'workflow' ||
+        value === 'request-flow' ||
+        value === 'resources' ||
+        value === 'events' ||
+        value === 'infra' ||
+        value === 'full'
+    ) {
+        return value;
+    }
+
+    return DEFAULT_CONFIG.runtime.defaultView;
 }
 
 function normalizeHelperVerbPolicy(value: HelperVerbPolicy | undefined) {
@@ -543,6 +586,14 @@ function normalizePositiveInteger(value: number | undefined, fallback: number) {
 function normalizeNonNegativeInteger(value: number | undefined, fallback: number) {
     if (Number.isFinite(value) && (value as number) >= 0) {
         return Math.floor(value as number);
+    }
+
+    return fallback;
+}
+
+function normalizeConfidence(value: number | undefined, fallback: number) {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1) {
+        return value;
     }
 
     return fallback;

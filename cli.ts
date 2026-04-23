@@ -24,6 +24,10 @@ import {
     writeImplementationHandoff,
     writePromptPacket
 } from './workflow';
+import { extractRuntimeTopology } from './runtime/extractRuntimeTopology';
+import { normalizeRuntimeView } from './runtime/filterRuntimeMapByView';
+import { writeRuntimeMapArtifacts } from './runtime/runtimeMapWriter';
+import { generateRuntimeDashboard } from './runtime/runtimeVisualizer';
 
 const program = new Command();
 const BLAST_RADIUS_WARNING_THRESHOLD = 5;
@@ -51,16 +55,19 @@ program.name('triadmind').description('TriadMind：顶点三元法驱动的项�
 program
     .command('init')
     .description('初始化目标项目的 `.triadmind` 工作区，并重新生成 `triad-map.json`')
-    .action(() => {
+    .action(async () => {
         const paths = getWorkspacePaths(process.cwd());
         const previousMap = readCurrentTriadMap(paths);
 
         console.log(chalk.cyan('🧭 [TriadMind] 正在初始化工作区...'));
         ensureTriadSpec(paths);
         syncProjectTopology(paths, true);
+        await writeRuntimeTopologyArtifacts(paths, {});
         assertNoTopologicalDegradation(paths, previousMap, 'init');
         installAlwaysOnRules(paths);
         writeMasterPrompt(paths);
+        console.log(chalk.green(`Runtime map written: ${paths.runtimeMapFile}`));
+        console.log(chalk.green(`Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
 
         console.log(chalk.green(`✅ triad-map 已同步到 ${paths.mapFile}`));
         console.log(chalk.green(`✅ triad.md 已写入 ${paths.triadSpecFile}`));
@@ -189,19 +196,63 @@ program
     .description('Incrementally synchronize triad-map using cached file hashes')
     .option('--force', 'Force a full triad-map rebuild')
     .option('--scan-mode <leaf|capability|module|domain>', 'Temporarily override parser scan mode for this sync')
-    .action((options: { force?: boolean; scanMode?: string }) => {
+    .action(async (options: { force?: boolean; scanMode?: string }) => {
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
         syncProjectTopology(paths, Boolean(options.force), normalizeScanModeOption(options.scanMode));
+        await writeRuntimeTopologyArtifacts(paths, {});
+        console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
+        console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
     });
 
 program
     .command('watch')
     .description('Watch source files and keep triad-map synchronized')
-    .action(() => {
+    .action(async () => {
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
         watchTriadMap(paths);
+    });
+
+program
+    .command('runtime')
+    .description('Extract runtime topology: frontend/API/service/workflow/worker/resource graph')
+    .option('--visualize', 'Generate runtime-visualizer.html after extraction')
+    .option('--view <workflow|request-flow|resources|events|infra|full>', 'Runtime topology view', 'full')
+    .option('--include-frontend', 'Enable frontend API call extraction')
+    .option('--include-infra', 'Enable docker/env/deployment extraction')
+    .option('--framework <name>', 'Hint framework extractor, e.g. fastapi, express, celery')
+    .action(async (options: {
+        visualize?: boolean;
+        view?: string;
+        includeFrontend?: boolean;
+        includeInfra?: boolean;
+        framework?: string;
+    }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const config = loadTriadConfig(paths);
+        if (!config.runtime.enabled) {
+            console.log(chalk.red('❌ Runtime topology extraction is disabled in `.triadmind/config.json`.'));
+            process.exitCode = 1;
+            return;
+        }
+
+        await writeRuntimeTopologyArtifacts(paths, {
+            view: normalizeRuntimeView(options.view, config.runtime.defaultView),
+            includeFrontend: options.includeFrontend ?? config.runtime.includeFrontend,
+            includeInfra: options.includeInfra ?? config.runtime.includeInfra,
+            frameworkHint: options.framework
+        });
+
+        console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
+        console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
+
+        if (options.visualize) {
+            generateRuntimeDashboard(paths.runtimeMapFile, paths.runtimeVisualizerFile);
+            console.log(chalk.green(`✅ Runtime visualizer written: ${paths.runtimeVisualizerFile}`));
+        }
     });
 
 program
@@ -246,7 +297,7 @@ program
 program
     .command('converge')
     .description('Reserve iterative recursive renormalization for high-fanout nodes and emit a TODO governance task')
-    .action(() => {
+    .action(async () => {
         executeConvergePlaceholder(getWorkspacePaths(process.cwd()));
     });
 
@@ -660,6 +711,20 @@ function executeApply(projectRoot: string) {
 
 function syncProjectTopology(paths: ReturnType<typeof getWorkspacePaths>, force = false, scanMode?: TriadScanMode) {
     return scanMode ? syncTriadMapWithOptions(paths, { force, scanMode }) : syncTriadMap(paths, force);
+}
+
+async function writeRuntimeTopologyArtifacts(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    options: {
+        view?: ReturnType<typeof normalizeRuntimeView>;
+        includeFrontend?: boolean;
+        includeInfra?: boolean;
+        frameworkHint?: string;
+    }
+) {
+    const runtimeMap = await extractRuntimeTopology(paths.projectRoot, options);
+    writeRuntimeMapArtifacts(runtimeMap, paths.runtimeMapFile, paths.runtimeDiagnosticsFile);
+    return runtimeMap;
 }
 
 function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {
