@@ -76,18 +76,28 @@ test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
         layout: 'force',
         traceDepth: 3,
         hideIsolated: true,
-        interactive: true
+        interactive: true,
+        theme: 'runtime-dark'
     });
 
     const html = fs.readFileSync(fixture.runtimeVisualizerPath, 'utf-8');
     assert.match(html, /data-runtime-visualizer-version="2"/);
     assert.match(html, /id="runtime-toolbar"/);
     assert.match(html, /id="runtime-graph"/);
+    assert.match(html, /id="status-legend"/);
+    assert.match(html, /id="filters-panel"/);
+    assert.match(html, /id="info-panel"/);
+    assert.match(html, /id="search-results"/);
+    assert.match(html, /id="edge-label-toggle"/);
+    assert.match(html, /id="node-presets"/);
+    assert.match(html, /runtime-flow-card/);
+    assert.match(html, /TriadMind Runtime Graph/);
     assert.match(html, /trace-upstream/);
     assert.match(html, /const runtimeMap = /);
     assert.match(html, /layout":"force"/);
     assert.match(html, /"traceDepth":3/);
     assert.match(html, /"hideIsolated":true/);
+    assert.match(html, /"theme":"runtime-dark"/);
 });
 
 test('cli runtime --visualize smoke test writes interactive visualizer html', () => {
@@ -121,7 +131,9 @@ async def run_item(id: str):
             'dagre',
             '--trace-depth',
             '2',
-            '--hide-isolated'
+            '--hide-isolated',
+            '--theme',
+            'runtime-dark'
         ],
         {
             cwd: root,
@@ -136,4 +148,8 @@ async def run_item(id: str):
     assert.match(html, /data-runtime-visualizer-version="2"/);
     assert.match(html, /id="runtime-toolbar"/);
     assert.match(html, /id="runtime-graph"/);
+    assert.match(html, /id="status-legend"/);
+    assert.match(html, /id="search-results"/);
+    assert.match(html, /id="edge-label-toggle"/);
+    assert.match(html, /"theme":"runtime-dark"/);
 });

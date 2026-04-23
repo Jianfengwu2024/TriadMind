@@ -226,6 +226,7 @@ program
     .option('--layout <force|dagre>', 'Runtime visualizer layout', 'dagre')
     .option('--trace-depth <n>', 'Default runtime trace depth', '2')
     .option('--hide-isolated', 'Hide isolated runtime nodes in the visualizer')
+    .option('--theme <auto|leaf-like|runtime-dark>', 'Runtime visualizer theme', 'leaf-like')
     .action(async (options: {
         visualize?: boolean;
         view?: string;
@@ -236,6 +237,7 @@ program
         layout?: string;
         traceDepth?: string;
         hideIsolated?: boolean;
+        theme?: string;
     }) => {
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
@@ -262,7 +264,11 @@ program
                 interactive: options.interactive !== false,
                 layout: options.layout === 'force' ? 'force' : 'dagre',
                 traceDepth: normalizePositiveCliInteger(options.traceDepth, 2),
-                hideIsolated: Boolean(options.hideIsolated)
+                hideIsolated: Boolean(options.hideIsolated),
+                theme:
+                    options.theme === 'auto' || options.theme === 'runtime-dark' || options.theme === 'leaf-like'
+                        ? options.theme
+                        : 'leaf-like'
             });
             console.log(chalk.green(`✅ Runtime visualizer written: ${paths.runtimeVisualizerFile}`));
         }

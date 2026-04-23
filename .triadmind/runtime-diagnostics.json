@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "level": "info",
+    "code": "RUNTIME_EXCLUDED_PATHS_SUMMARY",
+    "extractor": "RuntimeSourceCollector",
+    "message": "Skipped runtime paths by exclude rules: 6 [.git, .triadmind, dist, node_modules, package-lock.json (+1 more)]"
+  }
+]

@@ -175,6 +175,8 @@
       "tmp"
     ],
     "maxSourceFileBytes": 500000,
+    "maxScannedFiles": 5000,
+    "failOnExtractorError": false,
     "minConfidence": 0.4
   },
   "runtimeHealing": {
