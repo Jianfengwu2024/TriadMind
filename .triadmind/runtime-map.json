@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "project": "triadmind-core",
-  "generatedAt": "2026-04-23T11:58:41.066Z",
+  "generatedAt": "2026-04-23T12:21:18.296Z",
   "view": "full",
   "nodes": [
     {
@@ -171,7 +171,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1256,
+          "line": 1253,
           "column": 19,
           "kind": "import",
           "text": "spawn(",
@@ -296,7 +296,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 533,
+          "line": 542,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -304,7 +304,7 @@
         },
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1238,
+          "line": 1577,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dragging'",
@@ -348,7 +348,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1250,
+          "line": 1247,
           "column": 7,
           "kind": "inferred",
           "text": "function openFile(",
@@ -400,7 +400,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 533,
+          "line": 542,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -426,7 +426,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1238,
+          "line": 1577,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dragging'",
@@ -593,7 +593,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1256,
+          "line": 1253,
           "column": 19,
           "kind": "call",
           "text": "spawn(",
@@ -705,7 +705,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 533,
+          "line": 542,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -722,7 +722,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1238,
+          "line": 1577,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dragging'",

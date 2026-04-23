@@ -65,20 +65,25 @@ h3{font-size:12px;color:#a5b4fc;margin-bottom:10px;text-transform:uppercase;lett
 .neighbor-link:hover,.search-item:hover{background:#2a2a4e}
 .pill{display:inline-block;padding:2px 6px;border-radius:999px;background:#0f172a;border:1px solid #334155;margin:2px 4px 2px 0;color:#cbd5e1;font-size:11px}
 pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px solid var(--line2);border-radius:8px;padding:8px;color:#dce8ff;font-size:12px;max-height:190px;overflow:auto;margin-top:7px}
+.cluster-halo{fill:rgba(56,189,248,.05);stroke:rgba(125,211,252,.2);stroke-width:1.2;stroke-dasharray:6 6;pointer-events:none}
+.cluster-label{fill:#93c5fd;font-size:10px;letter-spacing:.04em;text-transform:uppercase;pointer-events:none}
 .node-shape{stroke-width:1.4;cursor:pointer;filter:drop-shadow(0 3px 8px rgba(0,0,0,.28))}
 .node-label{fill:#eff6ff;font-size:11px;font-weight:600;pointer-events:none;text-anchor:middle;dominant-baseline:central}
 .node-sub{fill:#dbeafe;font-size:9px;pointer-events:none;text-anchor:middle;dominant-baseline:central;opacity:.82}
 .edge-line{fill:none;stroke-width:1.8;marker-end:url(#arrow);cursor:pointer;opacity:.88}
 .edge-hit{fill:none;stroke:transparent;stroke-width:12;cursor:pointer}
 .edge-label{fill:#e2e8f0;font-size:9px;pointer-events:none;text-anchor:middle;paint-order:stroke;stroke:#020617;stroke-width:4px}
-.dim{opacity:.14}
+.edge-bundle-label{fill:#f8fafc;font-size:9px;pointer-events:none;text-anchor:middle;paint-order:stroke;stroke:#020617;stroke-width:4px}
+.dim{opacity:.09}
 .neighbor .node-shape{stroke:#f8fafc;stroke-width:3}
 .trace .node-shape{stroke:#fbbf24;stroke-width:3}
 .selected .node-shape{stroke:#38bdf8;stroke-width:4}
 .locked .node-shape{stroke:#a78bfa;stroke-width:3}
+.hovered .node-shape{stroke:#e2e8f0;stroke-width:2.6}
 .edge-neighbor{stroke-width:3.6;opacity:1}
 .edge-trace{stroke:#fbbf24 !important;stroke-width:4;opacity:1}
 .edge-selected{stroke:#38bdf8 !important;stroke-width:4.2;opacity:1}
+.edge-hover{stroke-width:3.2;opacity:1}
 #runtime-notice{position:absolute;left:14px;bottom:14px;background:rgba(15,23,42,.92);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;color:var(--muted);font-size:12px;max-width:min(620px,calc(100% - 28px));line-height:1.45}
 .trace-input{width:66px !important;border-radius:8px !important}
 .toggle-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1}
@@ -90,13 +95,13 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
 <main id="graph" data-runtime-visualizer-version="2">
   <div id="runtime-toolbar">
     <input id="search" class="runtime-search-chip" placeholder="Search id / label / type / sourcePath">
-    <select id="layout-select"><option value="dagre">dagre</option><option value="force">force</option></select>
+    <select id="layout-select"><option value="leaf-force">leaf-force</option><option value="dagre">dagre</option></select>
     <input id="trace-depth" class="trace-input" type="number" min="1" max="8" value="2">
     <button id="trace-upstream" type="button">Upstream</button>
     <button id="trace-downstream" type="button">Downstream</button>
     <button id="trace-both" type="button">Both</button>
     <button id="edge-label-toggle" type="button" class="active">Edge Labels: on</button>
-    <label class="toggle-chip"><input id="hide-isolated" type="checkbox" checked>Hide isolated</label>
+    <label class="toggle-chip"><input id="hide-isolated" type="checkbox" >Hide isolated</label>
     <button id="reset-view" type="button">Reset</button>
     <button id="fit-view" type="button">Fit</button>
   </div>
@@ -107,8 +112,10 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
       </marker>
     </defs>
     <g id="viewport">
+      <g id="clusters-layer"></g>
       <g id="edges-layer"></g>
       <g id="edge-labels-layer"></g>
+      <g id="bundle-labels-layer"></g>
       <g id="nodes-layer"></g>
     </g>
   </svg>
@@ -126,7 +133,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
     <h3>Node Presets</h3>
     <div id="node-presets" class="preset-list"></div>
     <div id="search-results"></div>
-    <p class="legend-hint">快速收敛到 ApiRoute → Service → Worker → Resource 主链路。</p>
+    <p class="legend-hint">Quickly narrow to ApiRoute → Service → Worker → Resource main chains.</p>
   </section>
   <section id="status-legend">
     <h3>Status</h3>
@@ -152,8 +159,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
   </section>
 </aside>
 <script>
-const runtimeMap = {"schemaVersion":"1.0","project":"triadmind-core","generatedAt":"2026-04-23T11:58:41.066Z","view":"full","nodes":[{"id":"Config.PackageJson","type":"Config","label":"package.json","sourcePath":"package.json","category":"infra","metadata":{"scripts":["clean","build","prepare","prepack","prepublishOnly","init","prompt","pipeline","macro","meso","micro","sync","watch","protocol","finalize","legacy","converge","plan","auto","invoke","rules","self","adapters","heal","snapshots","snapshot","rollback","handoff","master","apply","typecheck","test"],"dependencies":["chalk","commander","inquirer","tree-sitter","tree-sitter-cpp","tree-sitter-go","tree-sitter-java","tree-sitter-javascript","tree-sitter-python","tree-sitter-rust","tree-sitter-typescript","ts-morph","zod"],"originalLabel":"package.json","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"evidence":[{"sourcePath":"package.json","line":1,"column":1,"kind":"manifest","text":"package.json","confidence":0.8}]},{"id":"DataStore.Postgres","type":"DataStore","label":"Postgres","category":"infra","sourcePath":"runtime/runtimeLabeling.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"import","text":"postgres","confidence":0.65}],"metadata":{"originalLabel":"Postgres","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ExternalTool.subprocess","type":"ExternalTool","label":"subprocess","category":"external","sourcePath":"cli.ts","evidence":[{"sourcePath":"cli.ts","line":1256,"column":19,"kind":"import","text":"spawn(","confidence":0.65}],"metadata":{"originalLabel":"subprocess","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ModelProvider.OpenAI","type":"ModelProvider","label":"OpenAI","category":"external","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"metadata":{"originalLabel":"OpenAI","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ObjectStore.MinIO","type":"ObjectStore","label":"MinIO","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"metadata":{"originalLabel":"MinIO","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Queue.classList","type":"Queue","label":"classList","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":533,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"runtime/runtimeVisualizer.ts","line":1238,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"classList","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Service.detect","type":"Service","label":"detect","sourcePath":"runtime/extractors/configInfraExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"metadata":{"originalLabel":"detect","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.openFile","type":"Service","label":"openFile","sourcePath":"cli.ts","category":"backend","evidence":[{"sourcePath":"cli.ts","line":1250,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}],"metadata":{"originalLabel":"openFile","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/extractors/resourceAccessExtractor","type":"Service","label":"runtime/extractors/resourceAccessExtractor","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/extractors/resourceAccessExtractor","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/runtimeLabeling","type":"Service","label":"runtime/runtimeLabeling","sourcePath":"runtime/runtimeLabeling.ts","category":"backend","evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":1,"column":1,"kind":"inferred","text":"runtime/runtimeLabeling.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/runtimeLabeling","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Task.dimmed","type":"Task","label":"dimmed","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":533,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"dimmed","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Task.dragging","type":"Task","label":"dragging","sourcePath":"runtime/runtimeVisualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1238,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75}],"metadata":{"originalLabel":"dragging","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Workflow.tsx_cli.ts_pipeline","type":"Workflow","label":"tsx cli.ts pipeline","sourcePath":"package.json","category":"core","evidence":[{"sourcePath":"package.json","line":23,"column":5,"kind":"manifest","text":"\"pipeline\": \"tsx cli.ts pipeline\"","confidence":0.6}],"metadata":{"originalLabel":"tsx cli.ts pipeline","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}}],"edges":[{"from":"Service.detect","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres"},{"from":"Service.detect","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO"},{"from":"Service.openFile","to":"ExternalTool.subprocess","type":"uses_tool","confidence":0.65,"evidence":[{"sourcePath":"cli.ts","line":1256,"column":19,"kind":"call","text":"spawn(","confidence":0.65}],"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","type":"uses_model","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO"},{"from":"Service.runtime/runtimeLabeling","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"call","text":"postgres","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":533,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dimmed"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dragging","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1238,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dragging"},{"from":"Service.visualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.visualizer.enqueues.Task.dimmed"}],"diagnostics":[{"level":"info","code":"RUNTIME_EXCLUDED_PATHS_SUMMARY","extractor":"RuntimeSourceCollector","message":"Skipped runtime paths by exclude rules: 6 [.git, .triadmind, dist, node_modules, package-lock.json (+1 more)]"}]};
-const dashboardOptions = {"interactive":true,"layout":"dagre","traceDepth":2,"hideIsolated":true,"maxRenderEdges":2000,"theme":"leaf-like"};
+const runtimeMap = {"schemaVersion":"1.0","project":"triadmind-core","generatedAt":"2026-04-23T12:21:18.296Z","view":"full","nodes":[{"id":"Config.PackageJson","type":"Config","label":"package.json","sourcePath":"package.json","category":"infra","metadata":{"scripts":["clean","build","prepare","prepack","prepublishOnly","init","prompt","pipeline","macro","meso","micro","sync","watch","protocol","finalize","legacy","converge","plan","auto","invoke","rules","self","adapters","heal","snapshots","snapshot","rollback","handoff","master","apply","typecheck","test"],"dependencies":["chalk","commander","inquirer","tree-sitter","tree-sitter-cpp","tree-sitter-go","tree-sitter-java","tree-sitter-javascript","tree-sitter-python","tree-sitter-rust","tree-sitter-typescript","ts-morph","zod"],"originalLabel":"package.json","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"evidence":[{"sourcePath":"package.json","line":1,"column":1,"kind":"manifest","text":"package.json","confidence":0.8}]},{"id":"DataStore.Postgres","type":"DataStore","label":"Postgres","category":"infra","sourcePath":"runtime/runtimeLabeling.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"import","text":"postgres","confidence":0.65}],"metadata":{"originalLabel":"Postgres","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ExternalTool.subprocess","type":"ExternalTool","label":"subprocess","category":"external","sourcePath":"cli.ts","evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"import","text":"spawn(","confidence":0.65}],"metadata":{"originalLabel":"subprocess","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ModelProvider.OpenAI","type":"ModelProvider","label":"OpenAI","category":"external","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"metadata":{"originalLabel":"OpenAI","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ObjectStore.MinIO","type":"ObjectStore","label":"MinIO","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"metadata":{"originalLabel":"MinIO","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Queue.classList","type":"Queue","label":"classList","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":542,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"runtime/runtimeVisualizer.ts","line":1577,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"classList","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Service.detect","type":"Service","label":"detect","sourcePath":"runtime/extractors/configInfraExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"metadata":{"originalLabel":"detect","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.openFile","type":"Service","label":"openFile","sourcePath":"cli.ts","category":"backend","evidence":[{"sourcePath":"cli.ts","line":1247,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}],"metadata":{"originalLabel":"openFile","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/extractors/resourceAccessExtractor","type":"Service","label":"runtime/extractors/resourceAccessExtractor","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/extractors/resourceAccessExtractor","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/runtimeLabeling","type":"Service","label":"runtime/runtimeLabeling","sourcePath":"runtime/runtimeLabeling.ts","category":"backend","evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":1,"column":1,"kind":"inferred","text":"runtime/runtimeLabeling.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/runtimeLabeling","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Task.dimmed","type":"Task","label":"dimmed","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":542,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"dimmed","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Task.dragging","type":"Task","label":"dragging","sourcePath":"runtime/runtimeVisualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1577,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75}],"metadata":{"originalLabel":"dragging","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Workflow.tsx_cli.ts_pipeline","type":"Workflow","label":"tsx cli.ts pipeline","sourcePath":"package.json","category":"core","evidence":[{"sourcePath":"package.json","line":23,"column":5,"kind":"manifest","text":"\"pipeline\": \"tsx cli.ts pipeline\"","confidence":0.6}],"metadata":{"originalLabel":"tsx cli.ts pipeline","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}}],"edges":[{"from":"Service.detect","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres"},{"from":"Service.detect","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO"},{"from":"Service.openFile","to":"ExternalTool.subprocess","type":"uses_tool","confidence":0.65,"evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"call","text":"spawn(","confidence":0.65}],"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","type":"uses_model","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO"},{"from":"Service.runtime/runtimeLabeling","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"call","text":"postgres","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":542,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dimmed"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dragging","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1577,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dragging"},{"from":"Service.visualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.visualizer.enqueues.Task.dimmed"}],"diagnostics":[{"level":"info","code":"RUNTIME_EXCLUDED_PATHS_SUMMARY","extractor":"RuntimeSourceCollector","message":"Skipped runtime paths by exclude rules: 6 [.git, .triadmind, dist, node_modules, package-lock.json (+1 more)]"}]};
+const dashboardOptions = {"interactive":true,"layout":"dagre","traceDepth":2,"hideIsolated":false,"maxRenderEdges":2000,"theme":"runtime-dark"};
 
 const NODE_TYPE_PRESETS = {
   All: [],
@@ -222,9 +229,11 @@ const EDGE_COLORS = {
 const dom = {
   svg: document.getElementById('runtime-graph'),
   viewport: document.getElementById('viewport'),
+  clustersLayer: document.getElementById('clusters-layer'),
   nodesLayer: document.getElementById('nodes-layer'),
   edgesLayer: document.getElementById('edges-layer'),
   edgeLabelsLayer: document.getElementById('edge-labels-layer'),
+  bundleLabelsLayer: document.getElementById('bundle-labels-layer'),
   notice: document.getElementById('runtime-notice'),
   search: document.getElementById('search'),
   layoutSelect: document.getElementById('layout-select'),
@@ -247,10 +256,12 @@ const dom = {
 
 const graphStore = buildGraphStore(runtimeMap);
 const state = {
-  layout: dashboardOptions.layout || 'dagre',
+  layout: dashboardOptions.layout === 'dagre' ? 'dagre' : 'leaf-force',
   query: '',
   selectedNodeId: null,
   selectedEdgeId: null,
+  hoveredNodeId: null,
+  hoveredEdgeId: null,
   focusNodeId: null,
   trace: null,
   hideIsolated: Boolean(dashboardOptions.hideIsolated),
@@ -281,12 +292,7 @@ function bootRuntimeVisualizer() {
 }
 
 function applyTheme(theme) {
-  if (theme === 'auto') {
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.body.setAttribute('data-theme', prefersDark ? 'leaf-like' : 'runtime-dark');
-    return;
-  }
-  document.body.setAttribute('data-theme', theme || 'leaf-like');
+  document.body.setAttribute('data-theme', theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like');
 }
 
 function buildGraphStore(map) {
@@ -325,7 +331,7 @@ function hydrateControls() {
     renderGraph();
   });
   dom.layoutSelect.addEventListener('change', event => {
-    state.layout = event.target.value === 'force' ? 'force' : 'dagre';
+    state.layout = event.target.value === 'dagre' ? 'dagre' : 'leaf-force';
     state.positions = new Map();
     state.layoutDirty = true;
     renderGraph();
@@ -496,15 +502,26 @@ function renderGraph() {
     computeLayout(graph.nodes, graph.edges);
     state.layoutDirty = false;
   }
+  const bundleInfo = buildEdgeBundleInfo(graph);
   applyTransform();
+  dom.clustersLayer.innerHTML = '';
   dom.edgesLayer.innerHTML = '';
   dom.edgeLabelsLayer.innerHTML = '';
+  dom.bundleLabelsLayer.innerHTML = '';
   dom.nodesLayer.innerHTML = '';
+  if (state.layout === 'leaf-force') {
+    renderClusterHalos(graph.nodes);
+  }
   const highlighted = computeHighlightSets();
-  graph.edges.forEach((edge, edgeIndex) => renderEdge(edge, highlighted, edgeIndex, graph.edges.length));
+  graph.edges.forEach((edge, edgeIndex) => renderEdge(edge, highlighted, edgeIndex, graph.edges.length, bundleInfo));
+  renderBundleLabels(bundleInfo, highlighted);
   graph.nodes.forEach(node => renderNode(node, highlighted));
   if (!graph.nodes.length) {
     dom.notice.textContent = 'No runtime nodes match current filters.';
+  } else if (bundleInfo.bundledEdgeIds.size > 0) {
+    dom.notice.textContent = 'Bundled ' + bundleInfo.bundledEdgeIds.size + ' dense resource edges for readability.';
+  } else {
+    dom.notice.textContent = 'Runtime graph ready: click node/edge to inspect and trace.';
   }
 }
 
@@ -557,6 +574,8 @@ function computeHighlightSets() {
   const neighborEdgeIds = new Set();
   const traceNodeIds = new Set();
   const traceEdgeIds = new Set();
+  const hoveredNodeIds = new Set();
+  const hoveredEdgeIds = new Set();
 
   if (state.selectedNodeId) {
     neighborNodeIds.add(state.selectedNodeId);
@@ -582,11 +601,35 @@ function computeHighlightSets() {
     state.trace.edgeIds.forEach(id => traceEdgeIds.add(id));
   }
 
+  if (state.hoveredNodeId) {
+    hoveredNodeIds.add(state.hoveredNodeId);
+    const hoverEdges = [
+      ...(graphStore.incoming.get(state.hoveredNodeId) || []),
+      ...(graphStore.outgoing.get(state.hoveredNodeId) || [])
+    ];
+    hoverEdges.forEach(edge => {
+      hoveredEdgeIds.add(edge.id);
+      hoveredNodeIds.add(edge.from);
+      hoveredNodeIds.add(edge.to);
+    });
+  }
+
+  if (state.hoveredEdgeId) {
+    const hoverEdge = graphStore.edgeById.get(state.hoveredEdgeId);
+    if (hoverEdge) {
+      hoveredEdgeIds.add(hoverEdge.id);
+      hoveredNodeIds.add(hoverEdge.from);
+      hoveredNodeIds.add(hoverEdge.to);
+    }
+  }
+
   return {
     neighborNodeIds,
     neighborEdgeIds,
     traceNodeIds,
     traceEdgeIds,
+    hoveredNodeIds,
+    hoveredEdgeIds,
     hasFocus: Boolean(state.selectedNodeId || state.selectedEdgeId || state.trace)
   };
 }
@@ -655,12 +698,14 @@ function renderNode(node, highlighted) {
   const isTrace = highlighted.traceNodeIds.has(node.id);
   const isNeighbor = highlighted.neighborNodeIds.has(node.id);
   const isLocked = state.focusNodeId === node.id;
+  const isHovered = highlighted.hoveredNodeIds.has(node.id);
   group.setAttribute(
     'class',
     'runtime-node' +
       (isSelected ? ' selected' : '') +
       (isTrace ? ' trace' : '') +
       (isNeighbor ? ' neighbor' : '') +
+      (isHovered ? ' hovered' : '') +
       (isLocked ? ' locked' : '') +
       (highlighted.hasFocus && !isNeighbor && !isTrace && !isSelected ? ' dim' : '')
   );
@@ -694,6 +739,16 @@ function renderNode(node, highlighted) {
     event.stopPropagation();
     selectNode(node.id);
   });
+  group.addEventListener('mouseenter', () => {
+    state.hoveredNodeId = node.id;
+    renderGraph();
+  });
+  group.addEventListener('mouseleave', () => {
+    if (state.hoveredNodeId === node.id) {
+      state.hoveredNodeId = null;
+      renderGraph();
+    }
+  });
   group.addEventListener('dblclick', event => {
     event.stopPropagation();
     state.focusNodeId = node.id;
@@ -709,18 +764,19 @@ function renderNode(node, highlighted) {
   dom.nodesLayer.appendChild(group);
 }
 
-function renderEdge(edge, highlighted, edgeIndex, totalEdges) {
+function renderEdge(edge, highlighted, edgeIndex, totalEdges, bundleInfo) {
   const from = state.positions.get(edge.from);
   const to = state.positions.get(edge.to);
   if (!from || !to) {
     return;
   }
-  const points = edgePoints(from, to);
+  const geometry = resolveEdgeGeometry(edge, from, to, bundleInfo);
   const color = EDGE_COLORS[edge.type] || '#7aa2df';
   const isSelected = state.selectedEdgeId === edge.id;
   const isTrace = highlighted.traceEdgeIds.has(edge.id);
   const isNeighbor = highlighted.neighborEdgeIds.has(edge.id);
-  const pathData = 'M' + points.x1 + ',' + points.y1 + ' L' + points.x2 + ',' + points.y2;
+  const isHovered = highlighted.hoveredEdgeIds.has(edge.id);
+  const pathData = geometry.pathData;
 
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   line.setAttribute(
@@ -729,6 +785,7 @@ function renderEdge(edge, highlighted, edgeIndex, totalEdges) {
       (isSelected ? ' edge-selected' : '') +
       (isTrace ? ' edge-trace' : '') +
       (isNeighbor ? ' edge-neighbor' : '') +
+      (isHovered ? ' edge-hover' : '') +
       (highlighted.hasFocus && !isSelected && !isNeighbor && !isTrace ? ' dim' : '')
   );
   line.setAttribute('d', pathData);
@@ -741,22 +798,38 @@ function renderEdge(edge, highlighted, edgeIndex, totalEdges) {
     event.stopPropagation();
     selectEdge(edge.id);
   });
+  hit.addEventListener('mouseenter', () => {
+    state.hoveredEdgeId = edge.id;
+    renderGraph();
+  });
+  hit.addEventListener('mouseleave', () => {
+    if (state.hoveredEdgeId === edge.id) {
+      state.hoveredEdgeId = null;
+      renderGraph();
+    }
+  });
 
   dom.edgesLayer.append(line, hit);
 
-  if (!shouldRenderEdgeLabel(edgeIndex, totalEdges)) {
+  if (!shouldRenderEdgeLabel(edge, edgeIndex, totalEdges, bundleInfo, isSelected || isTrace || isNeighbor)) {
     return;
   }
   const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
   label.setAttribute('class', 'edge-label' + (highlighted.hasFocus && !isSelected && !isNeighbor && !isTrace ? ' dim' : ''));
-  label.setAttribute('x', String((points.x1 + points.x2) / 2));
-  label.setAttribute('y', String((points.y1 + points.y2) / 2 - 5));
+  label.setAttribute('x', String(geometry.labelPoint.x));
+  label.setAttribute('y', String(geometry.labelPoint.y));
   label.textContent = edge.type + (edge.confidence !== undefined ? ' ' + Number(edge.confidence).toFixed(2) : '');
   dom.edgeLabelsLayer.appendChild(label);
 }
 
-function shouldRenderEdgeLabel(edgeIndex, totalEdges) {
+function shouldRenderEdgeLabel(edge, edgeIndex, totalEdges, bundleInfo, forceVisible) {
   if (!state.showEdgeLabels) {
+    return false;
+  }
+  if (forceVisible) {
+    return true;
+  }
+  if (bundleInfo.bundledEdgeIds.has(edge.id)) {
     return false;
   }
   if (state.transform.k < 0.55) {
@@ -781,9 +854,192 @@ function edgePoints(from, to) {
   };
 }
 
+function resolveEdgeGeometry(edge, from, to, bundleInfo) {
+  const bundled = bundleInfo.edgeGeometry.get(edge.id);
+  if (!bundled) {
+    const points = edgePoints(from, to);
+    return {
+      pathData: 'M' + points.x1 + ',' + points.y1 + ' L' + points.x2 + ',' + points.y2,
+      labelPoint: { x: (points.x1 + points.x2) / 2, y: (points.y1 + points.y2) / 2 - 5 }
+    };
+  }
+
+  const sourceSegment = edgePoints(from, bundled.bundlePoint);
+  const targetSegment = edgePoints(to, bundled.bundlePoint);
+  const start = { x: sourceSegment.x1, y: sourceSegment.y1 };
+  const end = { x: targetSegment.x1, y: targetSegment.y1 };
+  const mid = { x: (start.x + bundled.bundlePoint.x) / 2, y: (start.y + bundled.bundlePoint.y) / 2 };
+  const normal = normalizeNormal(start, bundled.bundlePoint);
+  const control = {
+    x: mid.x + normal.x * bundled.curveOffset,
+    y: mid.y + normal.y * bundled.curveOffset
+  };
+  const labelPoint = {
+    x: (control.x + bundled.bundlePoint.x) / 2,
+    y: (control.y + bundled.bundlePoint.y) / 2 - 6
+  };
+  return {
+    pathData:
+      'M' + start.x + ',' + start.y +
+      ' Q' + control.x + ',' + control.y + ' ' + bundled.bundlePoint.x + ',' + bundled.bundlePoint.y +
+      ' L' + end.x + ',' + end.y,
+    labelPoint
+  };
+}
+
+function buildEdgeBundleInfo(graph) {
+  const edgeGeometry = new Map();
+  const bundledEdgeIds = new Set();
+  const summaries = [];
+  const nodeById = new Map(graph.nodes.map(node => [node.id, node]));
+  const incomingByTarget = new Map();
+
+  graph.edges.forEach(edge => {
+    const list = incomingByTarget.get(edge.to) || [];
+    list.push(edge);
+    incomingByTarget.set(edge.to, list);
+  });
+
+  incomingByTarget.forEach((incomingEdges, targetId) => {
+    const targetNode = nodeById.get(targetId);
+    if (!targetNode || !isResourceLikeType(targetNode.type) || incomingEdges.length < 6) {
+      return;
+    }
+
+    const targetPosition = state.positions.get(targetId);
+    if (!targetPosition) {
+      return;
+    }
+
+    const sourceX = incomingEdges
+      .map(edge => state.positions.get(edge.from)?.x)
+      .filter(value => Number.isFinite(value));
+    const averageSourceX = sourceX.length
+      ? sourceX.reduce((total, value) => total + value, 0) / sourceX.length
+      : targetPosition.x - 1;
+    const direction = averageSourceX <= targetPosition.x ? -1 : 1;
+    const bundlePoint = {
+      x: targetPosition.x + direction * 130,
+      y: targetPosition.y
+    };
+
+    incomingEdges
+      .slice()
+      .sort((left, right) => (left.from + left.type).localeCompare(right.from + right.type))
+      .forEach((edge, index) => {
+        edgeGeometry.set(edge.id, {
+          bundlePoint,
+          curveOffset: (index - (incomingEdges.length - 1) / 2) * 5.5
+        });
+        bundledEdgeIds.add(edge.id);
+      });
+
+    summaries.push({
+      targetId,
+      bundlePoint,
+      edgeCount: incomingEdges.length
+    });
+  });
+
+  return { edgeGeometry, bundledEdgeIds, summaries };
+}
+
+function renderBundleLabels(bundleInfo, highlighted) {
+  if (!state.showEdgeLabels || state.transform.k < 0.5) {
+    return;
+  }
+  bundleInfo.summaries.forEach(summary => {
+    const isHighlighted =
+      highlighted.traceNodeIds.has(summary.targetId) ||
+      highlighted.neighborNodeIds.has(summary.targetId) ||
+      state.selectedNodeId === summary.targetId;
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute(
+      'class',
+      'edge-bundle-label' + (highlighted.hasFocus && !isHighlighted ? ' dim' : '')
+    );
+    label.setAttribute('x', String(summary.bundlePoint.x));
+    label.setAttribute('y', String(summary.bundlePoint.y - 8));
+    label.textContent = 'bundle × ' + summary.edgeCount;
+    dom.bundleLabelsLayer.appendChild(label);
+  });
+}
+
+function renderClusterHalos(nodes) {
+  const groups = new Map();
+  nodes.forEach(node => {
+    const clusterName = getLeafClusterName(node.type);
+    if (clusterName === 'Other') {
+      return;
+    }
+    const list = groups.get(clusterName) || [];
+    list.push(node);
+    groups.set(clusterName, list);
+  });
+
+  groups.forEach((groupNodes, clusterName) => {
+    if (groupNodes.length < 2) {
+      return;
+    }
+    const points = groupNodes
+      .map(node => state.positions.get(node.id))
+      .filter(position => Boolean(position));
+    if (!points.length) {
+      return;
+    }
+    const centroid = {
+      x: points.reduce((total, point) => total + point.x, 0) / points.length,
+      y: points.reduce((total, point) => total + point.y, 0) / points.length
+    };
+    const radius =
+      Math.max(
+        ...points.map(point => Math.sqrt((point.x - centroid.x) ** 2 + (point.y - centroid.y) ** 2))
+      ) + 70;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('class', 'cluster-halo');
+    circle.setAttribute('cx', String(centroid.x));
+    circle.setAttribute('cy', String(centroid.y));
+    circle.setAttribute('r', String(Math.max(120, radius)));
+    dom.clustersLayer.appendChild(circle);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('class', 'cluster-label');
+    label.setAttribute('x', String(centroid.x - 36));
+    label.setAttribute('y', String(centroid.y - Math.max(120, radius) + 18));
+    label.textContent = clusterName;
+    dom.clustersLayer.appendChild(label);
+  });
+}
+
+function getLeafClusterName(nodeType) {
+  if (['FrontendEntry', 'FrontendComponent'].includes(nodeType)) return 'Frontend';
+  if (['ApiRoute', 'CliCommand', 'RpcEndpoint'].includes(nodeType)) return 'API';
+  if (['Service', 'Workflow', 'WorkflowNode', 'WorkflowEdge'].includes(nodeType)) return 'Service';
+  if (['Worker', 'Task', 'Queue', 'Scheduler', 'EventConsumer', 'MessageProducer'].includes(nodeType)) return 'Worker';
+  if (['DataStore', 'ObjectStore', 'Cache', 'FileSystem'].includes(nodeType)) return 'Resource';
+  if (['ExternalApi', 'ExternalTool', 'ModelProvider'].includes(nodeType)) return 'External';
+  if (['Config', 'Secret', 'Kernel', 'Plugin'].includes(nodeType)) return 'Infra';
+  return 'Other';
+}
+
+function isResourceLikeType(nodeType) {
+  return (
+    ['DataStore', 'ObjectStore', 'Cache', 'FileSystem', 'ExternalApi', 'ExternalTool', 'ModelProvider'].includes(nodeType)
+  );
+}
+
+function normalizeNormal(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+  return { x: -dy / length, y: dx / length };
+}
+
 function selectNode(nodeId) {
   state.selectedNodeId = nodeId;
   state.selectedEdgeId = null;
+  state.hoveredEdgeId = null;
   state.trace = null;
   state.focusNodeId = null;
   const node = graphStore.nodeById.get(nodeId);
@@ -794,6 +1050,7 @@ function selectNode(nodeId) {
 function selectEdge(edgeId) {
   state.selectedEdgeId = edgeId;
   state.selectedNodeId = null;
+  state.hoveredNodeId = null;
   state.trace = null;
   state.focusNodeId = null;
   const edge = graphStore.edgeById.get(edgeId);
@@ -804,6 +1061,8 @@ function selectEdge(edgeId) {
 function resetStateAndRender() {
   state.selectedNodeId = null;
   state.selectedEdgeId = null;
+  state.hoveredNodeId = null;
+  state.hoveredEdgeId = null;
   state.focusNodeId = null;
   state.trace = null;
   state.layoutDirty = true;
@@ -992,11 +1251,11 @@ function computeLayout(nodes, edges) {
   if (!nodes.length) {
     return;
   }
-  if (state.layout === 'force') {
-    computeForceLayout(nodes, edges);
+  if (state.layout === 'dagre') {
+    computeDagreLayout(nodes, edges);
     return;
   }
-  computeDagreLayout(nodes, edges);
+  computeLeafForceLayout(nodes, edges);
 }
 
 function computeDagreLayout(nodes, edges) {
@@ -1065,12 +1324,14 @@ function computeDagreLayout(nodes, edges) {
   });
 }
 
-function computeForceLayout(nodes, edges) {
-  if (!state.positions.size) {
-    computeDagreLayout(nodes, edges);
-  }
+function computeLeafForceLayout(nodes, edges) {
   const nodeIds = new Set(nodes.map(node => node.id));
-  const iterations = nodes.length > 500 ? 25 : 70;
+  if (state.positions.size === 0 || nodes.some(node => !state.positions.has(node.id))) {
+    seedLeafForcePositions(nodes);
+  }
+
+  const iterations = nodes.length > 500 ? 28 : 78;
+  const clusterAnchors = buildClusterAnchors(nodes);
 
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const deltas = new Map(nodes.map(node => [node.id, { x: 0, y: 0 }]));
@@ -1084,8 +1345,8 @@ function computeForceLayout(nodes, edges) {
         }
         const dx = leftPos.x - rightPos.x;
         const dy = leftPos.y - rightPos.y;
-        const distanceSquared = Math.max(100, dx * dx + dy * dy);
-        const force = 5600 / distanceSquared;
+        const distanceSquared = Math.max(110, dx * dx + dy * dy);
+        const force = 7400 / distanceSquared;
         deltas.get(nodes[i].id).x += dx * force;
         deltas.get(nodes[i].id).y += dy * force;
         deltas.get(nodes[j].id).x -= dx * force;
@@ -1107,7 +1368,7 @@ function computeForceLayout(nodes, edges) {
       const dx = toPos.x - fromPos.x;
       const dy = toPos.y - fromPos.y;
       const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-      const force = (distance - 230) * 0.012;
+      const force = (distance - 240) * 0.013;
       fromDelta.x += dx / distance * force;
       fromDelta.y += dy / distance * force;
       toDelta.x -= dx / distance * force;
@@ -1120,12 +1381,87 @@ function computeForceLayout(nodes, edges) {
       if (!current || !delta) {
         return;
       }
+      const anchor = clusterAnchors.get(node.id);
+      if (anchor) {
+        delta.x += (anchor.x - current.x) * 0.016;
+        delta.y += (anchor.y - current.y) * 0.016;
+      }
       state.positions.set(node.id, {
-        x: current.x + Math.max(-8, Math.min(8, delta.x)),
-        y: current.y + Math.max(-8, Math.min(8, delta.y))
+        x: current.x + Math.max(-9, Math.min(9, delta.x)),
+        y: current.y + Math.max(-9, Math.min(9, delta.y))
       });
     });
   }
+}
+
+function seedLeafForcePositions(nodes) {
+  const lanes = new Map();
+  nodes.forEach(node => {
+    const lane = getLeafTier(node.type);
+    const list = lanes.get(lane) || [];
+    list.push(node);
+    lanes.set(lane, list);
+  });
+
+  const center = { x: 540, y: 360 };
+  lanes.forEach((laneNodes, lane) => {
+    const radius = lane * 140 + 40;
+    laneNodes
+      .slice()
+      .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id)))
+      .forEach((node, index) => {
+        const angle = (Math.PI * 2 * index) / Math.max(1, laneNodes.length) - Math.PI / 2;
+        state.positions.set(node.id, {
+          x: center.x + Math.cos(angle) * radius + lane * 12,
+          y: center.y + Math.sin(angle) * radius
+        });
+      });
+  });
+}
+
+function buildClusterAnchors(nodes) {
+  const center = { x: 540, y: 360 };
+  const anchors = new Map();
+  const groups = new Map();
+
+  nodes.forEach(node => {
+    const cluster = getLeafClusterName(node.type);
+    const list = groups.get(cluster) || [];
+    list.push(node);
+    groups.set(cluster, list);
+  });
+
+  const orderedClusters = ['Frontend', 'API', 'Service', 'Worker', 'Resource', 'External', 'Infra', 'Other'];
+  orderedClusters.forEach((clusterName, clusterIndex) => {
+    const members = groups.get(clusterName) || [];
+    if (!members.length) {
+      return;
+    }
+    const ring = Math.max(1, Math.floor(clusterIndex / 2) + 1);
+    const baseRadius = 120 + ring * 130;
+    const baseAngle = ((clusterIndex % 8) / 8) * Math.PI * 2 - Math.PI / 2;
+    members
+      .slice()
+      .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id)))
+      .forEach((node, memberIndex) => {
+        const spread = members.length <= 1 ? 0 : (memberIndex - (members.length - 1) / 2) * 0.18;
+        const radius = baseRadius + (memberIndex % 3) * 18;
+        anchors.set(node.id, {
+          x: center.x + Math.cos(baseAngle + spread) * radius,
+          y: center.y + Math.sin(baseAngle + spread) * radius
+        });
+      });
+  });
+
+  return anchors;
+}
+
+function getLeafTier(nodeType) {
+  if (['Service', 'Workflow', 'WorkflowNode', 'WorkflowEdge'].includes(nodeType)) return 1;
+  if (['ApiRoute', 'CliCommand', 'RpcEndpoint', 'FrontendEntry', 'FrontendComponent'].includes(nodeType)) return 2;
+  if (['Worker', 'Task', 'Queue', 'Scheduler', 'EventConsumer', 'MessageProducer'].includes(nodeType)) return 3;
+  if (['DataStore', 'ObjectStore', 'Cache', 'FileSystem', 'ExternalApi', 'ExternalTool', 'ModelProvider', 'Config', 'Secret', 'Kernel', 'Plugin'].includes(nodeType)) return 4;
+  return 5;
 }
 
 function setupPanAndZoom() {

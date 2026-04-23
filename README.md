@@ -480,7 +480,7 @@ Reviewer controls:
 - `triadmind runtime --view resources --visualize` focuses on DB/cache/object-store/tool dependencies
 - `triadmind runtime --include-frontend --include-infra` enables frontend/API and infra extraction when needed
 - `triadmind runtime --visualize --layout dagre --trace-depth 2` enables v2 interactive runtime graph defaults
-- `triadmind runtime --visualize --layout force --hide-isolated` focuses on dense main paths in large graphs
+- `triadmind runtime --visualize --layout leaf-force --hide-isolated` focuses on dense main paths in large graphs
 - `triadmind runtime --visualize --theme leaf-like` aligns runtime visual style with leaf visualizer defaults
 - capability visualizer now defaults to fast fallback unless strict fingerprint is explicitly requested
 - the generated `visualizer.html` now includes `Architecture` / `Leaf` view toggle buttons in the UI

@@ -223,10 +223,10 @@ program
     .option('--include-infra', 'Enable docker/env/deployment extraction')
     .option('--framework <name>', 'Hint framework extractor, e.g. fastapi, express, celery')
     .option('--interactive', 'Generate interactive runtime topology visualizer', true)
-    .option('--layout <force|dagre>', 'Runtime visualizer layout', 'dagre')
+    .option('--layout <leaf-force|dagre>', 'Runtime visualizer layout', 'leaf-force')
     .option('--trace-depth <n>', 'Default runtime trace depth', '2')
     .option('--hide-isolated', 'Hide isolated runtime nodes in the visualizer')
-    .option('--theme <auto|leaf-like|runtime-dark>', 'Runtime visualizer theme', 'leaf-like')
+    .option('--theme <leaf-like|runtime-dark>', 'Runtime visualizer theme', 'leaf-like')
     .action(async (options: {
         visualize?: boolean;
         view?: string;
@@ -262,13 +262,10 @@ program
         if (options.visualize) {
             generateRuntimeDashboard(paths.runtimeMapFile, paths.runtimeVisualizerFile, {
                 interactive: options.interactive !== false,
-                layout: options.layout === 'force' ? 'force' : 'dagre',
+                layout: options.layout === 'dagre' ? 'dagre' : 'leaf-force',
                 traceDepth: normalizePositiveCliInteger(options.traceDepth, 2),
                 hideIsolated: Boolean(options.hideIsolated),
-                theme:
-                    options.theme === 'auto' || options.theme === 'runtime-dark' || options.theme === 'leaf-like'
-                        ? options.theme
-                        : 'leaf-like'
+                theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
             });
             console.log(chalk.green(`✅ Runtime visualizer written: ${paths.runtimeVisualizerFile}`));
         }

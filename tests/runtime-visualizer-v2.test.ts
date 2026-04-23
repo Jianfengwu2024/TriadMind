@@ -73,7 +73,7 @@ test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
     const fixture = writeRuntimeFixture(root);
 
     generateRuntimeDashboard(fixture.runtimeMapPath, fixture.runtimeVisualizerPath, {
-        layout: 'force',
+        layout: 'leaf-force',
         traceDepth: 3,
         hideIsolated: true,
         interactive: true,
@@ -91,10 +91,12 @@ test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
     assert.match(html, /id="edge-label-toggle"/);
     assert.match(html, /id="node-presets"/);
     assert.match(html, /runtime-flow-card/);
+    assert.match(html, /buildEdgeBundleInfo/);
+    assert.match(html, /clusters-layer/);
     assert.match(html, /TriadMind Runtime Graph/);
     assert.match(html, /trace-upstream/);
     assert.match(html, /const runtimeMap = /);
-    assert.match(html, /layout":"force"/);
+    assert.match(html, /layout":"leaf-force"/);
     assert.match(html, /"traceDepth":3/);
     assert.match(html, /"hideIsolated":true/);
     assert.match(html, /"theme":"runtime-dark"/);

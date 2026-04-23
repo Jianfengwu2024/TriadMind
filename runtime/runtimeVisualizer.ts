@@ -4,8 +4,8 @@ import { buildRuntimeGraphIndex } from './runtimeGraph';
 import { normalizeRuntimeNodeLabel } from './runtimeLabeling';
 import { RuntimeMap } from './types';
 
-export type RuntimeVisualizerLayout = 'force' | 'dagre';
-export type RuntimeVisualizerTheme = 'auto' | 'leaf-like' | 'runtime-dark';
+export type RuntimeVisualizerLayout = 'leaf-force' | 'dagre';
+export type RuntimeVisualizerTheme = 'leaf-like' | 'runtime-dark';
 
 export interface RuntimeDashboardOptions {
     title?: string;
@@ -63,9 +63,12 @@ function normalizeRuntimeMapForVisualizer(runtimeMap: RuntimeMap): RuntimeMap {
 }
 
 function normalizeRuntimeDashboardOptions(options: RuntimeDashboardOptions): Required<Omit<RuntimeDashboardOptions, 'title'>> {
+    const requestedLayout = String(options.layout ?? '').trim();
+    const normalizedLayout: RuntimeVisualizerLayout =
+        requestedLayout === 'dagre' ? 'dagre' : 'leaf-force';
     return {
         interactive: options.interactive ?? true,
-        layout: options.layout === 'force' || options.layout === 'dagre' ? options.layout : 'dagre',
+        layout: normalizedLayout,
         traceDepth: normalizePositiveInteger(options.traceDepth, 2),
         hideIsolated: options.hideIsolated ?? false,
         maxRenderEdges: normalizePositiveInteger(options.maxRenderEdges, 2000),
@@ -74,7 +77,7 @@ function normalizeRuntimeDashboardOptions(options: RuntimeDashboardOptions): Req
 }
 
 function normalizeRuntimeTheme(theme: RuntimeDashboardOptions['theme']): RuntimeVisualizerTheme {
-    if (theme === 'auto' || theme === 'leaf-like' || theme === 'runtime-dark') {
+    if (theme === 'runtime-dark' || theme === 'leaf-like') {
         return theme;
     }
     return 'leaf-like';
@@ -155,20 +158,25 @@ h3{font-size:12px;color:#a5b4fc;margin-bottom:10px;text-transform:uppercase;lett
 .neighbor-link:hover,.search-item:hover{background:#2a2a4e}
 .pill{display:inline-block;padding:2px 6px;border-radius:999px;background:#0f172a;border:1px solid #334155;margin:2px 4px 2px 0;color:#cbd5e1;font-size:11px}
 pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px solid var(--line2);border-radius:8px;padding:8px;color:#dce8ff;font-size:12px;max-height:190px;overflow:auto;margin-top:7px}
+.cluster-halo{fill:rgba(56,189,248,.05);stroke:rgba(125,211,252,.2);stroke-width:1.2;stroke-dasharray:6 6;pointer-events:none}
+.cluster-label{fill:#93c5fd;font-size:10px;letter-spacing:.04em;text-transform:uppercase;pointer-events:none}
 .node-shape{stroke-width:1.4;cursor:pointer;filter:drop-shadow(0 3px 8px rgba(0,0,0,.28))}
 .node-label{fill:#eff6ff;font-size:11px;font-weight:600;pointer-events:none;text-anchor:middle;dominant-baseline:central}
 .node-sub{fill:#dbeafe;font-size:9px;pointer-events:none;text-anchor:middle;dominant-baseline:central;opacity:.82}
 .edge-line{fill:none;stroke-width:1.8;marker-end:url(#arrow);cursor:pointer;opacity:.88}
 .edge-hit{fill:none;stroke:transparent;stroke-width:12;cursor:pointer}
 .edge-label{fill:#e2e8f0;font-size:9px;pointer-events:none;text-anchor:middle;paint-order:stroke;stroke:#020617;stroke-width:4px}
-.dim{opacity:.14}
+.edge-bundle-label{fill:#f8fafc;font-size:9px;pointer-events:none;text-anchor:middle;paint-order:stroke;stroke:#020617;stroke-width:4px}
+.dim{opacity:.09}
 .neighbor .node-shape{stroke:#f8fafc;stroke-width:3}
 .trace .node-shape{stroke:#fbbf24;stroke-width:3}
 .selected .node-shape{stroke:#38bdf8;stroke-width:4}
 .locked .node-shape{stroke:#a78bfa;stroke-width:3}
+.hovered .node-shape{stroke:#e2e8f0;stroke-width:2.6}
 .edge-neighbor{stroke-width:3.6;opacity:1}
 .edge-trace{stroke:#fbbf24 !important;stroke-width:4;opacity:1}
 .edge-selected{stroke:#38bdf8 !important;stroke-width:4.2;opacity:1}
+.edge-hover{stroke-width:3.2;opacity:1}
 #runtime-notice{position:absolute;left:14px;bottom:14px;background:rgba(15,23,42,.92);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;color:var(--muted);font-size:12px;max-width:min(620px,calc(100% - 28px));line-height:1.45}
 .trace-input{width:66px !important;border-radius:8px !important}
 .toggle-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1}
@@ -180,7 +188,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
 <main id="graph" data-runtime-visualizer-version="2">
   <div id="runtime-toolbar">
     <input id="search" class="runtime-search-chip" placeholder="Search id / label / type / sourcePath">
-    <select id="layout-select"><option value="dagre">dagre</option><option value="force">force</option></select>
+    <select id="layout-select"><option value="leaf-force">leaf-force</option><option value="dagre">dagre</option></select>
     <input id="trace-depth" class="trace-input" type="number" min="1" max="8" value="${options.traceDepth}">
     <button id="trace-upstream" type="button">Upstream</button>
     <button id="trace-downstream" type="button">Downstream</button>
@@ -197,8 +205,10 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
       </marker>
     </defs>
     <g id="viewport">
+      <g id="clusters-layer"></g>
       <g id="edges-layer"></g>
       <g id="edge-labels-layer"></g>
+      <g id="bundle-labels-layer"></g>
       <g id="nodes-layer"></g>
     </g>
   </svg>
@@ -216,7 +226,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
     <h3>Node Presets</h3>
     <div id="node-presets" class="preset-list"></div>
     <div id="search-results"></div>
-    <p class="legend-hint">快速收敛到 ApiRoute → Service → Worker → Resource 主链路。</p>
+    <p class="legend-hint">Quickly narrow to ApiRoute → Service → Worker → Resource main chains.</p>
   </section>
   <section id="status-legend">
     <h3>Status</h3>
@@ -319,9 +329,11 @@ const EDGE_COLORS = {
 const dom = {
   svg: document.getElementById('runtime-graph'),
   viewport: document.getElementById('viewport'),
+  clustersLayer: document.getElementById('clusters-layer'),
   nodesLayer: document.getElementById('nodes-layer'),
   edgesLayer: document.getElementById('edges-layer'),
   edgeLabelsLayer: document.getElementById('edge-labels-layer'),
+  bundleLabelsLayer: document.getElementById('bundle-labels-layer'),
   notice: document.getElementById('runtime-notice'),
   search: document.getElementById('search'),
   layoutSelect: document.getElementById('layout-select'),
@@ -344,10 +356,12 @@ const dom = {
 
 const graphStore = buildGraphStore(runtimeMap);
 const state = {
-  layout: dashboardOptions.layout || 'dagre',
+  layout: dashboardOptions.layout === 'dagre' ? 'dagre' : 'leaf-force',
   query: '',
   selectedNodeId: null,
   selectedEdgeId: null,
+  hoveredNodeId: null,
+  hoveredEdgeId: null,
   focusNodeId: null,
   trace: null,
   hideIsolated: Boolean(dashboardOptions.hideIsolated),
@@ -378,12 +392,7 @@ function bootRuntimeVisualizer() {
 }
 
 function applyTheme(theme) {
-  if (theme === 'auto') {
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.body.setAttribute('data-theme', prefersDark ? 'leaf-like' : 'runtime-dark');
-    return;
-  }
-  document.body.setAttribute('data-theme', theme || 'leaf-like');
+  document.body.setAttribute('data-theme', theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like');
 }
 
 function buildGraphStore(map) {
@@ -422,7 +431,7 @@ function hydrateControls() {
     renderGraph();
   });
   dom.layoutSelect.addEventListener('change', event => {
-    state.layout = event.target.value === 'force' ? 'force' : 'dagre';
+    state.layout = event.target.value === 'dagre' ? 'dagre' : 'leaf-force';
     state.positions = new Map();
     state.layoutDirty = true;
     renderGraph();
@@ -593,15 +602,26 @@ function renderGraph() {
     computeLayout(graph.nodes, graph.edges);
     state.layoutDirty = false;
   }
+  const bundleInfo = buildEdgeBundleInfo(graph);
   applyTransform();
+  dom.clustersLayer.innerHTML = '';
   dom.edgesLayer.innerHTML = '';
   dom.edgeLabelsLayer.innerHTML = '';
+  dom.bundleLabelsLayer.innerHTML = '';
   dom.nodesLayer.innerHTML = '';
+  if (state.layout === 'leaf-force') {
+    renderClusterHalos(graph.nodes);
+  }
   const highlighted = computeHighlightSets();
-  graph.edges.forEach((edge, edgeIndex) => renderEdge(edge, highlighted, edgeIndex, graph.edges.length));
+  graph.edges.forEach((edge, edgeIndex) => renderEdge(edge, highlighted, edgeIndex, graph.edges.length, bundleInfo));
+  renderBundleLabels(bundleInfo, highlighted);
   graph.nodes.forEach(node => renderNode(node, highlighted));
   if (!graph.nodes.length) {
     dom.notice.textContent = 'No runtime nodes match current filters.';
+  } else if (bundleInfo.bundledEdgeIds.size > 0) {
+    dom.notice.textContent = 'Bundled ' + bundleInfo.bundledEdgeIds.size + ' dense resource edges for readability.';
+  } else {
+    dom.notice.textContent = 'Runtime graph ready: click node/edge to inspect and trace.';
   }
 }
 
@@ -654,6 +674,8 @@ function computeHighlightSets() {
   const neighborEdgeIds = new Set();
   const traceNodeIds = new Set();
   const traceEdgeIds = new Set();
+  const hoveredNodeIds = new Set();
+  const hoveredEdgeIds = new Set();
 
   if (state.selectedNodeId) {
     neighborNodeIds.add(state.selectedNodeId);
@@ -679,11 +701,35 @@ function computeHighlightSets() {
     state.trace.edgeIds.forEach(id => traceEdgeIds.add(id));
   }
 
+  if (state.hoveredNodeId) {
+    hoveredNodeIds.add(state.hoveredNodeId);
+    const hoverEdges = [
+      ...(graphStore.incoming.get(state.hoveredNodeId) || []),
+      ...(graphStore.outgoing.get(state.hoveredNodeId) || [])
+    ];
+    hoverEdges.forEach(edge => {
+      hoveredEdgeIds.add(edge.id);
+      hoveredNodeIds.add(edge.from);
+      hoveredNodeIds.add(edge.to);
+    });
+  }
+
+  if (state.hoveredEdgeId) {
+    const hoverEdge = graphStore.edgeById.get(state.hoveredEdgeId);
+    if (hoverEdge) {
+      hoveredEdgeIds.add(hoverEdge.id);
+      hoveredNodeIds.add(hoverEdge.from);
+      hoveredNodeIds.add(hoverEdge.to);
+    }
+  }
+
   return {
     neighborNodeIds,
     neighborEdgeIds,
     traceNodeIds,
     traceEdgeIds,
+    hoveredNodeIds,
+    hoveredEdgeIds,
     hasFocus: Boolean(state.selectedNodeId || state.selectedEdgeId || state.trace)
   };
 }
@@ -752,12 +798,14 @@ function renderNode(node, highlighted) {
   const isTrace = highlighted.traceNodeIds.has(node.id);
   const isNeighbor = highlighted.neighborNodeIds.has(node.id);
   const isLocked = state.focusNodeId === node.id;
+  const isHovered = highlighted.hoveredNodeIds.has(node.id);
   group.setAttribute(
     'class',
     'runtime-node' +
       (isSelected ? ' selected' : '') +
       (isTrace ? ' trace' : '') +
       (isNeighbor ? ' neighbor' : '') +
+      (isHovered ? ' hovered' : '') +
       (isLocked ? ' locked' : '') +
       (highlighted.hasFocus && !isNeighbor && !isTrace && !isSelected ? ' dim' : '')
   );
@@ -791,6 +839,16 @@ function renderNode(node, highlighted) {
     event.stopPropagation();
     selectNode(node.id);
   });
+  group.addEventListener('mouseenter', () => {
+    state.hoveredNodeId = node.id;
+    renderGraph();
+  });
+  group.addEventListener('mouseleave', () => {
+    if (state.hoveredNodeId === node.id) {
+      state.hoveredNodeId = null;
+      renderGraph();
+    }
+  });
   group.addEventListener('dblclick', event => {
     event.stopPropagation();
     state.focusNodeId = node.id;
@@ -806,18 +864,19 @@ function renderNode(node, highlighted) {
   dom.nodesLayer.appendChild(group);
 }
 
-function renderEdge(edge, highlighted, edgeIndex, totalEdges) {
+function renderEdge(edge, highlighted, edgeIndex, totalEdges, bundleInfo) {
   const from = state.positions.get(edge.from);
   const to = state.positions.get(edge.to);
   if (!from || !to) {
     return;
   }
-  const points = edgePoints(from, to);
+  const geometry = resolveEdgeGeometry(edge, from, to, bundleInfo);
   const color = EDGE_COLORS[edge.type] || '#7aa2df';
   const isSelected = state.selectedEdgeId === edge.id;
   const isTrace = highlighted.traceEdgeIds.has(edge.id);
   const isNeighbor = highlighted.neighborEdgeIds.has(edge.id);
-  const pathData = 'M' + points.x1 + ',' + points.y1 + ' L' + points.x2 + ',' + points.y2;
+  const isHovered = highlighted.hoveredEdgeIds.has(edge.id);
+  const pathData = geometry.pathData;
 
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   line.setAttribute(
@@ -826,6 +885,7 @@ function renderEdge(edge, highlighted, edgeIndex, totalEdges) {
       (isSelected ? ' edge-selected' : '') +
       (isTrace ? ' edge-trace' : '') +
       (isNeighbor ? ' edge-neighbor' : '') +
+      (isHovered ? ' edge-hover' : '') +
       (highlighted.hasFocus && !isSelected && !isNeighbor && !isTrace ? ' dim' : '')
   );
   line.setAttribute('d', pathData);
@@ -838,22 +898,38 @@ function renderEdge(edge, highlighted, edgeIndex, totalEdges) {
     event.stopPropagation();
     selectEdge(edge.id);
   });
+  hit.addEventListener('mouseenter', () => {
+    state.hoveredEdgeId = edge.id;
+    renderGraph();
+  });
+  hit.addEventListener('mouseleave', () => {
+    if (state.hoveredEdgeId === edge.id) {
+      state.hoveredEdgeId = null;
+      renderGraph();
+    }
+  });
 
   dom.edgesLayer.append(line, hit);
 
-  if (!shouldRenderEdgeLabel(edgeIndex, totalEdges)) {
+  if (!shouldRenderEdgeLabel(edge, edgeIndex, totalEdges, bundleInfo, isSelected || isTrace || isNeighbor)) {
     return;
   }
   const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
   label.setAttribute('class', 'edge-label' + (highlighted.hasFocus && !isSelected && !isNeighbor && !isTrace ? ' dim' : ''));
-  label.setAttribute('x', String((points.x1 + points.x2) / 2));
-  label.setAttribute('y', String((points.y1 + points.y2) / 2 - 5));
+  label.setAttribute('x', String(geometry.labelPoint.x));
+  label.setAttribute('y', String(geometry.labelPoint.y));
   label.textContent = edge.type + (edge.confidence !== undefined ? ' ' + Number(edge.confidence).toFixed(2) : '');
   dom.edgeLabelsLayer.appendChild(label);
 }
 
-function shouldRenderEdgeLabel(edgeIndex, totalEdges) {
+function shouldRenderEdgeLabel(edge, edgeIndex, totalEdges, bundleInfo, forceVisible) {
   if (!state.showEdgeLabels) {
+    return false;
+  }
+  if (forceVisible) {
+    return true;
+  }
+  if (bundleInfo.bundledEdgeIds.has(edge.id)) {
     return false;
   }
   if (state.transform.k < 0.55) {
@@ -878,9 +954,192 @@ function edgePoints(from, to) {
   };
 }
 
+function resolveEdgeGeometry(edge, from, to, bundleInfo) {
+  const bundled = bundleInfo.edgeGeometry.get(edge.id);
+  if (!bundled) {
+    const points = edgePoints(from, to);
+    return {
+      pathData: 'M' + points.x1 + ',' + points.y1 + ' L' + points.x2 + ',' + points.y2,
+      labelPoint: { x: (points.x1 + points.x2) / 2, y: (points.y1 + points.y2) / 2 - 5 }
+    };
+  }
+
+  const sourceSegment = edgePoints(from, bundled.bundlePoint);
+  const targetSegment = edgePoints(to, bundled.bundlePoint);
+  const start = { x: sourceSegment.x1, y: sourceSegment.y1 };
+  const end = { x: targetSegment.x1, y: targetSegment.y1 };
+  const mid = { x: (start.x + bundled.bundlePoint.x) / 2, y: (start.y + bundled.bundlePoint.y) / 2 };
+  const normal = normalizeNormal(start, bundled.bundlePoint);
+  const control = {
+    x: mid.x + normal.x * bundled.curveOffset,
+    y: mid.y + normal.y * bundled.curveOffset
+  };
+  const labelPoint = {
+    x: (control.x + bundled.bundlePoint.x) / 2,
+    y: (control.y + bundled.bundlePoint.y) / 2 - 6
+  };
+  return {
+    pathData:
+      'M' + start.x + ',' + start.y +
+      ' Q' + control.x + ',' + control.y + ' ' + bundled.bundlePoint.x + ',' + bundled.bundlePoint.y +
+      ' L' + end.x + ',' + end.y,
+    labelPoint
+  };
+}
+
+function buildEdgeBundleInfo(graph) {
+  const edgeGeometry = new Map();
+  const bundledEdgeIds = new Set();
+  const summaries = [];
+  const nodeById = new Map(graph.nodes.map(node => [node.id, node]));
+  const incomingByTarget = new Map();
+
+  graph.edges.forEach(edge => {
+    const list = incomingByTarget.get(edge.to) || [];
+    list.push(edge);
+    incomingByTarget.set(edge.to, list);
+  });
+
+  incomingByTarget.forEach((incomingEdges, targetId) => {
+    const targetNode = nodeById.get(targetId);
+    if (!targetNode || !isResourceLikeType(targetNode.type) || incomingEdges.length < 6) {
+      return;
+    }
+
+    const targetPosition = state.positions.get(targetId);
+    if (!targetPosition) {
+      return;
+    }
+
+    const sourceX = incomingEdges
+      .map(edge => state.positions.get(edge.from)?.x)
+      .filter(value => Number.isFinite(value));
+    const averageSourceX = sourceX.length
+      ? sourceX.reduce((total, value) => total + value, 0) / sourceX.length
+      : targetPosition.x - 1;
+    const direction = averageSourceX <= targetPosition.x ? -1 : 1;
+    const bundlePoint = {
+      x: targetPosition.x + direction * 130,
+      y: targetPosition.y
+    };
+
+    incomingEdges
+      .slice()
+      .sort((left, right) => (left.from + left.type).localeCompare(right.from + right.type))
+      .forEach((edge, index) => {
+        edgeGeometry.set(edge.id, {
+          bundlePoint,
+          curveOffset: (index - (incomingEdges.length - 1) / 2) * 5.5
+        });
+        bundledEdgeIds.add(edge.id);
+      });
+
+    summaries.push({
+      targetId,
+      bundlePoint,
+      edgeCount: incomingEdges.length
+    });
+  });
+
+  return { edgeGeometry, bundledEdgeIds, summaries };
+}
+
+function renderBundleLabels(bundleInfo, highlighted) {
+  if (!state.showEdgeLabels || state.transform.k < 0.5) {
+    return;
+  }
+  bundleInfo.summaries.forEach(summary => {
+    const isHighlighted =
+      highlighted.traceNodeIds.has(summary.targetId) ||
+      highlighted.neighborNodeIds.has(summary.targetId) ||
+      state.selectedNodeId === summary.targetId;
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute(
+      'class',
+      'edge-bundle-label' + (highlighted.hasFocus && !isHighlighted ? ' dim' : '')
+    );
+    label.setAttribute('x', String(summary.bundlePoint.x));
+    label.setAttribute('y', String(summary.bundlePoint.y - 8));
+    label.textContent = 'bundle × ' + summary.edgeCount;
+    dom.bundleLabelsLayer.appendChild(label);
+  });
+}
+
+function renderClusterHalos(nodes) {
+  const groups = new Map();
+  nodes.forEach(node => {
+    const clusterName = getLeafClusterName(node.type);
+    if (clusterName === 'Other') {
+      return;
+    }
+    const list = groups.get(clusterName) || [];
+    list.push(node);
+    groups.set(clusterName, list);
+  });
+
+  groups.forEach((groupNodes, clusterName) => {
+    if (groupNodes.length < 2) {
+      return;
+    }
+    const points = groupNodes
+      .map(node => state.positions.get(node.id))
+      .filter(position => Boolean(position));
+    if (!points.length) {
+      return;
+    }
+    const centroid = {
+      x: points.reduce((total, point) => total + point.x, 0) / points.length,
+      y: points.reduce((total, point) => total + point.y, 0) / points.length
+    };
+    const radius =
+      Math.max(
+        ...points.map(point => Math.sqrt((point.x - centroid.x) ** 2 + (point.y - centroid.y) ** 2))
+      ) + 70;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('class', 'cluster-halo');
+    circle.setAttribute('cx', String(centroid.x));
+    circle.setAttribute('cy', String(centroid.y));
+    circle.setAttribute('r', String(Math.max(120, radius)));
+    dom.clustersLayer.appendChild(circle);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('class', 'cluster-label');
+    label.setAttribute('x', String(centroid.x - 36));
+    label.setAttribute('y', String(centroid.y - Math.max(120, radius) + 18));
+    label.textContent = clusterName;
+    dom.clustersLayer.appendChild(label);
+  });
+}
+
+function getLeafClusterName(nodeType) {
+  if (['FrontendEntry', 'FrontendComponent'].includes(nodeType)) return 'Frontend';
+  if (['ApiRoute', 'CliCommand', 'RpcEndpoint'].includes(nodeType)) return 'API';
+  if (['Service', 'Workflow', 'WorkflowNode', 'WorkflowEdge'].includes(nodeType)) return 'Service';
+  if (['Worker', 'Task', 'Queue', 'Scheduler', 'EventConsumer', 'MessageProducer'].includes(nodeType)) return 'Worker';
+  if (['DataStore', 'ObjectStore', 'Cache', 'FileSystem'].includes(nodeType)) return 'Resource';
+  if (['ExternalApi', 'ExternalTool', 'ModelProvider'].includes(nodeType)) return 'External';
+  if (['Config', 'Secret', 'Kernel', 'Plugin'].includes(nodeType)) return 'Infra';
+  return 'Other';
+}
+
+function isResourceLikeType(nodeType) {
+  return (
+    ['DataStore', 'ObjectStore', 'Cache', 'FileSystem', 'ExternalApi', 'ExternalTool', 'ModelProvider'].includes(nodeType)
+  );
+}
+
+function normalizeNormal(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+  return { x: -dy / length, y: dx / length };
+}
+
 function selectNode(nodeId) {
   state.selectedNodeId = nodeId;
   state.selectedEdgeId = null;
+  state.hoveredEdgeId = null;
   state.trace = null;
   state.focusNodeId = null;
   const node = graphStore.nodeById.get(nodeId);
@@ -891,6 +1150,7 @@ function selectNode(nodeId) {
 function selectEdge(edgeId) {
   state.selectedEdgeId = edgeId;
   state.selectedNodeId = null;
+  state.hoveredNodeId = null;
   state.trace = null;
   state.focusNodeId = null;
   const edge = graphStore.edgeById.get(edgeId);
@@ -901,6 +1161,8 @@ function selectEdge(edgeId) {
 function resetStateAndRender() {
   state.selectedNodeId = null;
   state.selectedEdgeId = null;
+  state.hoveredNodeId = null;
+  state.hoveredEdgeId = null;
   state.focusNodeId = null;
   state.trace = null;
   state.layoutDirty = true;
@@ -1089,11 +1351,11 @@ function computeLayout(nodes, edges) {
   if (!nodes.length) {
     return;
   }
-  if (state.layout === 'force') {
-    computeForceLayout(nodes, edges);
+  if (state.layout === 'dagre') {
+    computeDagreLayout(nodes, edges);
     return;
   }
-  computeDagreLayout(nodes, edges);
+  computeLeafForceLayout(nodes, edges);
 }
 
 function computeDagreLayout(nodes, edges) {
@@ -1162,12 +1424,14 @@ function computeDagreLayout(nodes, edges) {
   });
 }
 
-function computeForceLayout(nodes, edges) {
-  if (!state.positions.size) {
-    computeDagreLayout(nodes, edges);
-  }
+function computeLeafForceLayout(nodes, edges) {
   const nodeIds = new Set(nodes.map(node => node.id));
-  const iterations = nodes.length > 500 ? 25 : 70;
+  if (state.positions.size === 0 || nodes.some(node => !state.positions.has(node.id))) {
+    seedLeafForcePositions(nodes);
+  }
+
+  const iterations = nodes.length > 500 ? 28 : 78;
+  const clusterAnchors = buildClusterAnchors(nodes);
 
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const deltas = new Map(nodes.map(node => [node.id, { x: 0, y: 0 }]));
@@ -1181,8 +1445,8 @@ function computeForceLayout(nodes, edges) {
         }
         const dx = leftPos.x - rightPos.x;
         const dy = leftPos.y - rightPos.y;
-        const distanceSquared = Math.max(100, dx * dx + dy * dy);
-        const force = 5600 / distanceSquared;
+        const distanceSquared = Math.max(110, dx * dx + dy * dy);
+        const force = 7400 / distanceSquared;
         deltas.get(nodes[i].id).x += dx * force;
         deltas.get(nodes[i].id).y += dy * force;
         deltas.get(nodes[j].id).x -= dx * force;
@@ -1204,7 +1468,7 @@ function computeForceLayout(nodes, edges) {
       const dx = toPos.x - fromPos.x;
       const dy = toPos.y - fromPos.y;
       const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-      const force = (distance - 230) * 0.012;
+      const force = (distance - 240) * 0.013;
       fromDelta.x += dx / distance * force;
       fromDelta.y += dy / distance * force;
       toDelta.x -= dx / distance * force;
@@ -1217,12 +1481,87 @@ function computeForceLayout(nodes, edges) {
       if (!current || !delta) {
         return;
       }
+      const anchor = clusterAnchors.get(node.id);
+      if (anchor) {
+        delta.x += (anchor.x - current.x) * 0.016;
+        delta.y += (anchor.y - current.y) * 0.016;
+      }
       state.positions.set(node.id, {
-        x: current.x + Math.max(-8, Math.min(8, delta.x)),
-        y: current.y + Math.max(-8, Math.min(8, delta.y))
+        x: current.x + Math.max(-9, Math.min(9, delta.x)),
+        y: current.y + Math.max(-9, Math.min(9, delta.y))
       });
     });
   }
+}
+
+function seedLeafForcePositions(nodes) {
+  const lanes = new Map();
+  nodes.forEach(node => {
+    const lane = getLeafTier(node.type);
+    const list = lanes.get(lane) || [];
+    list.push(node);
+    lanes.set(lane, list);
+  });
+
+  const center = { x: 540, y: 360 };
+  lanes.forEach((laneNodes, lane) => {
+    const radius = lane * 140 + 40;
+    laneNodes
+      .slice()
+      .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id)))
+      .forEach((node, index) => {
+        const angle = (Math.PI * 2 * index) / Math.max(1, laneNodes.length) - Math.PI / 2;
+        state.positions.set(node.id, {
+          x: center.x + Math.cos(angle) * radius + lane * 12,
+          y: center.y + Math.sin(angle) * radius
+        });
+      });
+  });
+}
+
+function buildClusterAnchors(nodes) {
+  const center = { x: 540, y: 360 };
+  const anchors = new Map();
+  const groups = new Map();
+
+  nodes.forEach(node => {
+    const cluster = getLeafClusterName(node.type);
+    const list = groups.get(cluster) || [];
+    list.push(node);
+    groups.set(cluster, list);
+  });
+
+  const orderedClusters = ['Frontend', 'API', 'Service', 'Worker', 'Resource', 'External', 'Infra', 'Other'];
+  orderedClusters.forEach((clusterName, clusterIndex) => {
+    const members = groups.get(clusterName) || [];
+    if (!members.length) {
+      return;
+    }
+    const ring = Math.max(1, Math.floor(clusterIndex / 2) + 1);
+    const baseRadius = 120 + ring * 130;
+    const baseAngle = ((clusterIndex % 8) / 8) * Math.PI * 2 - Math.PI / 2;
+    members
+      .slice()
+      .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id)))
+      .forEach((node, memberIndex) => {
+        const spread = members.length <= 1 ? 0 : (memberIndex - (members.length - 1) / 2) * 0.18;
+        const radius = baseRadius + (memberIndex % 3) * 18;
+        anchors.set(node.id, {
+          x: center.x + Math.cos(baseAngle + spread) * radius,
+          y: center.y + Math.sin(baseAngle + spread) * radius
+        });
+      });
+  });
+
+  return anchors;
+}
+
+function getLeafTier(nodeType) {
+  if (['Service', 'Workflow', 'WorkflowNode', 'WorkflowEdge'].includes(nodeType)) return 1;
+  if (['ApiRoute', 'CliCommand', 'RpcEndpoint', 'FrontendEntry', 'FrontendComponent'].includes(nodeType)) return 2;
+  if (['Worker', 'Task', 'Queue', 'Scheduler', 'EventConsumer', 'MessageProducer'].includes(nodeType)) return 3;
+  if (['DataStore', 'ObjectStore', 'Cache', 'FileSystem', 'ExternalApi', 'ExternalTool', 'ModelProvider', 'Config', 'Secret', 'Kernel', 'Plugin'].includes(nodeType)) return 4;
+  return 5;
 }
 
 function setupPanAndZoom() {
