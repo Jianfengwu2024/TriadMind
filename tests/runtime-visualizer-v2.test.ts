@@ -83,6 +83,10 @@ test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
     const html = fs.readFileSync(fixture.runtimeVisualizerPath, 'utf-8');
     assert.match(html, /data-runtime-visualizer-version="2"/);
     assert.match(html, /id="runtime-toolbar"/);
+    assert.match(html, /id="cluster-controls"/);
+    assert.match(html, /id="view-leaf"/);
+    assert.match(html, /id="view-flow"/);
+    assert.match(html, /id="toggle-clusters"/);
     assert.match(html, /id="runtime-graph"/);
     assert.match(html, /id="status-legend"/);
     assert.match(html, /id="filters-panel"/);
@@ -93,6 +97,7 @@ test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
     assert.match(html, /runtime-flow-card/);
     assert.match(html, /buildEdgeBundleInfo/);
     assert.match(html, /clusters-layer/);
+    assert.match(html, /Runtime first render/);
     assert.match(html, /TriadMind Runtime Graph/);
     assert.match(html, /trace-upstream/);
     assert.match(html, /const runtimeMap = /);
@@ -149,9 +154,55 @@ async def run_item(id: str):
     const html = fs.readFileSync(outputPath, 'utf-8');
     assert.match(html, /data-runtime-visualizer-version="2"/);
     assert.match(html, /id="runtime-toolbar"/);
+    assert.match(html, /id="cluster-controls"/);
     assert.match(html, /id="runtime-graph"/);
     assert.match(html, /id="status-legend"/);
     assert.match(html, /id="search-results"/);
     assert.match(html, /id="edge-label-toggle"/);
     assert.match(html, /"theme":"runtime-dark"/);
+});
+
+test('cli runtime accepts legacy force layout alias and normalizes to leaf-force', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-runtime-cli-force-'));
+    fs.mkdirSync(path.join(root, 'backend'), { recursive: true });
+    fs.writeFileSync(
+        path.join(root, 'backend', 'app.py'),
+        `
+from fastapi import APIRouter
+router = APIRouter()
+
+@router.get("/health")
+async def health():
+    return {"ok": True}
+`,
+        'utf-8'
+    );
+
+    const repoRoot = path.resolve(__dirname, '..');
+    const cliPath = path.join(repoRoot, 'cli.ts');
+    const tsxLoader = pathToFileURL(require.resolve('tsx')).href;
+    const result = spawnSync(
+        process.execPath,
+        [
+            '--import',
+            tsxLoader,
+            cliPath,
+            'runtime',
+            '--visualize',
+            '--layout',
+            'force',
+            '--theme',
+            'leaf-like'
+        ],
+        {
+            cwd: root,
+            encoding: 'utf-8'
+        }
+    );
+
+    assert.equal(result.status, 0, `runtime cli failed: ${result.stderr || result.stdout}`);
+    const outputPath = path.join(root, '.triadmind', 'runtime-visualizer.html');
+    assert.equal(fs.existsSync(outputPath), true);
+    const html = fs.readFileSync(outputPath, 'utf-8');
+    assert.match(html, /"layout":"leaf-force"/);
 });

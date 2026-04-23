@@ -223,7 +223,7 @@ program
     .option('--include-infra', 'Enable docker/env/deployment extraction')
     .option('--framework <name>', 'Hint framework extractor, e.g. fastapi, express, celery')
     .option('--interactive', 'Generate interactive runtime topology visualizer', true)
-    .option('--layout <leaf-force|dagre>', 'Runtime visualizer layout', 'leaf-force')
+    .option('--layout <leaf-force|dagre>', 'Runtime visualizer layout (legacy "force" maps to leaf-force)', 'leaf-force')
     .option('--trace-depth <n>', 'Default runtime trace depth', '2')
     .option('--hide-isolated', 'Hide isolated runtime nodes in the visualizer')
     .option('--theme <leaf-like|runtime-dark>', 'Runtime visualizer theme', 'leaf-like')

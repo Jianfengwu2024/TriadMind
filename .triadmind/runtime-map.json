@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "project": "triadmind-core",
-  "generatedAt": "2026-04-23T12:21:18.296Z",
+  "generatedAt": "2026-04-23T12:37:00.943Z",
   "view": "full",
   "nodes": [
     {
@@ -296,7 +296,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 542,
+          "line": 593,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -304,7 +304,7 @@
         },
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1577,
+          "line": 1650,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dragging'",
@@ -400,7 +400,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 542,
+          "line": 593,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -426,7 +426,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1577,
+          "line": 1650,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dragging'",
@@ -705,7 +705,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 542,
+          "line": 593,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dimmed'",
@@ -722,7 +722,7 @@
       "evidence": [
         {
           "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1577,
+          "line": 1650,
           "column": 13,
           "kind": "call",
           "text": "classList.add('dragging'",

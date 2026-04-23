@@ -117,6 +117,10 @@ h1{font-size:18px;margin-bottom:8px;color:#f8fafc}
 #search:focus{border-color:var(--accent)}
 #search-results{max-height:150px;overflow-y:auto;display:none;padding-top:6px}
 #legend-wrap{flex:1;overflow:auto}
+#cluster-controls{position:absolute;top:14px;left:14px;z-index:22;display:flex;gap:8px;flex-wrap:wrap}
+#cluster-controls button{background:var(--chip);border:1px solid var(--chip-border);color:#e2e8f0;padding:8px 12px;border-radius:999px;cursor:pointer;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+#cluster-controls button:hover{filter:brightness(1.08)}
+#cluster-controls button.active{background:#082f49;border-color:#38bdf8;color:#e0f2fe;box-shadow:0 0 18px rgba(56,189,248,.28)}
 #runtime-toolbar{position:absolute;top:14px;left:14px;z-index:20;display:flex;gap:8px;flex-wrap:wrap;background:rgba(15,23,42,.92);border:1px solid var(--line2);border-radius:12px;padding:10px;box-shadow:0 12px 28px rgba(0,0,0,.28);max-width:calc(100% - 28px)}
 #runtime-toolbar button,#runtime-toolbar select,#runtime-toolbar input{background:var(--chip);border:1px solid var(--chip-border);color:#e2e8f0;padding:7px 10px;border-radius:999px;font-size:12px}
 #runtime-toolbar button{cursor:pointer}
@@ -181,11 +185,16 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
 .trace-input{width:66px !important;border-radius:8px !important}
 .toggle-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1}
 .toggle-chip input{accent-color:var(--accent)}
-@media (max-width:1100px){#sidebar{display:none}#runtime-toolbar .runtime-search-chip{width:180px}}
+@media (max-width:1100px){#sidebar{display:none}#runtime-toolbar .runtime-search-chip{width:180px}#cluster-controls{right:14px}}
 </style>
 </head>
 <body>
 <main id="graph" data-runtime-visualizer-version="2">
+  <div id="cluster-controls">
+    <button id="view-leaf" class="view-toggle active" data-view="leaf" type="button">Leaf View</button>
+    <button id="view-flow" class="view-toggle" data-view="flow" type="button">Flow View</button>
+    <button id="toggle-clusters" type="button">Collapse Resource Clusters</button>
+  </div>
   <div id="runtime-toolbar">
     <input id="search" class="runtime-search-chip" placeholder="Search id / label / type / sourcePath">
     <select id="layout-select"><option value="leaf-force">leaf-force</option><option value="dagre">dagre</option></select>
@@ -349,6 +358,9 @@ const dom = {
   edgeFilterContainer: document.getElementById('edge-type-filters'),
   presetContainer: document.getElementById('node-presets'),
   searchResults: document.getElementById('search-results'),
+  viewLeaf: document.getElementById('view-leaf'),
+  viewFlow: document.getElementById('view-flow'),
+  toggleClusters: document.getElementById('toggle-clusters'),
   detailTitle: document.getElementById('detail-title'),
   detailBody: document.getElementById('detail-body'),
   diagnosticsContent: document.getElementById('diagnostics-content')
@@ -358,6 +370,8 @@ const graphStore = buildGraphStore(runtimeMap);
 const state = {
   layout: dashboardOptions.layout === 'dagre' ? 'dagre' : 'leaf-force',
   query: '',
+  currentView: 'leaf',
+  clustersCollapsed: false,
   selectedNodeId: null,
   selectedEdgeId: null,
   hoveredNodeId: null,
@@ -371,8 +385,10 @@ const state = {
   transform: { x: 0, y: 0, k: 1 },
   positions: new Map(),
   draggingNodeId: null,
-  layoutDirty: true
+  layoutDirty: true,
+  firstRenderMs: 0
 };
+const renderBootStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
 const allNodeTypes = Array.from(new Set(graphStore.nodes.map(node => node.type))).sort();
 const allEdgeTypes = Array.from(new Set(graphStore.edges.map(edge => edge.type))).sort();
@@ -420,6 +436,8 @@ function hydrateControls() {
   dom.layoutSelect.value = state.layout;
   dom.hideIsolated.checked = state.hideIsolated;
   syncEdgeLabelToggle();
+  syncViewToggle();
+  syncClusterToggle();
   setupPresetButtons();
   buildFilterControls(dom.nodeFilterContainer, allNodeTypes, state.activeNodeTypes, type => NODE_COLORS[type] || '#64748b', nodeTypeCounts, true);
   buildFilterControls(dom.edgeFilterContainer, allEdgeTypes, state.activeEdgeTypes, type => EDGE_COLORS[type] || '#7aa2df', edgeTypeCounts, false);
@@ -432,8 +450,10 @@ function hydrateControls() {
   });
   dom.layoutSelect.addEventListener('change', event => {
     state.layout = event.target.value === 'dagre' ? 'dagre' : 'leaf-force';
+    state.currentView = state.layout === 'dagre' ? 'flow' : 'leaf';
     state.positions = new Map();
     state.layoutDirty = true;
+    syncViewToggle();
     renderGraph();
   });
   dom.traceDepth.addEventListener('change', () => {
@@ -454,8 +474,39 @@ function hydrateControls() {
   });
   dom.resetView.addEventListener('click', resetStateAndRender);
   dom.fitView.addEventListener('click', fitView);
+  dom.viewLeaf.addEventListener('click', () => setGraphView('leaf'));
+  dom.viewFlow.addEventListener('click', () => setGraphView('flow'));
+  dom.toggleClusters.addEventListener('click', () => {
+    state.clustersCollapsed = !state.clustersCollapsed;
+    syncClusterToggle();
+    state.layoutDirty = true;
+    renderGraph();
+  });
   setupPanAndZoom();
   renderSearchResults();
+}
+
+function setGraphView(view) {
+  state.currentView = view === 'flow' ? 'flow' : 'leaf';
+  state.layout = state.currentView === 'flow' ? 'dagre' : 'leaf-force';
+  dom.layoutSelect.value = state.layout;
+  state.layoutDirty = true;
+  syncViewToggle();
+  renderGraph();
+}
+
+function syncViewToggle() {
+  dom.viewLeaf.classList.toggle('active', state.currentView === 'leaf');
+  dom.viewFlow.classList.toggle('active', state.currentView === 'flow');
+}
+
+function syncClusterToggle() {
+  const button = dom.toggleClusters;
+  if (!button) {
+    return;
+  }
+  button.classList.toggle('active', state.clustersCollapsed);
+  button.textContent = state.clustersCollapsed ? 'Expand Resource Clusters' : 'Collapse Resource Clusters';
 }
 
 function hydrateDiagnostics() {
@@ -609,7 +660,7 @@ function renderGraph() {
   dom.edgeLabelsLayer.innerHTML = '';
   dom.bundleLabelsLayer.innerHTML = '';
   dom.nodesLayer.innerHTML = '';
-  if (state.layout === 'leaf-force') {
+  if (state.currentView === 'leaf' && state.layout === 'leaf-force') {
     renderClusterHalos(graph.nodes);
   }
   const highlighted = computeHighlightSets();
@@ -622,6 +673,11 @@ function renderGraph() {
     dom.notice.textContent = 'Bundled ' + bundleInfo.bundledEdgeIds.size + ' dense resource edges for readability.';
   } else {
     dom.notice.textContent = 'Runtime graph ready: click node/edge to inspect and trace.';
+  }
+  if (!state.firstRenderMs) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    state.firstRenderMs = Math.round(now - renderBootStartedAt);
+    console.log('[TriadMind] Runtime first render: ' + state.firstRenderMs + 'ms');
   }
 }
 
@@ -643,6 +699,23 @@ function getVisibleGraph() {
       allowedNodeIds.has(edge.from) &&
       allowedNodeIds.has(edge.to)
     );
+  }
+
+  if (state.clustersCollapsed) {
+    const highlightedNodeIds = new Set();
+    if (state.selectedNodeId) highlightedNodeIds.add(state.selectedNodeId);
+    if (state.focusNodeId) highlightedNodeIds.add(state.focusNodeId);
+    if (state.trace) state.trace.nodeIds.forEach(nodeId => highlightedNodeIds.add(nodeId));
+    const suppressedClusters = new Set(['Resource', 'External', 'Infra']);
+    nodes = nodes.filter(node => {
+      if (highlightedNodeIds.has(node.id)) {
+        return true;
+      }
+      const cluster = getLeafClusterName(node.type);
+      return !suppressedClusters.has(cluster);
+    });
+    allowedNodeIds = new Set(nodes.map(node => node.id));
+    edges = edges.filter(edge => allowedNodeIds.has(edge.from) && allowedNodeIds.has(edge.to));
   }
 
   if (state.hideIsolated) {

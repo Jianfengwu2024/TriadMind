@@ -24,6 +24,10 @@ h1{font-size:18px;margin-bottom:8px;color:#f8fafc}
 #search:focus{border-color:var(--accent)}
 #search-results{max-height:150px;overflow-y:auto;display:none;padding-top:6px}
 #legend-wrap{flex:1;overflow:auto}
+#cluster-controls{position:absolute;top:14px;left:14px;z-index:22;display:flex;gap:8px;flex-wrap:wrap}
+#cluster-controls button{background:var(--chip);border:1px solid var(--chip-border);color:#e2e8f0;padding:8px 12px;border-radius:999px;cursor:pointer;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+#cluster-controls button:hover{filter:brightness(1.08)}
+#cluster-controls button.active{background:#082f49;border-color:#38bdf8;color:#e0f2fe;box-shadow:0 0 18px rgba(56,189,248,.28)}
 #runtime-toolbar{position:absolute;top:14px;left:14px;z-index:20;display:flex;gap:8px;flex-wrap:wrap;background:rgba(15,23,42,.92);border:1px solid var(--line2);border-radius:12px;padding:10px;box-shadow:0 12px 28px rgba(0,0,0,.28);max-width:calc(100% - 28px)}
 #runtime-toolbar button,#runtime-toolbar select,#runtime-toolbar input{background:var(--chip);border:1px solid var(--chip-border);color:#e2e8f0;padding:7px 10px;border-radius:999px;font-size:12px}
 #runtime-toolbar button{cursor:pointer}
@@ -88,11 +92,16 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
 .trace-input{width:66px !important;border-radius:8px !important}
 .toggle-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1}
 .toggle-chip input{accent-color:var(--accent)}
-@media (max-width:1100px){#sidebar{display:none}#runtime-toolbar .runtime-search-chip{width:180px}}
+@media (max-width:1100px){#sidebar{display:none}#runtime-toolbar .runtime-search-chip{width:180px}#cluster-controls{right:14px}}
 </style>
 </head>
 <body>
 <main id="graph" data-runtime-visualizer-version="2">
+  <div id="cluster-controls">
+    <button id="view-leaf" class="view-toggle active" data-view="leaf" type="button">Leaf View</button>
+    <button id="view-flow" class="view-toggle" data-view="flow" type="button">Flow View</button>
+    <button id="toggle-clusters" type="button">Collapse Resource Clusters</button>
+  </div>
   <div id="runtime-toolbar">
     <input id="search" class="runtime-search-chip" placeholder="Search id / label / type / sourcePath">
     <select id="layout-select"><option value="leaf-force">leaf-force</option><option value="dagre">dagre</option></select>
@@ -101,7 +110,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
     <button id="trace-downstream" type="button">Downstream</button>
     <button id="trace-both" type="button">Both</button>
     <button id="edge-label-toggle" type="button" class="active">Edge Labels: on</button>
-    <label class="toggle-chip"><input id="hide-isolated" type="checkbox" >Hide isolated</label>
+    <label class="toggle-chip"><input id="hide-isolated" type="checkbox" checked>Hide isolated</label>
     <button id="reset-view" type="button">Reset</button>
     <button id="fit-view" type="button">Fit</button>
   </div>
@@ -127,7 +136,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
     <h1>triadmind-core</h1>
     <p>Leaf-style runtime graph: consistent controls and review flow with capability visualizer while keeping runtime semantics.</p>
     <div class="stats">view: full · nodes: 13 · edges: 10 · normalized edges: 7</div>
-    <div class="stats">diagnostics: 1 · layout: dagre · interactive: on</div>
+    <div class="stats">diagnostics: 1 · layout: leaf-force · interactive: on</div>
   </section>
   <section id="search-wrap">
     <h3>Node Presets</h3>
@@ -159,8 +168,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px sol
   </section>
 </aside>
 <script>
-const runtimeMap = {"schemaVersion":"1.0","project":"triadmind-core","generatedAt":"2026-04-23T12:21:18.296Z","view":"full","nodes":[{"id":"Config.PackageJson","type":"Config","label":"package.json","sourcePath":"package.json","category":"infra","metadata":{"scripts":["clean","build","prepare","prepack","prepublishOnly","init","prompt","pipeline","macro","meso","micro","sync","watch","protocol","finalize","legacy","converge","plan","auto","invoke","rules","self","adapters","heal","snapshots","snapshot","rollback","handoff","master","apply","typecheck","test"],"dependencies":["chalk","commander","inquirer","tree-sitter","tree-sitter-cpp","tree-sitter-go","tree-sitter-java","tree-sitter-javascript","tree-sitter-python","tree-sitter-rust","tree-sitter-typescript","ts-morph","zod"],"originalLabel":"package.json","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"evidence":[{"sourcePath":"package.json","line":1,"column":1,"kind":"manifest","text":"package.json","confidence":0.8}]},{"id":"DataStore.Postgres","type":"DataStore","label":"Postgres","category":"infra","sourcePath":"runtime/runtimeLabeling.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"import","text":"postgres","confidence":0.65}],"metadata":{"originalLabel":"Postgres","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ExternalTool.subprocess","type":"ExternalTool","label":"subprocess","category":"external","sourcePath":"cli.ts","evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"import","text":"spawn(","confidence":0.65}],"metadata":{"originalLabel":"subprocess","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ModelProvider.OpenAI","type":"ModelProvider","label":"OpenAI","category":"external","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"metadata":{"originalLabel":"OpenAI","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ObjectStore.MinIO","type":"ObjectStore","label":"MinIO","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"metadata":{"originalLabel":"MinIO","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Queue.classList","type":"Queue","label":"classList","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":542,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"runtime/runtimeVisualizer.ts","line":1577,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"classList","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Service.detect","type":"Service","label":"detect","sourcePath":"runtime/extractors/configInfraExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"metadata":{"originalLabel":"detect","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.openFile","type":"Service","label":"openFile","sourcePath":"cli.ts","category":"backend","evidence":[{"sourcePath":"cli.ts","line":1247,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}],"metadata":{"originalLabel":"openFile","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/extractors/resourceAccessExtractor","type":"Service","label":"runtime/extractors/resourceAccessExtractor","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/extractors/resourceAccessExtractor","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/runtimeLabeling","type":"Service","label":"runtime/runtimeLabeling","sourcePath":"runtime/runtimeLabeling.ts","category":"backend","evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":1,"column":1,"kind":"inferred","text":"runtime/runtimeLabeling.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/runtimeLabeling","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Task.dimmed","type":"Task","label":"dimmed","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":542,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"dimmed","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Task.dragging","type":"Task","label":"dragging","sourcePath":"runtime/runtimeVisualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1577,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75}],"metadata":{"originalLabel":"dragging","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Workflow.tsx_cli.ts_pipeline","type":"Workflow","label":"tsx cli.ts pipeline","sourcePath":"package.json","category":"core","evidence":[{"sourcePath":"package.json","line":23,"column":5,"kind":"manifest","text":"\"pipeline\": \"tsx cli.ts pipeline\"","confidence":0.6}],"metadata":{"originalLabel":"tsx cli.ts pipeline","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}}],"edges":[{"from":"Service.detect","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres"},{"from":"Service.detect","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO"},{"from":"Service.openFile","to":"ExternalTool.subprocess","type":"uses_tool","confidence":0.65,"evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"call","text":"spawn(","confidence":0.65}],"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","type":"uses_model","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO"},{"from":"Service.runtime/runtimeLabeling","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"call","text":"postgres","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":542,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dimmed"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dragging","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1577,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dragging"},{"from":"Service.visualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.visualizer.enqueues.Task.dimmed"}],"diagnostics":[{"level":"info","code":"RUNTIME_EXCLUDED_PATHS_SUMMARY","extractor":"RuntimeSourceCollector","message":"Skipped runtime paths by exclude rules: 6 [.git, .triadmind, dist, node_modules, package-lock.json (+1 more)]"}]};
-const dashboardOptions = {"interactive":true,"layout":"dagre","traceDepth":2,"hideIsolated":false,"maxRenderEdges":2000,"theme":"runtime-dark"};
+const runtimeMap = {"schemaVersion":"1.0","project":"triadmind-core","generatedAt":"2026-04-23T12:37:00.943Z","view":"full","nodes":[{"id":"Config.PackageJson","type":"Config","label":"package.json","sourcePath":"package.json","category":"infra","metadata":{"scripts":["clean","build","prepare","prepack","prepublishOnly","init","prompt","pipeline","macro","meso","micro","sync","watch","protocol","finalize","legacy","converge","plan","auto","invoke","rules","self","adapters","heal","snapshots","snapshot","rollback","handoff","master","apply","typecheck","test"],"dependencies":["chalk","commander","inquirer","tree-sitter","tree-sitter-cpp","tree-sitter-go","tree-sitter-java","tree-sitter-javascript","tree-sitter-python","tree-sitter-rust","tree-sitter-typescript","ts-morph","zod"],"originalLabel":"package.json","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"evidence":[{"sourcePath":"package.json","line":1,"column":1,"kind":"manifest","text":"package.json","confidence":0.8}]},{"id":"DataStore.Postgres","type":"DataStore","label":"Postgres","category":"infra","sourcePath":"runtime/runtimeLabeling.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"import","text":"postgres","confidence":0.65}],"metadata":{"originalLabel":"Postgres","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ExternalTool.subprocess","type":"ExternalTool","label":"subprocess","category":"external","sourcePath":"cli.ts","evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"import","text":"spawn(","confidence":0.65}],"metadata":{"originalLabel":"subprocess","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ModelProvider.OpenAI","type":"ModelProvider","label":"OpenAI","category":"external","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"metadata":{"originalLabel":"OpenAI","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ObjectStore.MinIO","type":"ObjectStore","label":"MinIO","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"metadata":{"originalLabel":"MinIO","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Queue.classList","type":"Queue","label":"classList","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":593,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"runtime/runtimeVisualizer.ts","line":1650,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"classList","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Service.detect","type":"Service","label":"detect","sourcePath":"runtime/extractors/configInfraExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"metadata":{"originalLabel":"detect","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.openFile","type":"Service","label":"openFile","sourcePath":"cli.ts","category":"backend","evidence":[{"sourcePath":"cli.ts","line":1247,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}],"metadata":{"originalLabel":"openFile","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/extractors/resourceAccessExtractor","type":"Service","label":"runtime/extractors/resourceAccessExtractor","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/extractors/resourceAccessExtractor","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/runtimeLabeling","type":"Service","label":"runtime/runtimeLabeling","sourcePath":"runtime/runtimeLabeling.ts","category":"backend","evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":1,"column":1,"kind":"inferred","text":"runtime/runtimeLabeling.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/runtimeLabeling","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Task.dimmed","type":"Task","label":"dimmed","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":593,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"dimmed","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Task.dragging","type":"Task","label":"dragging","sourcePath":"runtime/runtimeVisualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1650,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75}],"metadata":{"originalLabel":"dragging","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Workflow.tsx_cli.ts_pipeline","type":"Workflow","label":"tsx cli.ts pipeline","sourcePath":"package.json","category":"core","evidence":[{"sourcePath":"package.json","line":23,"column":5,"kind":"manifest","text":"\"pipeline\": \"tsx cli.ts pipeline\"","confidence":0.6}],"metadata":{"originalLabel":"tsx cli.ts pipeline","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}}],"edges":[{"from":"Service.detect","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres"},{"from":"Service.detect","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO"},{"from":"Service.openFile","to":"ExternalTool.subprocess","type":"uses_tool","confidence":0.65,"evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"call","text":"spawn(","confidence":0.65}],"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","type":"uses_model","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO"},{"from":"Service.runtime/runtimeLabeling","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"call","text":"postgres","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":593,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dimmed"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dragging","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1650,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dragging"},{"from":"Service.visualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.visualizer.enqueues.Task.dimmed"}],"diagnostics":[{"level":"info","code":"RUNTIME_EXCLUDED_PATHS_SUMMARY","extractor":"RuntimeSourceCollector","message":"Skipped runtime paths by exclude rules: 6 [.git, .triadmind, dist, node_modules, package-lock.json (+1 more)]"}]};
+const dashboardOptions = {"interactive":true,"layout":"leaf-force","traceDepth":2,"hideIsolated":true,"maxRenderEdges":2000,"theme":"leaf-like"};
 
 const NODE_TYPE_PRESETS = {
   All: [],
@@ -249,6 +258,9 @@ const dom = {
   edgeFilterContainer: document.getElementById('edge-type-filters'),
   presetContainer: document.getElementById('node-presets'),
   searchResults: document.getElementById('search-results'),
+  viewLeaf: document.getElementById('view-leaf'),
+  viewFlow: document.getElementById('view-flow'),
+  toggleClusters: document.getElementById('toggle-clusters'),
   detailTitle: document.getElementById('detail-title'),
   detailBody: document.getElementById('detail-body'),
   diagnosticsContent: document.getElementById('diagnostics-content')
@@ -258,6 +270,8 @@ const graphStore = buildGraphStore(runtimeMap);
 const state = {
   layout: dashboardOptions.layout === 'dagre' ? 'dagre' : 'leaf-force',
   query: '',
+  currentView: 'leaf',
+  clustersCollapsed: false,
   selectedNodeId: null,
   selectedEdgeId: null,
   hoveredNodeId: null,
@@ -271,8 +285,10 @@ const state = {
   transform: { x: 0, y: 0, k: 1 },
   positions: new Map(),
   draggingNodeId: null,
-  layoutDirty: true
+  layoutDirty: true,
+  firstRenderMs: 0
 };
+const renderBootStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
 const allNodeTypes = Array.from(new Set(graphStore.nodes.map(node => node.type))).sort();
 const allEdgeTypes = Array.from(new Set(graphStore.edges.map(edge => edge.type))).sort();
@@ -320,6 +336,8 @@ function hydrateControls() {
   dom.layoutSelect.value = state.layout;
   dom.hideIsolated.checked = state.hideIsolated;
   syncEdgeLabelToggle();
+  syncViewToggle();
+  syncClusterToggle();
   setupPresetButtons();
   buildFilterControls(dom.nodeFilterContainer, allNodeTypes, state.activeNodeTypes, type => NODE_COLORS[type] || '#64748b', nodeTypeCounts, true);
   buildFilterControls(dom.edgeFilterContainer, allEdgeTypes, state.activeEdgeTypes, type => EDGE_COLORS[type] || '#7aa2df', edgeTypeCounts, false);
@@ -332,8 +350,10 @@ function hydrateControls() {
   });
   dom.layoutSelect.addEventListener('change', event => {
     state.layout = event.target.value === 'dagre' ? 'dagre' : 'leaf-force';
+    state.currentView = state.layout === 'dagre' ? 'flow' : 'leaf';
     state.positions = new Map();
     state.layoutDirty = true;
+    syncViewToggle();
     renderGraph();
   });
   dom.traceDepth.addEventListener('change', () => {
@@ -354,8 +374,39 @@ function hydrateControls() {
   });
   dom.resetView.addEventListener('click', resetStateAndRender);
   dom.fitView.addEventListener('click', fitView);
+  dom.viewLeaf.addEventListener('click', () => setGraphView('leaf'));
+  dom.viewFlow.addEventListener('click', () => setGraphView('flow'));
+  dom.toggleClusters.addEventListener('click', () => {
+    state.clustersCollapsed = !state.clustersCollapsed;
+    syncClusterToggle();
+    state.layoutDirty = true;
+    renderGraph();
+  });
   setupPanAndZoom();
   renderSearchResults();
+}
+
+function setGraphView(view) {
+  state.currentView = view === 'flow' ? 'flow' : 'leaf';
+  state.layout = state.currentView === 'flow' ? 'dagre' : 'leaf-force';
+  dom.layoutSelect.value = state.layout;
+  state.layoutDirty = true;
+  syncViewToggle();
+  renderGraph();
+}
+
+function syncViewToggle() {
+  dom.viewLeaf.classList.toggle('active', state.currentView === 'leaf');
+  dom.viewFlow.classList.toggle('active', state.currentView === 'flow');
+}
+
+function syncClusterToggle() {
+  const button = dom.toggleClusters;
+  if (!button) {
+    return;
+  }
+  button.classList.toggle('active', state.clustersCollapsed);
+  button.textContent = state.clustersCollapsed ? 'Expand Resource Clusters' : 'Collapse Resource Clusters';
 }
 
 function hydrateDiagnostics() {
@@ -509,7 +560,7 @@ function renderGraph() {
   dom.edgeLabelsLayer.innerHTML = '';
   dom.bundleLabelsLayer.innerHTML = '';
   dom.nodesLayer.innerHTML = '';
-  if (state.layout === 'leaf-force') {
+  if (state.currentView === 'leaf' && state.layout === 'leaf-force') {
     renderClusterHalos(graph.nodes);
   }
   const highlighted = computeHighlightSets();
@@ -522,6 +573,11 @@ function renderGraph() {
     dom.notice.textContent = 'Bundled ' + bundleInfo.bundledEdgeIds.size + ' dense resource edges for readability.';
   } else {
     dom.notice.textContent = 'Runtime graph ready: click node/edge to inspect and trace.';
+  }
+  if (!state.firstRenderMs) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    state.firstRenderMs = Math.round(now - renderBootStartedAt);
+    console.log('[TriadMind] Runtime first render: ' + state.firstRenderMs + 'ms');
   }
 }
 
@@ -543,6 +599,23 @@ function getVisibleGraph() {
       allowedNodeIds.has(edge.from) &&
       allowedNodeIds.has(edge.to)
     );
+  }
+
+  if (state.clustersCollapsed) {
+    const highlightedNodeIds = new Set();
+    if (state.selectedNodeId) highlightedNodeIds.add(state.selectedNodeId);
+    if (state.focusNodeId) highlightedNodeIds.add(state.focusNodeId);
+    if (state.trace) state.trace.nodeIds.forEach(nodeId => highlightedNodeIds.add(nodeId));
+    const suppressedClusters = new Set(['Resource', 'External', 'Infra']);
+    nodes = nodes.filter(node => {
+      if (highlightedNodeIds.has(node.id)) {
+        return true;
+      }
+      const cluster = getLeafClusterName(node.type);
+      return !suppressedClusters.has(cluster);
+    });
+    allowedNodeIds = new Set(nodes.map(node => node.id));
+    edges = edges.filter(edge => allowedNodeIds.has(edge.from) && allowedNodeIds.has(edge.to));
   }
 
   if (state.hideIsolated) {
