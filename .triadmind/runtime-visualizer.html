@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TriadMind Runtime Topology - triadmind-core</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, Segoe UI, Arial, sans-serif; }
+    body { margin: 0; background: #0b1020; color: #dbe3f3; }
+    .app { display: grid; grid-template-columns: 1fr 360px; min-height: 100vh; }
+    .main { padding: 20px; overflow: auto; }
+    .sidebar { border-left: 1px solid #26314f; padding: 20px; background: #121a2f; overflow: auto; }
+    .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .chip { background: #16213b; padding: 8px 12px; border-radius: 999px; font-size: 12px; }
+    .lanes { display: grid; grid-template-columns: repeat(6, minmax(180px, 1fr)); gap: 16px; }
+    .lane { background: #10182c; border: 1px solid #26314f; border-radius: 14px; padding: 12px; }
+    .lane h3 { margin: 0 0 12px; font-size: 14px; }
+    .node { display: block; width: 100%; text-align: left; margin: 0 0 8px; background: #18233f; border: 1px solid #2b3d68; color: #edf3ff; border-radius: 10px; padding: 10px; cursor: pointer; }
+    .node small { display: block; color: #94a7cc; margin-top: 4px; }
+    .muted { color: #8fa2c6; }
+    .edge { padding: 8px 0; border-bottom: 1px solid #26314f; font-size: 13px; }
+    .edge-type { display: inline-block; min-width: 84px; color: #87b6ff; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #0d1426; border-radius: 10px; padding: 12px; }
+    @media (max-width: 1200px) { .app { grid-template-columns: 1fr; } .sidebar { border-left: none; border-top: 1px solid #26314f; } .lanes { grid-template-columns: repeat(2, minmax(180px, 1fr)); } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="main">
+      <h1>triadmind-core runtime topology</h1>
+      <div class="summary">
+        <div class="chip">view: resources</div>
+        <div class="chip">nodes: 8</div>
+        <div class="chip">edges: 6</div>
+        <div class="chip">diagnostics: 0</div>
+      </div>
+      <div id="lanes" class="lanes"></div>
+    </div>
+    <aside class="sidebar">
+      <h2 id="detail-title">Select a node</h2>
+      <div id="detail-body" class="muted">Click any node to inspect source, metadata, evidence, and edges.</div>
+    </aside>
+  </div>
+  <script>
+    const runtimeMap = {"schemaVersion":"1.0","project":"triadmind-core","generatedAt":"2026-04-23T02:58:59.766Z","view":"resources","nodes":[{"id":"DataStore.Postgres","type":"DataStore","label":"Postgres","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65}],"metadata":{}},{"id":"ExternalTool.subprocess","type":"ExternalTool","label":"subprocess","category":"external","sourcePath":"cli.ts","evidence":[{"sourcePath":"cli.ts","line":1157,"column":19,"kind":"import","text":"spawn(","confidence":0.65}]},{"id":"ModelProvider.OpenAI","type":"ModelProvider","label":"OpenAI","category":"external","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"metadata":{}},{"id":"ObjectStore.MinIO","type":"ObjectStore","label":"MinIO","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"metadata":{}},{"id":"Service.detect","type":"Service","label":"detect","sourcePath":"runtime/extractors/configInfraExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"metadata":{}},{"id":"Service.openFile","type":"Service","label":"openFile","sourcePath":"cli.ts","category":"backend","evidence":[{"sourcePath":"cli.ts","line":1151,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}]},{"id":"Service.runtime/extractors/resourceAccessExtractor","type":"Service","label":"runtime/extractors/resourceAccessExtractor","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"metadata":{}},{"id":"Task.dimmed","type":"Task","label":"dimmed","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"visualizer.ts","line":627,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}]}],"edges":[{"from":"Service.detect","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres"},{"from":"Service.detect","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO"},{"from":"Service.openFile","to":"ExternalTool.subprocess","type":"uses_tool","confidence":0.65,"evidence":[{"sourcePath":"cli.ts","line":1157,"column":19,"kind":"call","text":"spawn(","confidence":0.65}],"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","type":"uses_model","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO"}],"diagnostics":[]};
+    const lanes = [
+      { key: 'Frontend', types: ['FrontendEntry', 'FrontendComponent'] },
+      { key: 'API', types: ['ApiRoute', 'CliCommand', 'RpcEndpoint'] },
+      { key: 'Service', types: ['Service', 'Workflow', 'WorkflowNode', 'WorkflowEdge'] },
+      { key: 'Worker', types: ['Worker', 'Task', 'Queue', 'Scheduler', 'MessageProducer', 'EventConsumer'] },
+      { key: 'Resources', types: ['DataStore', 'ObjectStore', 'Cache', 'FileSystem', 'Config', 'Secret'] },
+      { key: 'External', types: ['ExternalApi', 'ExternalTool', 'ModelProvider', 'Kernel', 'Plugin', 'UnknownRuntime'] }
+    ];
+    const edgeColors = { calls:'#5bc0eb', invokes:'#9bc53d', enqueues:'#f25f5c', reads:'#ffe066', writes:'#ff9f1c', caches:'#c77dff', executes:'#2ec4b6', contains:'#6c8ef5', connects:'#8d99ae' };
+    const lanesEl = document.getElementById('lanes');
+    const detailTitle = document.getElementById('detail-title');
+    const detailBody = document.getElementById('detail-body');
+    const edgesByNode = new Map();
+    for (const edge of runtimeMap.edges) {
+      if (!edgesByNode.has(edge.from)) edgesByNode.set(edge.from, { outgoing: [], incoming: [] });
+      if (!edgesByNode.has(edge.to)) edgesByNode.set(edge.to, { outgoing: [], incoming: [] });
+      edgesByNode.get(edge.from).outgoing.push(edge);
+      edgesByNode.get(edge.to).incoming.push(edge);
+    }
+    function render() {
+      lanesEl.innerHTML = '';
+      for (const lane of lanes) {
+        const nodes = runtimeMap.nodes.filter(node => lane.types.includes(node.type));
+        if (!nodes.length) continue;
+        const section = document.createElement('section');
+        section.className = 'lane';
+        section.innerHTML = '<h3>' + lane.key + ' <span class="muted">(' + nodes.length + ')</span></h3>';
+        for (const node of nodes) {
+          const button = document.createElement('button');
+          button.className = 'node';
+          button.innerHTML = '<strong>' + escapeHtml(node.label) + '</strong><small>' + escapeHtml(node.type) + '</small>';
+          button.onclick = () => showNode(node);
+          section.appendChild(button);
+        }
+        lanesEl.appendChild(section);
+      }
+    }
+    function showNode(node) {
+      const io = edgesByNode.get(node.id) || { incoming: [], outgoing: [] };
+      detailTitle.textContent = node.label;
+      const details = [
+        '<div><strong>Type:</strong> ' + escapeHtml(node.type) + '</div>',
+        '<div><strong>Source:</strong> ' + escapeHtml(node.sourcePath || '-') + '</div>',
+        '<div><strong>Framework:</strong> ' + escapeHtml(node.framework || '-') + '</div>',
+        '<h3>Metadata</h3><pre>' + escapeHtml(JSON.stringify(node.metadata || {}, null, 2)) + '</pre>',
+        '<h3>Evidence</h3><pre>' + escapeHtml(JSON.stringify(node.evidence || [], null, 2)) + '</pre>',
+        '<h3>Outgoing</h3>' + renderEdges(io.outgoing),
+        '<h3>Incoming</h3>' + renderEdges(io.incoming)
+      ];
+      detailBody.innerHTML = details.join('');
+    }
+    function renderEdges(edges) {
+      if (!edges.length) return '<div class="muted">None</div>';
+      return edges.map(edge => '<div class="edge"><span class="edge-type" style="color:' + (edgeColors[edge.type] || '#9ab') + '">' + escapeHtml(edge.type) + '</span>' + escapeHtml(edge.from + ' → ' + edge.to) + '</div>').join('');
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[char]));
+    }
+    render();
+  </script>
+</body>
+</html>

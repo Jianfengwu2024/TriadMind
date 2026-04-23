@@ -85,21 +85,120 @@ D:/TraidMind/triadmind-core
   "categories": {
     "frontend": [
       "src/frontend",
-      "frontend"
+      "frontend",
+      "src/client",
+      "client",
+      "src/web",
+      "web",
+      "src/app",
+      "app",
+      "apps/frontend",
+      "packages/frontend"
     ],
     "backend": [
       "src/backend",
-      "backend"
+      "backend",
+      "src/server",
+      "server",
+      "src/api",
+      "api",
+      "apps/backend",
+      "packages/backend"
     ],
     "core": [
       "src/core",
-      "core"
+      "core",
+      "src/shared",
+      "shared",
+      "src/lib",
+      "lib"
     ]
   },
   "parser": {
     "excludePatterns": [
       "node_modules",
       ".triadmind"
+    ],
+    "excludePathPatterns": [
+      "tests",
+      "test",
+      "schema",
+      "schemas",
+      "model",
+      "models",
+      "entity",
+      "entities",
+      "dto",
+      "vo",
+      "types",
+      "types.py",
+      "migrations",
+      "alembic/versions",
+      "__pycache__",
+      "node_modules",
+      "venv",
+      ".venv",
+      ".next",
+      "dist",
+      "build"
+    ],
+    "scanCategories": [
+      "frontend",
+      "backend"
+    ],
+    "scanMode": "capability",
+    "leafOutputFile": ".triadmind/leaf-map.json",
+    "capabilityOutputFile": ".triadmind/triad-map.json",
+    "capabilityThreshold": 4,
+    "excludeTestFiles": true,
+    "excludeMagicMethods": true,
+    "excludePrivateMethods": true,
+    "helperVerbPolicy": "suppress",
+    "foldHelpersIntoOwner": true,
+    "entryMethodNames": [
+      "execute",
+      "run",
+      "handle",
+      "process",
+      "dispatch",
+      "apply",
+      "invoke",
+      "plan",
+      "schedule",
+      "orchestrate"
+    ],
+    "excludeNodeNamePatterns": [
+      "^(__.*__|_(?!_).*)$",
+      "^(test_.+)$",
+      "^__.*__$",
+      "^(upgrade|downgrade)$"
+    ],
+    "ignoreGenericContracts": true,
+    "genericContractIgnoreList": [
+      "str",
+      "string",
+      "int",
+      "number",
+      "bool",
+      "boolean",
+      "float",
+      "dict",
+      "object",
+      "list",
+      "array",
+      "any",
+      "unknown",
+      "json",
+      "request",
+      "response",
+      "path",
+      "void",
+      "none",
+      "dict[str,any]",
+      "optional[str]",
+      "optional[int]",
+      "list[str]",
+      "list[any]"
     ],
     "includeUntaggedExports": true,
     "jsDocTags": {
@@ -108,9 +207,45 @@ D:/TraidMind/triadmind-core
       "rightBranch": "RightBranch"
     }
   },
+  "visualizer": {
+    "defaultView": "architecture",
+    "showIsolatedCapabilities": false,
+    "maxContractEdges": 1200,
+    "maxPrimaryEdges": 1500,
+    "fastMode": true,
+    "strictFingerprint": false,
+    "fastMayaThreshold": 0,
+    "fastFingerprintThreshold": 0,
+    "maxFingerprintNodes": 8,
+    "maxFingerprintOwners": 100,
+    "fingerprintTimeoutMs": 50,
+    "maxRenderNodes": 400,
+    "showFoldedLeaves": false
+  },
   "protocol": {
     "minConfidence": 0.6,
     "requireConfidence": false
+  },
+  "runtime": {
+    "enabled": true,
+    "defaultView": "full",
+    "includeFrontend": true,
+    "includeInfra": true,
+    "frameworkHints": [],
+    "excludePathPatterns": [
+      "node_modules",
+      ".triadmind",
+      "venv",
+      ".venv",
+      "__pycache__",
+      ".next",
+      "dist",
+      "build",
+      "tests",
+      "test"
+    ],
+    "maxSourceFileBytes": 500000,
+    "minConfidence": 0.4
   },
   "runtimeHealing": {
     "enabled": true,
@@ -132,7 +267,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "execute getAvailableAdapters flow",
+      "problem": "Adapter Capability: Provide Adapter registry get available adapters language adapter[]",
       "demand": [
         "None",
         "[Ghost:Read] Map (adapterRegistry)"
@@ -147,7 +282,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "adapterRegistry.ts",
     "fission": {
-      "problem": "execute registerAdapter flow",
+      "problem": "Adapter Capability: Provide Adapter registry register language",
       "demand": [
         "LanguageAdapter (adapter)",
         "[Ghost:Read] Map (adapterRegistry)"
@@ -158,33 +293,50 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "AdapterRegistry.resolveAdapter",
-    "category": "core",
-    "sourcePath": "adapterRegistry.ts",
-    "fission": {
-      "problem": "execute resolveAdapter flow",
-      "demand": [
-        "WorkspacePaths | string (pathsOrProjectRoot)",
-        "[Ghost:Read] Map (adapterRegistry)"
-      ],
-      "answer": [
-        "LanguageAdapter"
-      ]
-    }
-  },
-  {
     "nodeId": "Analyzer.calculateBlastRadius",
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute calculateBlastRadius flow",
+      "problem": "System Capability: Analyze Analyzer calculate blast radius string[]",
       "demand": [
         "any[] (map)",
-        "string (targetNodeId)",
-        "boolean (isContractChange)"
+        "[Generic] string (targetNodeId)",
+        "[Generic] boolean (isContractChange)",
+        "AnalyzerOptions (options)"
       ],
       "answer": [
         "string[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.calculateProducerConsumerEdges",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "Interface Capability: Analyze Analyzer calculate producer consumer edges removed edge[]",
+      "demand": [
+        "any[] (map)",
+        "AnalyzerOptions (options)"
+      ],
+      "answer": [
+        "RemovedEdge[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.detectCycles",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "System Capability: Analyze Analyzer detect cycles string[][]",
+      "demand": [
+        "any[] (map)",
+        "AnalyzerOptions (options)",
+        "[Ghost:Read] getCycles (getCycles)"
+      ],
+      "answer": [
+        "string[][]"
       ]
     }
   },
@@ -193,11 +345,12 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute detectTopologicalDrift flow",
+      "problem": "System Capability: Analyze Analyzer detect topological drift report",
       "demand": [
         "any[] (oldMap)",
         "any[] (newMap)",
-        "[Ghost:Read] getCycles (getCycles)"
+        "AnalyzerOptions (options)",
+        "[Ghost:Read] detectCycles (detectCycles)"
       ],
       "answer": [
         "DriftReport"
@@ -205,33 +358,93 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "Bootstrap.buildSelfBootstrapArchitecture",
+    "nodeId": "Analyzer.generateFeatureHash",
     "category": "core",
-    "sourcePath": "bootstrap.ts",
+    "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute buildSelfBootstrapArchitecture flow",
+      "problem": "System Capability: Produce Analyzer generate feature hash string",
       "demand": [
-        "WorkspacePaths (paths)"
+        "number[][] (matrix)",
+        "[Ghost:Read] generateMayaFeatureHash (generateMayaFeatureHash)"
       ],
       "answer": [
-        "SelfBootstrapArchitecture"
+        "[Generic] string"
       ]
     }
   },
   {
-    "nodeId": "Bootstrap.buildSelfBootstrapProtocol",
+    "nodeId": "Analyzer.generateMayaFeatureHash",
     "category": "core",
-    "sourcePath": "bootstrap.ts",
+    "sourcePath": "analyzer.ts",
     "fission": {
-      "problem": "execute buildSelfBootstrapProtocol flow",
+      "problem": "System Capability: Produce Analyzer generate maya feature hash string",
       "demand": [
-        "WorkspacePaths (paths)",
-        "[Ghost:Read] getSelfBootstrapNodeIds (getSelfBootstrapNodeIds)",
-        "[Ghost:Read] normalizePath (normalizePath)",
-        "[Ghost:Read] readTriadMap (readTriadMap)"
+        "number[] (mayaSequence)",
+        "[Ghost:Read] createHash (createHash)"
       ],
       "answer": [
-        "UpgradeProtocol"
+        "[Generic] string"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateMayanMatrix",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "System Capability: Produce Analyzer generate mayan matrix number[][]",
+      "demand": [
+        "any[] (normalizedNodes)",
+        "[Ghost:Read] generateMayaSequence (generateMayaSequence)",
+        "[Ghost:Read] mapTopologyToYoungPartition (mapTopologyToYoungPartition)"
+      ],
+      "answer": [
+        "number[][]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateMayaSequence",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "System Capability: Produce Analyzer generate maya sequence number[]",
+      "demand": [
+        "number[] (partition)"
+      ],
+      "answer": [
+        "number[]"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.generateRenormalizeProtocol",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "Workflow Capability: Produce Analyzer generate renormalize protocol",
+      "demand": [
+        "any[] (map)",
+        "string[][] (cycles)",
+        "AnalyzerOptions (options)"
+      ],
+      "answer": [
+        "RenormalizeProtocol"
+      ]
+    }
+  },
+  {
+    "nodeId": "Analyzer.mapTopologyToYoungPartition",
+    "category": "core",
+    "sourcePath": "analyzer.ts",
+    "fission": {
+      "problem": "System Capability: Provide Analyzer map topology to young partition number[]",
+      "demand": [
+        "any[] (subgraph)",
+        "[Ghost:Read] buildYoungPartitionFromNormalizedNodes (buildYoungPartitionFromNormalizedNodes)"
+      ],
+      "answer": [
+        "number[]"
       ]
     }
   },
@@ -240,7 +453,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "execute writeSelfBootstrapProtocol flow",
+      "problem": "Workflow Capability: Produce Bootstrap write self protocol workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] module (fs)"
@@ -255,7 +468,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "bootstrap.ts",
     "fission": {
-      "problem": "execute writeSelfBootstrapReport flow",
+      "problem": "System Capability: Produce Bootstrap write self report workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] module (fs)",
@@ -267,11 +480,11 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "BootstrapRightBranch.getBootstrapModuleRoles",
+    "nodeId": "BootstrapRightBranch.module_pipeline",
     "category": "core",
     "sourcePath": "bootstrapRightBranch.ts",
     "fission": {
-      "problem": "execute getBootstrapModuleRoles flow",
+      "problem": "Workflow Capability: Provide Bootstrap right branch",
       "demand": [
         "None"
       ],
@@ -281,13 +494,15 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "BootstrapRightBranch.getSelfBootstrapLoopLines",
+    "nodeId": "Config.createSourcePathFilter",
     "category": "core",
-    "sourcePath": "bootstrapRightBranch.ts",
+    "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute getSelfBootstrapLoopLines flow",
+      "problem": "System Capability: Produce Config create source path filter string",
       "demand": [
-        "None"
+        "[Generic] string (projectRoot)",
+        "TriadConfig (config)",
+        "[Ghost:Read] shouldExcludeSourcePath (shouldExcludeSourcePath)"
       ],
       "answer": [
         "void"
@@ -295,41 +510,14 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "BootstrapRightBranch.getSelfBootstrapMicroRules",
+    "nodeId": "Config.describeSourceScanScope",
     "category": "core",
-    "sourcePath": "bootstrapRightBranch.ts",
+    "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute getSelfBootstrapMicroRules flow",
+      "problem": "System Capability: Provide Config describe source scan scope string",
       "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "BootstrapRightBranch.getSelfBootstrapNodeIds",
-    "category": "core",
-    "sourcePath": "bootstrapRightBranch.ts",
-    "fission": {
-      "problem": "execute getSelfBootstrapNodeIds flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "BootstrapRightBranch.getSelfBootstrapPreamble",
-    "category": "core",
-    "sourcePath": "bootstrapRightBranch.ts",
-    "fission": {
-      "problem": "execute getSelfBootstrapPreamble flow",
-      "demand": [
-        "None"
+        "[Generic] string (projectRoot)",
+        "TriadConfig (config)"
       ],
       "answer": [
         "void"
@@ -341,10 +529,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute ensureTriadConfig flow",
+      "problem": "System Capability: Provide Config ensure triad workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)",
+        "[Generic] unknown (force)",
         "[Ghost:Read] buildDefaultConfig (buildDefaultConfig)",
         "[Ghost:Read] module (fs)"
       ],
@@ -358,7 +546,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute loadTriadConfig flow",
+      "problem": "System Capability: Analyze Config load triad",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] TriadConfig (DEFAULT_CONFIG)",
@@ -371,35 +559,78 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "Config.resolveCategoryFromConfig",
-    "category": "core",
-    "sourcePath": "config.ts",
-    "fission": {
-      "problem": "execute resolveCategoryFromConfig flow",
-      "demand": [
-        "string (sourcePath)",
-        "TriadConfig (config)",
-        "[Ghost:Read] normalizePath (normalizePath)",
-        "[Ghost:Read] TriadCategory (TriadCategory)"
-      ],
-      "answer": [
-        "TriadCategory"
-      ]
-    }
-  },
-  {
     "nodeId": "Config.shouldExcludeSourcePath",
     "category": "core",
     "sourcePath": "config.ts",
     "fission": {
-      "problem": "execute shouldExcludeSourcePath flow",
+      "problem": "System Capability: Provide Config should exclude source path string",
       "demand": [
-        "string (sourcePath)",
+        "[Generic] string (sourcePath)",
         "TriadConfig (config)",
+        "[Ghost:Read] isHardExcludedSourceFile (isHardExcludedSourceFile)",
+        "[Ghost:Read] isHardExcludedSourcePath (isHardExcludedSourcePath)",
+        "[Ghost:Read] matchesSourcePathPattern (matchesSourcePathPattern)",
         "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Config.shouldSkipWalkPath",
+    "category": "core",
+    "sourcePath": "config.ts",
+    "fission": {
+      "problem": "System Capability: Provide Config should skip walk path string",
+      "demand": [
+        "[Generic] string (value)",
+        "[Ghost:Read] unknown[] (HARD_EXCLUDE_BASENAME_PATTERNS)",
+        "[Ghost:Read] Set (HARD_EXCLUDE_SEGMENTS)",
+        "[Ghost:Read] isHardExcludedSourceFile (isHardExcludedSourceFile)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "ExtractRuntimeTopology.extractRuntimeTopology",
+    "category": "core",
+    "sourcePath": "runtime/extractRuntimeTopology.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Extract runtime topology promise",
+      "demand": [
+        "[Generic] string (projectRoot)",
+        "RuntimeExtractOptions (options)",
+        "[Ghost:Read] filterRuntimeMapByView (filterRuntimeMapByView)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] RuntimeDiagnostic (RuntimeDiagnostic)",
+        "[Ghost:Read] RuntimeExtractContext (RuntimeExtractContext)",
+        "[Ghost:Read] RuntimeMap (RuntimeMap)"
+      ],
+      "answer": [
+        "Promise<RuntimeMap>"
+      ]
+    }
+  },
+  {
+    "nodeId": "ExtractRuntimeTopology.getBuiltInRuntimeExtractors",
+    "category": "core",
+    "sourcePath": "runtime/extractRuntimeTopology.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Extract runtime topology get built in extractors",
+      "demand": [
+        "None",
+        "[Ghost:Read] RuntimeTopologyExtractor (configInfraExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (frontendApiCallExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (httpRouteExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (resourceAccessExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (taskQueueExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (workflowRegistryExtractor)"
+      ],
+      "answer": [
+        "RuntimeTopologyExtractor[]"
       ]
     }
   },
@@ -408,10 +639,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "generator.ts",
     "fission": {
-      "problem": "execute applyProtocol flow",
+      "problem": "Workflow Capability: Produce Generator protocol { changed",
       "demand": [
-        "string (projectRoot)",
-        "string (protocolPath)",
+        "[Generic] string (projectRoot)",
+        "[Generic] string (protocolPath)",
         "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
@@ -420,196 +651,16 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "GeneratorRightBranch.buildFunctionStructure",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute buildFunctionStructure flow",
-      "demand": [
-        "ParsedNodeRef (ref)",
-        "TriadNodeDefinition (node)",
-        "OptionalKind<ParameterDeclarationStructure>[] (parameters)",
-        "string (returnType)",
-        "boolean (includeTodo)"
-      ],
-      "answer": [
-        "OptionalKind<FunctionDeclarationStructure>"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.buildMethodStructure",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute buildMethodStructure flow",
-      "demand": [
-        "ParsedNodeRef (ref)",
-        "TriadNodeDefinition (node)",
-        "OptionalKind<ParameterDeclarationStructure>[] (parameters)",
-        "string (returnType)",
-        "boolean (includeTodo)",
-        "[Ghost:Read] Scope (Scope)"
-      ],
-      "answer": [
-        "OptionalKind<MethodDeclarationStructure>"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.buildParameters",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute buildParameters flow",
-      "demand": [
-        "string[] (demand)",
-        "[Ghost:Read] OptionalKind (OptionalKind)",
-        "[Ghost:Read] ParameterDeclarationStructure (ParameterDeclarationStructure)",
-        "[Ghost:Read] parseDemandEntry (parseDemandEntry)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.buildTodoStatement",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute buildTodoStatement flow",
-      "demand": [
-        "string (nodeId)",
-        "string (responsibility)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.buildTriadGeneratedDoc",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute buildTriadGeneratedDoc flow",
-      "demand": [
-        "string (responsibility)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.collectTypeTokens",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute collectTypeTokens flow",
-      "demand": [
-        "string (typeText)",
-        "[Ghost:Read] getBuiltinTypeNames (getBuiltinTypeNames)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.getBuiltinTypeNames",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute getBuiltinTypeNames flow",
-      "demand": [
-        "None",
-        "[Ghost:Read] Set (BUILTIN_TYPE_NAMES)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.normalizeToken",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute normalizeToken flow",
-      "demand": [
-        "string (value)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.resolveSourceFilePath",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute resolveSourceFilePath flow",
-      "demand": [
-        "string (projectRoot)",
-        "ParsedNodeRef (ref)",
-        "TriadNodeDefinition (node)",
-        "NodeLocationMap (nodeLocations)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "GeneratorRightBranch.resolveTypesModuleSpecifier",
-    "category": "core",
-    "sourcePath": "generatorRightBranch.ts",
-    "fission": {
-      "problem": "execute resolveTypesModuleSpecifier flow",
-      "demand": [
-        "string (projectRoot)",
-        "SourceFile (sourceFile)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "GeneratorRightBranch.shouldUseTopLevelFunction",
     "category": "core",
     "sourcePath": "generatorRightBranch.ts",
     "fission": {
-      "problem": "execute shouldUseTopLevelFunction flow",
+      "problem": "System Capability: Provide Generator right branch should use top level source file",
       "demand": [
         "SourceFile (sourceFile)",
         "ParsedNodeRef (ref)",
-        "string (sourcePath)",
+        "[Generic] string (sourcePath)",
         "[Ghost:Read] normalizeToken (normalizeToken)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Healing.buildHealingPrompt",
-    "category": "core",
-    "sourcePath": "healing.ts",
-    "fission": {
-      "problem": "execute buildHealingPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (errorText)",
-        "HealingDiagnosis (diagnosis)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] getHealingOutputRuleLines (getHealingOutputRuleLines)",
-        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -621,11 +672,11 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "healing.ts",
     "fission": {
-      "problem": "execute diagnoseRuntimeFailure flow",
+      "problem": "Execution Capability: Analyze Healing diagnose runtime failure diagnosis",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (errorText)",
-        "number (retryCount)",
+        "[Generic] string (errorText)",
+        "[Generic] number (retryCount)",
         "TriadNodeDefinition[] (nodes)",
         "[Ghost:Read] buildSummary (buildSummary)",
         "[Ghost:Read] normalizePath (normalizePath)"
@@ -636,68 +687,15 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "Healing.prepareHealingArtifacts",
-    "category": "core",
-    "sourcePath": "healing.ts",
-    "fission": {
-      "problem": "execute prepareHealingArtifacts flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (errorText)",
-        "unknown (retryCount)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] HealingDiagnosis (HealingDiagnosis)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "HealingRightBranch.buildEvidence",
-    "category": "core",
-    "sourcePath": "healingRightBranch.ts",
-    "fission": {
-      "problem": "execute buildEvidence flow",
-      "demand": [
-        "string (errorText)",
-        "RuntimeTraceFrame[] (traceFrames)",
-        "TriadNodeDefinition | null (matchedNode)",
-        "HealingBranchKind (diagnosis)",
-        "BlastRadius (blastRadius)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "HealingRightBranch.buildSummary",
-    "category": "core",
-    "sourcePath": "healingRightBranch.ts",
-    "fission": {
-      "problem": "execute buildSummary flow",
-      "demand": [
-        "TriadNodeDefinition | null (matchedNode)",
-        "HealingBranchKind (diagnosis)",
-        "HealingActionKind (suggestedAction)",
-        "BlastRadius (blastRadius)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "HealingRightBranch.chooseSuggestedAction",
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute chooseSuggestedAction flow",
+      "problem": "Execution Capability: Provide Healing right branch choose suggested action",
       "demand": [
         "HealingBranchKind (diagnosis)",
-        "number (retryCount)",
-        "number (maxAutoRetries)"
+        "[Generic] number (retryCount)",
+        "[Generic] number (maxAutoRetries)"
       ],
       "answer": [
         "HealingActionKind"
@@ -709,9 +707,9 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute classifyDiagnosis flow",
+      "problem": "Execution Capability: Provide Healing right branch classify diagnosis",
       "demand": [
-        "string (errorText)"
+        "[Generic] string (errorText)"
       ],
       "answer": [
         "HealingBranchKind"
@@ -723,60 +721,14 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute estimateBlastRadius flow",
+      "problem": "Execution Capability: Provide Healing right branch estimate blast radius",
       "demand": [
         "TriadNodeDefinition | null (rootNode)",
         "TriadNodeDefinition[] (nodes)",
-        "boolean (isContractChange)"
+        "[Generic] boolean (isContractChange)"
       ],
       "answer": [
         "BlastRadius"
-      ]
-    }
-  },
-  {
-    "nodeId": "HealingRightBranch.getContractGuardLine",
-    "category": "core",
-    "sourcePath": "healingRightBranch.ts",
-    "fission": {
-      "problem": "execute getContractGuardLine flow",
-      "demand": [
-        "boolean (requireHumanApprovalForContractChanges)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "HealingRightBranch.getHealingOutputRuleLines",
-    "category": "core",
-    "sourcePath": "healingRightBranch.ts",
-    "fission": {
-      "problem": "execute getHealingOutputRuleLines flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "HealingRightBranch.parseTraceLine",
-    "category": "core",
-    "sourcePath": "healingRightBranch.ts",
-    "fission": {
-      "problem": "execute parseTraceLine flow",
-      "demand": [
-        "string (line)",
-        "string (projectRootNormalized)",
-        "string (projectRoot)",
-        "[Ghost:Read] normalizePath (normalizePath)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
       ]
     }
   },
@@ -785,7 +737,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "healingRightBranch.ts",
     "fission": {
-      "problem": "execute scoreNodeMatch flow",
+      "problem": "Execution Capability: Provide Healing right branch score node match runtime trace",
       "demand": [
         "RuntimeTraceFrame (frame)",
         "TriadNodeDefinition (node)",
@@ -797,29 +749,14 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "Ir.buildTopologyIR",
-    "category": "core",
-    "sourcePath": "ir.ts",
-    "fission": {
-      "problem": "execute buildTopologyIR flow",
-      "demand": [
-        "TriadNodeDefinition[] (nodes)",
-        "TriadLanguage (language)"
-      ],
-      "answer": [
-        "TriadTopologyIR"
-      ]
-    }
-  },
-  {
     "nodeId": "Parser.runParser",
     "category": "core",
     "sourcePath": "parser.ts",
     "fission": {
-      "problem": "execute runParser flow",
+      "problem": "System Capability: Run Parser string",
       "demand": [
-        "string (targetDir)",
-        "string (outputPath)",
+        "[Generic] string (targetDir)",
+        "[Generic] string (outputPath)",
         "[Ghost:Read] resolveAdapter (resolveAdapter)"
       ],
       "answer": [
@@ -832,7 +769,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute createCppAdapter flow",
+      "problem": "Adapter Capability: Produce Polyglot adapter create cpp language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -848,7 +785,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute createGoAdapter flow",
+      "problem": "Adapter Capability: Produce Polyglot adapter create go language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -864,7 +801,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute createJavaAdapter flow",
+      "problem": "Adapter Capability: Produce Polyglot adapter create java language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -880,7 +817,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute createJavaScriptAdapter flow",
+      "problem": "Adapter Capability: Produce Polyglot adapter create java script language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -896,7 +833,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute createPythonAdapter flow",
+      "problem": "Adapter Capability: Produce Polyglot adapter create python language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -912,7 +849,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "polyglotAdapter.ts",
     "fission": {
-      "problem": "execute createRustAdapter flow",
+      "problem": "Adapter Capability: Produce Polyglot adapter create rust language",
       "demand": [
         "None",
         "[Ghost:Read] createPolyglotAdapter (createPolyglotAdapter)",
@@ -928,7 +865,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "execute assertProtocolShape flow",
+      "problem": "Workflow Capability: Provide Protocol assert shape upgrade",
       "demand": [
         "UpgradeProtocol (protocol)",
         "ProtocolValidationContext (context)",
@@ -943,73 +880,13 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "Protocol.normalizeCategory",
-    "category": "core",
-    "sourcePath": "protocol.ts",
-    "fission": {
-      "problem": "execute normalizeCategory flow",
-      "demand": [
-        "string (category)",
-        "TriadCategory (fallback)",
-        "[Ghost:Read] getPrefixCategoryMap (getPrefixCategoryMap)"
-      ],
-      "answer": [
-        "TriadCategory"
-      ]
-    }
-  },
-  {
-    "nodeId": "Protocol.parseDemandEntry",
-    "category": "core",
-    "sourcePath": "protocol.ts",
-    "fission": {
-      "problem": "execute parseDemandEntry flow",
-      "demand": [
-        "string (entry)",
-        "number (index)"
-      ],
-      "answer": [
-        "ParsedDemand | null"
-      ]
-    }
-  },
-  {
-    "nodeId": "Protocol.parseNodeRef",
-    "category": "core",
-    "sourcePath": "protocol.ts",
-    "fission": {
-      "problem": "execute parseNodeRef flow",
-      "demand": [
-        "string (nodeId)",
-        "string (category)"
-      ],
-      "answer": [
-        "ParsedNodeRef"
-      ]
-    }
-  },
-  {
-    "nodeId": "Protocol.parseReturnType",
-    "category": "core",
-    "sourcePath": "protocol.ts",
-    "fission": {
-      "problem": "execute parseReturnType flow",
-      "demand": [
-        "string (answer)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "Protocol.readJsonFile",
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "execute readJsonFile flow",
+      "problem": "Workflow Capability: Analyze Protocol read json file t",
       "demand": [
-        "string (filePath)",
+        "[Generic] string (filePath)",
         "[Ghost:Read] module (fs)"
       ],
       "answer": [
@@ -1022,9 +899,9 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "protocol.ts",
     "fission": {
-      "problem": "execute readTriadMap flow",
+      "problem": "Workflow Capability: Analyze Protocol read triad map string",
       "demand": [
-        "string (mapPath)",
+        "[Generic] string (mapPath)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] getTriadNodeDefinitionSchema (getTriadNodeDefinitionSchema)",
         "[Ghost:Read] readJsonFile (readJsonFile)",
@@ -1040,40 +917,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "protocolRightBranch.ts",
     "fission": {
-      "problem": "execute getPrefixCategoryMap flow",
+      "problem": "Workflow Capability: Provide Protocol right branch get prefix category map record",
       "demand": [
         "None",
         "[Ghost:Read] Record<string, TriadCategory> (PREFIX_CATEGORY_MAP)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "ProtocolRightBranch.getTriadNodeDefinitionSchema",
-    "category": "core",
-    "sourcePath": "protocolRightBranch.ts",
-    "fission": {
-      "problem": "execute getTriadNodeDefinitionSchema flow",
-      "demand": [
-        "None",
-        "[Ghost:Read] object (triadNodeDefinitionSchema)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "ProtocolRightBranch.getUpgradeProtocolSchema",
-    "category": "core",
-    "sourcePath": "protocolRightBranch.ts",
-    "fission": {
-      "problem": "execute getUpgradeProtocolSchema flow",
-      "demand": [
-        "None",
-        "[Ghost:Read] object (upgradeProtocolSchema)"
       ],
       "answer": [
         "void"
@@ -1085,7 +932,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "rules.ts",
     "fission": {
-      "problem": "execute installAlwaysOnRules flow",
+      "problem": "Policy Capability: Provide Rules install always on workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] buildCursorRule (buildCursorRule)",
@@ -1099,15 +946,165 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "Snapshot.collectProtocolSnapshotFiles",
+    "nodeId": "RuntimeMapWriter.writeRuntimeDiagnostics",
     "category": "core",
-    "sourcePath": "snapshot.ts",
+    "sourcePath": "runtime/runtimeMapWriter.ts",
     "fission": {
-      "problem": "execute collectProtocolSnapshotFiles flow",
+      "problem": "Execution Capability: Produce Runtime map writer write diagnostics diagnostic[]",
       "demand": [
-        "WorkspacePaths (paths)",
-        "UpgradeProtocol (protocol)",
+        "RuntimeDiagnostic[] (diagnostics)",
+        "[Generic] string (diagnosticsPath)",
+        "[Ghost:Read] module (fs)",
         "[Ghost:Read] module (path)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeMapWriter.writeRuntimeMap",
+    "category": "core",
+    "sourcePath": "runtime/runtimeMapWriter.ts",
+    "fission": {
+      "problem": "Execution Capability: Produce Runtime map writer write",
+      "demand": [
+        "RuntimeMap (runtimeMap)",
+        "[Generic] string (runtimeMapPath)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeMapWriter.writeRuntimeMapArtifacts",
+    "category": "core",
+    "sourcePath": "runtime/runtimeMapWriter.ts",
+    "fission": {
+      "problem": "Execution Capability: Produce Runtime map writer write artifacts",
+      "demand": [
+        "RuntimeMap (runtimeMap)",
+        "[Generic] string (runtimeMapPath)",
+        "[Generic] string (diagnosticsPath)",
+        "[Ghost:Read] writeRuntimeDiagnostics (writeRuntimeDiagnostics)",
+        "[Ghost:Read] writeRuntimeMap (writeRuntimeMap)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.apiRouteId",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Interface Capability: Provide Runtime utils api route id string",
+      "demand": [
+        "[Generic] string (method)",
+        "[Generic] string (routePath)",
+        "[Ghost:Read] normalizeApiPath (normalizeApiPath)",
+        "[Ghost:Read] normalizeRuntimeId (normalizeRuntimeId)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.dedupeEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils dedupe evidence evidence[]",
+      "demand": [
+        "RuntimeEvidence[] (evidence)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.ensureEdgeEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils ensure edge evidence",
+      "demand": [
+        "RuntimeEdge (edge)",
+        "[Ghost:Read] inferredEvidence (inferredEvidence)"
+      ],
+      "answer": [
+        "RuntimeEdge"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.ensureNodeEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils ensure node evidence",
+      "demand": [
+        "RuntimeNode (node)",
+        "[Ghost:Read] inferredEvidence (inferredEvidence)"
+      ],
+      "answer": [
+        "RuntimeNode"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.lineEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils line evidence",
+      "demand": [
+        "RuntimeSourceFile (file)",
+        "RuntimeEvidence['kind'] (kind)",
+        "[Generic] string (text)",
+        "[Generic] unknown (index)",
+        "[Generic] unknown (confidence)",
+        "[Ghost:Read] findLineColumn (findLineColumn)"
+      ],
+      "answer": [
+        "RuntimeEvidence"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.toPascalServiceName",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils to pascal service name string",
+      "demand": [
+        "[Generic] string (value)",
+        "[Ghost:Read] toPascalCase (toPascalCase)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeVisualizer.generateRuntimeDashboard",
+    "category": "core",
+    "sourcePath": "runtime/runtimeVisualizer.ts",
+    "fission": {
+      "problem": "Execution Capability: Produce Runtime visualizer generate dashboard string",
+      "demand": [
+        "[Generic] string (runtimeMapPath)",
+        "[Generic] string (outputPath)",
+        "RuntimeDashboardOptions (options)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] RuntimeMap (RuntimeMap)"
       ],
       "answer": [
         "void"
@@ -1119,10 +1116,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "execute createSnapshot flow",
+      "problem": "System Capability: Produce Snapshot create workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (label)",
+        "[Generic] string (label)",
         "string[] (filePaths)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] normalizePath (normalizePath)",
@@ -1138,7 +1135,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "execute listSnapshots flow",
+      "problem": "System Capability: Provide Snapshot list snapshots workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] module (fs)"
@@ -1153,10 +1150,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "snapshot.ts",
     "fission": {
-      "problem": "execute restoreSnapshot flow",
+      "problem": "System Capability: Coordinate Snapshot restore workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (snapshotId)",
+        "[Generic] string (snapshotId)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] listSnapshots (listSnapshots)",
         "[Ghost:Read] module (path)"
@@ -1171,7 +1168,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "stage.ts",
     "fission": {
-      "problem": "execute analyzeWorkspaceStage flow",
+      "problem": "Workflow Capability: Analyze Stage analyze workspace analysis",
       "demand": [
         "StageAnalysisInput (input)"
       ],
@@ -1185,10 +1182,26 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "execute syncTriadMap flow",
+      "problem": "Workflow Capability: Coordinate Sync triad map workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)",
+        "[Generic] unknown (force)",
+        "[Ghost:Read] syncTriadMapWithOptions (syncTriadMapWithOptions)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "Sync.syncTriadMapWithOptions",
+    "category": "core",
+    "sourcePath": "sync.ts",
+    "fission": {
+      "problem": "Workflow Capability: Coordinate Sync triad map with options workspace paths",
+      "demand": [
+        "WorkspacePaths (paths)",
+        "{ force?: boolean; scanMode?: TriadScanMode } (options)",
         "[Ghost:Read] default (chalk)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] resolveAdapter (resolveAdapter)"
@@ -1203,7 +1216,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "sync.ts",
     "fission": {
-      "problem": "execute watchTriadMap flow",
+      "problem": "Workflow Capability: Coordinate Sync watch triad map workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] default (chalk)",
@@ -1219,7 +1232,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "treeSitterGhostScanner.ts",
     "fission": {
-      "problem": "execute scanTreeSitterGhostReferences flow",
+      "problem": "System Capability: Analyze Tree sitter ghost scanner scan references parser syntax",
       "demand": [
         "Parser.SyntaxNode (executableNode)",
         "TreeSitterGhostScanOptions (options)",
@@ -1244,16 +1257,18 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "treeSitterParser.ts",
     "fission": {
-      "problem": "execute runTreeSitterParser flow",
+      "problem": "System Capability: Run Tree sitter parser triad language",
       "demand": [
         "TriadLanguage (language)",
-        "string (targetDir)",
-        "string (outputPath)",
+        "[Generic] string (targetDir)",
+        "[Generic] string (outputPath)",
         "TriadConfig (config)",
+        "[Ghost:Read] aggregateNodesForScanMode (aggregateNodesForScanMode)",
         "[Ghost:Read] default (chalk)",
         "[Ghost:Read] collectLanguageNodes (collectLanguageNodes)",
         "[Ghost:Read] dedupeNodes (dedupeNodes)",
         "[Ghost:Read] module (fs)",
+        "[Ghost:Read] isIgnorableFsError (isIgnorableFsError)",
         "[Ghost:Read] module (path)",
         "[Ghost:Read] Record<TriadLanguage, any> (TREE_SITTER_LANGUAGES)"
       ],
@@ -1267,10 +1282,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "treeSitterParser.ts",
     "fission": {
-      "problem": "execute runTreeSitterTypeScriptParser flow",
+      "problem": "System Capability: Run Tree sitter parser type script string",
       "demand": [
-        "string (targetDir)",
-        "string (outputPath)",
+        "[Generic] string (targetDir)",
+        "[Generic] string (outputPath)",
         "TriadConfig (config)",
         "[Ghost:Read] runTreeSitterParser (runTreeSitterParser)"
       ],
@@ -1284,10 +1299,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "execute applyUpgradeProtocol flow",
+      "problem": "Workflow Capability: Produce Typescript adapter upgrade protocol { changed",
       "demand": [
-        "string (projectRoot)",
-        "string (protocolPath)",
+        "[Generic] string (projectRoot)",
+        "[Generic] string (protocolPath)",
         "[Ghost:Read] applyTypeScriptProtocol (applyTypeScriptProtocol)"
       ],
       "answer": [
@@ -1300,7 +1315,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "execute createTypeScriptAdapter flow",
+      "problem": "Adapter Capability: Produce Typescript adapter create type script language",
       "demand": [
         "None",
         "[Ghost:Read] applyUpgradeProtocol (applyUpgradeProtocol)",
@@ -1313,30 +1328,13 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "TypescriptAdapter.parseTopology",
-    "category": "core",
-    "sourcePath": "typescriptAdapter.ts",
-    "fission": {
-      "problem": "execute parseTopology flow",
-      "demand": [
-        "string (projectRoot)",
-        "string (outputPath)",
-        "[Ghost:Read] runTreeSitterParser (runTreeSitterParser)",
-        "[Ghost:Read] runTypeScriptParser (runTypeScriptParser)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "TypescriptAdapter.readTopologyIR",
     "category": "core",
     "sourcePath": "typescriptAdapter.ts",
     "fission": {
-      "problem": "execute readTopologyIR flow",
+      "problem": "Adapter Capability: Analyze Typescript adapter read topology ir triad",
       "demand": [
-        "string (projectRoot)",
+        "[Generic] string (projectRoot)",
         "[Ghost:Read] buildTopologyIR (buildTopologyIR)",
         "[Ghost:Read] readTriadMap (readTriadMap)"
       ],
@@ -1350,10 +1348,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "typescriptGenerator.ts",
     "fission": {
-      "problem": "execute applyTypeScriptProtocol flow",
+      "problem": "Workflow Capability: Produce Typescript generator type script protocol { changed",
       "demand": [
-        "string (projectRoot)",
-        "string (protocolPath)",
+        "[Generic] string (projectRoot)",
+        "[Generic] string (protocolPath)",
         "[Ghost:Read] assertProtocolShape (assertProtocolShape)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] module (path)",
@@ -1370,10 +1368,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "typescriptParser.ts",
     "fission": {
-      "problem": "execute runTypeScriptParser flow",
+      "problem": "System Capability: Run Typescript parser type script string",
       "demand": [
-        "string (targetDir)",
-        "string (outputPath)",
+        "[Generic] string (targetDir)",
+        "[Generic] string (outputPath)",
         "[Ghost:Read] default (chalk)",
         "[Ghost:Read] collectClassMethodNodes (collectClassMethodNodes)",
         "[Ghost:Read] collectExportedFunctionNodes (collectExportedFunctionNodes)",
@@ -1390,154 +1388,15 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "visualizer.ts",
     "fission": {
-      "problem": "execute generateDashboard flow",
+      "problem": "System Capability: Produce Visualizer generate dashboard string",
       "demand": [
-        "string (mapPath)",
-        "string (protocolPath)",
-        "string (outputPath)",
+        "[Generic] string (mapPath)",
+        "[Generic] string (protocolPath)",
+        "[Generic] string (outputPath)",
+        "DashboardOptions (dashboardOptions)",
+        "[Ghost:Read] buildHtml (buildHtml)",
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] UpgradeProtocol (UpgradeProtocol)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildImplementationHandoffPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildImplementationHandoffPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (triadSpec)",
-        "ImplementationHandoffInput (input)",
-        "[Ghost:Read] getImplementationHandoffRuleLines (getImplementationHandoffRuleLines)",
-        "[Ghost:Read] normalizePath (normalizePath)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildImplementationPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildImplementationPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] getImplementationExecutionWorkflowLines (getImplementationExecutionWorkflowLines)",
-        "[Ghost:Read] normalizePath (normalizePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildMacroPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildMacroPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] buildMacroPromptShape (buildMacroPromptShape)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildMasterPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildMasterPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] getMasterPromptExpectedBehaviorLines (getMasterPromptExpectedBehaviorLines)",
-        "[Ghost:Read] getMasterPromptImplementationPhaseLines (getMasterPromptImplementationPhaseLines)",
-        "[Ghost:Read] getMasterPromptProtocolPhaseLines (getMasterPromptProtocolPhaseLines)",
-        "[Ghost:Read] getMasterPromptStageRouterLines (getMasterPromptStageRouterLines)",
-        "[Ghost:Read] normalizePath (normalizePath)",
-        "[Ghost:Read] module (path)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildMesoPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildMesoPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] buildMesoPromptShape (buildMesoPromptShape)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildMicroPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildMicroPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] buildMicroPromptShape (buildMicroPromptShape)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildPipelinePrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildPipelinePrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] normalizePath (normalizePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workflow.buildProtocolPrompt",
-    "category": "core",
-    "sourcePath": "workflow.ts",
-    "fission": {
-      "problem": "execute buildProtocolPrompt flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] module (fs)",
-        "[Ghost:Read] getProtocolOutputContractLines (getProtocolOutputContractLines)",
-        "[Ghost:Read] normalizePath (normalizePath)"
       ],
       "answer": [
         "void"
@@ -1549,11 +1408,11 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute createDraftTemplate flow",
+      "problem": "Workflow Capability: Produce Workflow create draft template workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (userDemand)",
-        "unknown (force)",
+        "[Generic] unknown (userDemand)",
+        "[Generic] unknown (force)",
         "[Ghost:Read] createDraftProtocolTemplate (createDraftProtocolTemplate)",
         "[Ghost:Read] module (fs)"
       ],
@@ -1567,10 +1426,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute ensureMultiPassTemplates flow",
+      "problem": "Workflow Capability: Provide Workflow ensure multi pass templates workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)",
+        "[Generic] string (userDemand)",
         "{ resetArtifacts?: boolean } (options)",
         "[Ghost:Read] buildMacroPrompt (buildMacroPrompt)",
         "[Ghost:Read] buildMesoPrompt (buildMesoPrompt)",
@@ -1589,10 +1448,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute ensurePipelineArtifactSeeds flow",
+      "problem": "Workflow Capability: Provide Workflow ensure artifact seeds workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)",
+        "[Generic] string (userDemand)",
         "[Ghost:Read] createMacroSplitSeed (createMacroSplitSeed)",
         "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
         "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
@@ -1608,10 +1467,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute ensureTriadSpec flow",
+      "problem": "Workflow Capability: Provide Workflow ensure triad spec workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "unknown (force)",
+        "[Generic] unknown (force)",
         "[Ghost:Read] buildTriadSpec (buildTriadSpec)",
         "[Ghost:Read] ensureTriadConfig (ensureTriadConfig)",
         "[Ghost:Read] module (fs)"
@@ -1626,10 +1485,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute resetPipelineArtifacts flow",
+      "problem": "Workflow Capability: Provide Workflow reset artifacts workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)",
+        "[Generic] string (userDemand)",
         "[Ghost:Read] createMacroSplitSeed (createMacroSplitSeed)",
         "[Ghost:Read] createMesoSplitSeed (createMesoSplitSeed)",
         "[Ghost:Read] createMicroSplitSeed (createMicroSplitSeed)",
@@ -1645,7 +1504,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute writeImplementationHandoff flow",
+      "problem": "Workflow Capability: Produce Workflow write implementation handoff workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "ImplementationHandoffInput (input)",
@@ -1662,7 +1521,7 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute writeMasterPrompt flow",
+      "problem": "Workflow Capability: Produce Workflow write master prompt workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
         "[Ghost:Read] buildMasterPrompt (buildMasterPrompt)",
@@ -1679,10 +1538,10 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workflow.ts",
     "fission": {
-      "problem": "execute writePromptPacket flow",
+      "problem": "Workflow Capability: Produce Workflow write prompt packet workspace paths",
       "demand": [
         "WorkspacePaths (paths)",
-        "string (userDemand)",
+        "[Generic] string (userDemand)",
         "[Ghost:Read] createDraftTemplate (createDraftTemplate)",
         "[Ghost:Read] ensureMultiPassTemplates (ensureMultiPassTemplates)",
         "[Ghost:Read] ensureTriadSpec (ensureTriadSpec)",
@@ -1695,218 +1554,16 @@ D:/TraidMind/triadmind-core
     }
   },
   {
-    "nodeId": "WorkflowRightBranch.buildMacroPromptShape",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute buildMacroPromptShape flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] normalizePath (normalizePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.buildMesoPromptShape",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute buildMesoPromptShape flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] normalizePath (normalizePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.buildMicroPromptShape",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute buildMicroPromptShape flow",
-      "demand": [
-        "WorkspacePaths (paths)",
-        "string (userDemand)",
-        "[Ghost:Read] normalizePath (normalizePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.buildTriadSpecDocument",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute buildTriadSpecDocument flow",
-      "demand": [
-        "string (projectName)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
     "nodeId": "WorkflowRightBranch.createDraftProtocolTemplate",
     "category": "core",
     "sourcePath": "workflowRightBranch.ts",
     "fission": {
-      "problem": "execute createDraftProtocolTemplate flow",
+      "problem": "Workflow Capability: Produce Workflow right branch create draft protocol template string",
       "demand": [
-        "string (projectRoot)",
-        "string (mapFile)",
-        "unknown (userDemand)",
+        "[Generic] string (projectRoot)",
+        "[Generic] string (mapFile)",
+        "[Generic] unknown (userDemand)",
         "[Ghost:Read] normalizePath (normalizePath)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.createMacroSplitSeed",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute createMacroSplitSeed flow",
-      "demand": [
-        "string (userDemand)"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.createMesoSplitSeed",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute createMesoSplitSeed flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.createMicroSplitSeed",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute createMicroSplitSeed flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.getImplementationExecutionWorkflowLines",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute getImplementationExecutionWorkflowLines flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.getImplementationHandoffRuleLines",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute getImplementationHandoffRuleLines flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.getMasterPromptExpectedBehaviorLines",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute getMasterPromptExpectedBehaviorLines flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.getMasterPromptImplementationPhaseLines",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute getMasterPromptImplementationPhaseLines flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.getMasterPromptProtocolPhaseLines",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute getMasterPromptProtocolPhaseLines flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.getMasterPromptStageRouterLines",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute getMasterPromptStageRouterLines flow",
-      "demand": [
-        "None"
-      ],
-      "answer": [
-        "void"
-      ]
-    }
-  },
-  {
-    "nodeId": "WorkflowRightBranch.getProtocolOutputContractLines",
-    "category": "core",
-    "sourcePath": "workflowRightBranch.ts",
-    "fission": {
-      "problem": "execute getProtocolOutputContractLines flow",
-      "demand": [
-        "None"
       ],
       "answer": [
         "void"
@@ -1918,27 +1575,13 @@ D:/TraidMind/triadmind-core
     "category": "core",
     "sourcePath": "workspace.ts",
     "fission": {
-      "problem": "execute getWorkspacePaths flow",
+      "problem": "System Capability: Provide Workspace get paths",
       "demand": [
-        "string (projectRoot)",
+        "[Generic] string (projectRoot)",
         "[Ghost:Read] module (path)"
       ],
       "answer": [
         "WorkspacePaths"
-      ]
-    }
-  },
-  {
-    "nodeId": "Workspace.normalizePath",
-    "category": "core",
-    "sourcePath": "workspace.ts",
-    "fission": {
-      "problem": "execute normalizePath flow",
-      "demand": [
-        "string (input)"
-      ],
-      "answer": [
-        "void"
       ]
     }
   }
@@ -2455,7 +2098,7 @@ export function getAvailableAdapters(): LanguageAdapter[] {
 
 [Changed File] typescriptAdapter.ts
 ```ts
-import { loadTriadConfig } from './config';
+import { loadTriadConfig, TriadConfig } from './config';
 import { buildTopologyIR, TriadTopologyIR } from './ir';
 import { LanguageAdapter } from './languageAdapter';
 import { readTriadMap } from './protocol';
@@ -2491,9 +2134,9 @@ export function readTopologyIR(projectRoot: string): TriadTopologyIR {
  * TriadMind 自动生成骨架
  * 职责：执行 parseTopology 流程
  */
-export function parseTopology(projectRoot: string, outputPath?: string): void {
+export function parseTopology(projectRoot: string, outputPath?: string, configOverride?: TriadConfig): void {
     const paths = getWorkspacePaths(projectRoot);
-    const config = loadTriadConfig(paths);
+    const config = configOverride ?? loadTriadConfig(paths);
 
     if (config.architecture.parserEngine === 'native') {
         runTypeScriptParser(projectRoot, outputPath);

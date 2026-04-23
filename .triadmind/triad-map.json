@@ -332,6 +332,46 @@
     }
   },
   {
+    "nodeId": "ExtractRuntimeTopology.extractRuntimeTopology",
+    "category": "core",
+    "sourcePath": "runtime/extractRuntimeTopology.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Extract runtime topology promise",
+      "demand": [
+        "[Generic] string (projectRoot)",
+        "RuntimeExtractOptions (options)",
+        "[Ghost:Read] filterRuntimeMapByView (filterRuntimeMapByView)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] RuntimeDiagnostic (RuntimeDiagnostic)",
+        "[Ghost:Read] RuntimeExtractContext (RuntimeExtractContext)",
+        "[Ghost:Read] RuntimeMap (RuntimeMap)"
+      ],
+      "answer": [
+        "Promise<RuntimeMap>"
+      ]
+    }
+  },
+  {
+    "nodeId": "ExtractRuntimeTopology.getBuiltInRuntimeExtractors",
+    "category": "core",
+    "sourcePath": "runtime/extractRuntimeTopology.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Extract runtime topology get built in extractors",
+      "demand": [
+        "None",
+        "[Ghost:Read] RuntimeTopologyExtractor (configInfraExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (frontendApiCallExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (httpRouteExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (resourceAccessExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (taskQueueExtractor)",
+        "[Ghost:Read] RuntimeTopologyExtractor (workflowRegistryExtractor)"
+      ],
+      "answer": [
+        "RuntimeTopologyExtractor[]"
+      ]
+    }
+  },
+  {
     "nodeId": "Generator.applyProtocol",
     "category": "core",
     "sourcePath": "generator.ts",
@@ -636,6 +676,172 @@
         "[Ghost:Read] module (fs)",
         "[Ghost:Read] module (path)",
         "[Ghost:Read] upsertAgentsMd (upsertAgentsMd)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeMapWriter.writeRuntimeDiagnostics",
+    "category": "core",
+    "sourcePath": "runtime/runtimeMapWriter.ts",
+    "fission": {
+      "problem": "Execution Capability: Produce Runtime map writer write diagnostics diagnostic[]",
+      "demand": [
+        "RuntimeDiagnostic[] (diagnostics)",
+        "[Generic] string (diagnosticsPath)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeMapWriter.writeRuntimeMap",
+    "category": "core",
+    "sourcePath": "runtime/runtimeMapWriter.ts",
+    "fission": {
+      "problem": "Execution Capability: Produce Runtime map writer write",
+      "demand": [
+        "RuntimeMap (runtimeMap)",
+        "[Generic] string (runtimeMapPath)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeMapWriter.writeRuntimeMapArtifacts",
+    "category": "core",
+    "sourcePath": "runtime/runtimeMapWriter.ts",
+    "fission": {
+      "problem": "Execution Capability: Produce Runtime map writer write artifacts",
+      "demand": [
+        "RuntimeMap (runtimeMap)",
+        "[Generic] string (runtimeMapPath)",
+        "[Generic] string (diagnosticsPath)",
+        "[Ghost:Read] writeRuntimeDiagnostics (writeRuntimeDiagnostics)",
+        "[Ghost:Read] writeRuntimeMap (writeRuntimeMap)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.apiRouteId",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Interface Capability: Provide Runtime utils api route id string",
+      "demand": [
+        "[Generic] string (method)",
+        "[Generic] string (routePath)",
+        "[Ghost:Read] normalizeApiPath (normalizeApiPath)",
+        "[Ghost:Read] normalizeRuntimeId (normalizeRuntimeId)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.dedupeEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils dedupe evidence evidence[]",
+      "demand": [
+        "RuntimeEvidence[] (evidence)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.ensureEdgeEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils ensure edge evidence",
+      "demand": [
+        "RuntimeEdge (edge)",
+        "[Ghost:Read] inferredEvidence (inferredEvidence)"
+      ],
+      "answer": [
+        "RuntimeEdge"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.ensureNodeEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils ensure node evidence",
+      "demand": [
+        "RuntimeNode (node)",
+        "[Ghost:Read] inferredEvidence (inferredEvidence)"
+      ],
+      "answer": [
+        "RuntimeNode"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.lineEvidence",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils line evidence",
+      "demand": [
+        "RuntimeSourceFile (file)",
+        "RuntimeEvidence['kind'] (kind)",
+        "[Generic] string (text)",
+        "[Generic] unknown (index)",
+        "[Generic] unknown (confidence)",
+        "[Ghost:Read] findLineColumn (findLineColumn)"
+      ],
+      "answer": [
+        "RuntimeEvidence"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeUtils.toPascalServiceName",
+    "category": "core",
+    "sourcePath": "runtime/runtimeUtils.ts",
+    "fission": {
+      "problem": "Execution Capability: Provide Runtime utils to pascal service name string",
+      "demand": [
+        "[Generic] string (value)",
+        "[Ghost:Read] toPascalCase (toPascalCase)"
+      ],
+      "answer": [
+        "void"
+      ]
+    }
+  },
+  {
+    "nodeId": "RuntimeVisualizer.generateRuntimeDashboard",
+    "category": "core",
+    "sourcePath": "runtime/runtimeVisualizer.ts",
+    "fission": {
+      "problem": "Execution Capability: Produce Runtime visualizer generate dashboard string",
+      "demand": [
+        "[Generic] string (runtimeMapPath)",
+        "[Generic] string (outputPath)",
+        "RuntimeDashboardOptions (options)",
+        "[Ghost:Read] module (fs)",
+        "[Ghost:Read] module (path)",
+        "[Ghost:Read] RuntimeMap (RuntimeMap)"
       ],
       "answer": [
         "void"
