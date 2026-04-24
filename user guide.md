@@ -178,6 +178,8 @@ Dream 是“提案生成器”，不是自动改代码器。
 ### 6.2 Dream 命令
 
 ```bash
+triadmind dream
+triadmind dream --json
 triadmind dream run
 triadmind dream run --json
 triadmind dream run --mode idle
@@ -188,6 +190,14 @@ triadmind dream auto --trigger manual --force
 triadmind dream review --json
 triadmind dream visualize --open
 ```
+
+Dream 默认路由说明：
+
+- `triadmind dream` 等价于 `triadmind dream run`
+- `triadmind dream --json` 等价于 `triadmind dream run --json`
+- proposal 的 `category` 会按 `sourcePath + .triadmind/config.json -> categories` 自动校验；无法映射时回退 `unknown` 并记录到 `.triadmind/dream-diagnostics.json`
+- `dream.lock` 会先做 PID 存活探测：锁对应进程已退出时会立即回收，不必等待 `lockTimeoutMinutes`
+- idle Dream 在高开销图遍历阶段会分批让出事件循环，减少对前台任务的阻塞
 
 ### 6.3 Dream Daemon（v3）
 

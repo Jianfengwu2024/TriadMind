@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { loadTriadConfig } from './config';
 import { runDreamAnalysis } from './dream';
@@ -42,6 +43,7 @@ interface DreamLockPayload {
     pid: number;
     trigger: string;
     acquiredAt: string;
+    host?: string;
 }
 
 interface DreamLockResult {
@@ -49,7 +51,7 @@ interface DreamLockResult {
     staleRecovered: boolean;
 }
 
-export function tickDreamAutoRun(paths: WorkspacePaths, options: DreamAutoTickOptions): DreamAutoTickResult {
+export async function tickDreamAutoRun(paths: WorkspacePaths, options: DreamAutoTickOptions): Promise<DreamAutoTickResult> {
     const trigger = String(options.trigger ?? '').trim() || 'unknown';
     const now = options.now ?? new Date();
     const nowIso = now.toISOString();
@@ -119,7 +121,7 @@ export function tickDreamAutoRun(paths: WorkspacePaths, options: DreamAutoTickOp
     }
 
     try {
-        const result = runDreamAnalysis(paths, {
+        const result = await runDreamAnalysis(paths, {
             mode: 'idle',
             force: true
         });
@@ -223,8 +225,10 @@ function tryAcquireDreamLock(
     if (fs.existsSync(lockFilePath)) {
         const existing = readDreamLock(lockFilePath);
         const acquiredAt = Date.parse(existing?.acquiredAt ?? '');
-        const isStale = Number.isFinite(acquiredAt) ? Date.now() - acquiredAt > timeoutMs : true;
-        if (!isStale) {
+        const isStaleByTime = Number.isFinite(acquiredAt) ? Date.now() - acquiredAt > timeoutMs : true;
+        const processAlive = isProcessAlive(existing?.pid);
+        const shouldRecover = isStaleByTime || !processAlive;
+        if (!shouldRecover) {
             return {
                 acquired: false,
                 staleRecovered: false
@@ -246,7 +250,8 @@ function tryAcquireDreamLock(
         schemaVersion: '1.0',
         pid: process.pid,
         trigger,
-        acquiredAt: nowIso
+        acquiredAt: nowIso,
+        host: os.hostname()
     };
 
     try {
@@ -277,7 +282,8 @@ function readDreamLock(lockFilePath: string) {
             schemaVersion: '1.0',
             pid: Number(parsed.pid ?? 0),
             trigger: String(parsed.trigger ?? ''),
-            acquiredAt: String(parsed.acquiredAt ?? '')
+            acquiredAt: String(parsed.acquiredAt ?? ''),
+            host: typeof parsed.host === 'string' ? parsed.host : undefined
         };
     } catch {
         return undefined;
@@ -293,6 +299,23 @@ function releaseDreamLock(lockFilePath: string) {
         fs.unlinkSync(lockFilePath);
     } catch {
         // best effort
+    }
+}
+
+function isProcessAlive(pid: number | undefined) {
+    if (typeof pid !== 'number' || !Number.isFinite(pid) || pid <= 0) {
+        return false;
+    }
+
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error: any) {
+        const code = String(error?.code ?? '').toUpperCase();
+        if (code === 'EPERM') {
+            return true;
+        }
+        return false;
     }
 }
 

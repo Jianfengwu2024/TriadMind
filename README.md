@@ -171,6 +171,8 @@ triadmind verify --strict --json
 ### 4.4 Dream 建议生成
 
 ```bash
+triadmind dream
+triadmind dream --json
 triadmind dream run
 triadmind dream run --json
 triadmind dream run --mode idle
@@ -186,9 +188,14 @@ triadmind dream daemon stop
 
 默认行为（v2）：
 
+- `triadmind dream` 等价于 `triadmind dream run`
+- `triadmind dream --json` 等价于 `triadmind dream run --json`
 - `init/sync/runtime/plan/apply/verify/govern/trend` 会自动记一次 Dream 活动
 - 达到 `minEventsBetweenRuns` 且满足时间门禁后，会自动触发一次 idle Dream
 - 使用 `dream.lock` 做互斥，旧锁超时会自动回收（stale lock recovery）
+- `dream.lock` 在检查超时前会先做 PID 存活探测：锁进程已退出时立即回收，不再被 `lockTimeoutMinutes` 长时间阻塞
+- idle Dream 在高开销图遍历阶段采用分批让出事件循环（event-loop yielding），降低对前台任务的阻塞风险
+- Dream proposal 的 `category` 会基于 `sourcePath + config.categories` 自动校验并修正；无法映射时回退为 `unknown` 并记录到 `.triadmind/dream-diagnostics.json`
 
 ### 4.5 治理门禁
 

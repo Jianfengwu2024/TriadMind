@@ -95,18 +95,18 @@ function createSchedulerFixture(overrides: {
     return root;
 }
 
-test('auto dream waits until event gate passes then runs once', () => {
+test('auto dream waits until event gate passes then runs once', async () => {
     const root = createSchedulerFixture({
         minEventsBetweenRuns: 2
     });
     const paths = getWorkspacePaths(root);
 
-    const first = tickDreamAutoRun(paths, { trigger: 'sync' });
+    const first = await tickDreamAutoRun(paths, { trigger: 'sync' });
     assert.equal(first.status, 'skipped');
     assert.match(first.reason, /event gate blocked/i);
     assert.equal(first.pendingEvents, 1);
 
-    const second = tickDreamAutoRun(paths, { trigger: 'sync' });
+    const second = await tickDreamAutoRun(paths, { trigger: 'sync' });
     assert.equal(second.status, 'run');
     assert.equal(second.ran, true);
     assert.equal(second.pendingEvents, 0);
@@ -114,7 +114,7 @@ test('auto dream waits until event gate passes then runs once', () => {
     assert.equal(fs.existsSync(paths.dreamAutoStateFile), true);
 });
 
-test('auto dream skips when lock is held by another process', () => {
+test('auto dream skips when lock is held by another process', async () => {
     const root = createSchedulerFixture({
         minEventsBetweenRuns: 1,
         lockTimeoutMinutes: 30
@@ -126,7 +126,7 @@ test('auto dream skips when lock is held by another process', () => {
         JSON.stringify(
             {
                 schemaVersion: '1.0',
-                pid: 999999,
+                pid: process.pid,
                 trigger: 'sync',
                 acquiredAt: new Date().toISOString()
             },
@@ -136,13 +136,13 @@ test('auto dream skips when lock is held by another process', () => {
         'utf-8'
     );
 
-    const result = tickDreamAutoRun(paths, { trigger: 'sync' });
+    const result = await tickDreamAutoRun(paths, { trigger: 'sync' });
     assert.equal(result.status, 'skipped');
     assert.equal(result.lock, 'busy');
     assert.match(result.reason, /lock is busy/i);
 });
 
-test('auto dream recovers stale lock and proceeds', () => {
+test('auto dream recovers stale lock and proceeds', async () => {
     const root = createSchedulerFixture({
         minEventsBetweenRuns: 1,
         lockTimeoutMinutes: 1
@@ -165,7 +165,36 @@ test('auto dream recovers stale lock and proceeds', () => {
         'utf-8'
     );
 
-    const result = tickDreamAutoRun(paths, { trigger: 'sync' });
+    const result = await tickDreamAutoRun(paths, { trigger: 'sync' });
+    assert.equal(result.status, 'run');
+    assert.equal(result.lock, 'stale_recovered');
+    assert.equal(fs.existsSync(paths.dreamLockFile), false);
+});
+
+test('auto dream recovers dead process lock before timeout and proceeds', async () => {
+    const root = createSchedulerFixture({
+        minEventsBetweenRuns: 1,
+        lockTimeoutMinutes: 30
+    });
+    const paths = getWorkspacePaths(root);
+    const activeButDeadPid = 999999;
+
+    fs.writeFileSync(
+        paths.dreamLockFile,
+        JSON.stringify(
+            {
+                schemaVersion: '1.0',
+                pid: activeButDeadPid,
+                trigger: 'sync',
+                acquiredAt: new Date().toISOString()
+            },
+            null,
+            2
+        ),
+        'utf-8'
+    );
+
+    const result = await tickDreamAutoRun(paths, { trigger: 'sync' });
     assert.equal(result.status, 'run');
     assert.equal(result.lock, 'stale_recovered');
     assert.equal(fs.existsSync(paths.dreamLockFile), false);

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { loadTriadConfig, TriadLanguage } from './config';
+import { loadTriadConfig, resolveCategoryBySourcePath, TriadLanguage } from './config';
 import { TriadOp, UpgradeProtocol } from './protocol';
 import { VerifyMetrics, runTopologyVerify } from './verify';
 import { WorkspacePaths } from './workspace';
@@ -11,6 +11,7 @@ const UNMATCHED_ROUTE_DIAGNOSTIC_CODE = 'RUNTIME_FRONTEND_API_ROUTE_UNMATCHED';
 const DEFAULT_EXECUTE_RATIO_LIMIT = 0.1;
 const DEFAULT_GHOST_RATIO_LIMIT = 0.4;
 const FANOUT_ALERT_THRESHOLD = 6;
+const DREAM_IDLE_YIELD_BATCH_SIZE = 200;
 
 type TriadNodeLike = {
     nodeId?: string;
@@ -69,6 +70,8 @@ export interface DreamProposal {
     title: string;
     priority: 'low' | 'medium' | 'high';
     confidence: number;
+    category?: 'frontend' | 'backend' | 'core' | 'unknown';
+    sourcePath?: string;
     objective: string;
     expectedOutcome: string;
     actions: string[];
@@ -142,7 +145,7 @@ interface FanoutNode {
     downstreamNodeIds: string[];
 }
 
-export function runDreamAnalysis(paths: WorkspacePaths, options: DreamRunOptions = {}): DreamRunResult {
+export async function runDreamAnalysis(paths: WorkspacePaths, options: DreamRunOptions = {}): Promise<DreamRunResult> {
     const config = loadTriadConfig(paths);
     const dreamConfig = normalizeDreamConfig(config.dream, options);
     const mode = normalizeDreamMode(options.mode, dreamConfig.idleOnly);
@@ -183,13 +186,17 @@ export function runDreamAnalysis(paths: WorkspacePaths, options: DreamRunOptions
     const triadNodes = readTriadNodes(paths.mapFile, diagnostics);
     const runtimeMap = readRuntimeMap(paths.runtimeMapFile, diagnostics);
     const runtimeDiagnostics = readRuntimeDiagnostics(paths.runtimeDiagnosticsFile, diagnostics);
-    const fanoutNodes = detectHighFanoutNodes(triadNodes, FANOUT_ALERT_THRESHOLD);
+    const fanoutNodes = await detectHighFanoutNodes(triadNodes, FANOUT_ALERT_THRESHOLD, {
+        enableYield: mode === 'idle',
+        batchSize: DREAM_IDLE_YIELD_BATCH_SIZE
+    });
     const findings = buildDreamFindings(metrics, triadNodes, runtimeDiagnostics, fanoutNodes);
-    const proposals = rankAndFilterProposals(
+    const rankedProposals = rankAndFilterProposals(
         buildDreamProposals(paths, findings, triadNodes, runtimeDiagnostics, fanoutNodes),
         dreamConfig.minConfidence,
         dreamConfig.maxProposals
     );
+    const proposals = validateProposalConsistency(rankedProposals, config.categories, diagnostics);
     const summary = buildSummary(metrics, findings, proposals, runtimeMap);
 
     const report: DreamReport = {
@@ -653,6 +660,99 @@ function rankAndFilterProposals(proposals: DreamProposal[], minConfidence: numbe
         .slice(0, maxProposals);
 }
 
+function validateProposalConsistency(
+    proposals: DreamProposal[],
+    categories: { frontend: string[]; backend: string[]; core: string[] },
+    diagnostics: DreamDiagnostic[]
+) {
+    return proposals.map((proposal) => {
+        const sourcePath = normalizeProposalSourcePath(
+            proposal.sourcePath ?? extractProposalSourcePathFromProtocol(proposal) ?? extractProposalSourcePathFromEvidence(proposal)
+        );
+        const previousCategory = normalizeProposalCategory(proposal.category);
+        const resolvedCategory = sourcePath ? resolveCategoryBySourcePath(sourcePath, categories) : 'unknown';
+
+        if (sourcePath && previousCategory !== resolvedCategory) {
+            diagnostics.push({
+                level: 'warning',
+                code: 'DREAM_PROPOSAL_CATEGORY_MISMATCH_AUTO_FIXED',
+                component: 'DreamProposalValidator',
+                message: `Proposal ${proposal.id} category auto-fixed: ${previousCategory} -> ${resolvedCategory}`,
+                sourcePath
+            });
+        } else if (!sourcePath && previousCategory !== 'unknown') {
+            diagnostics.push({
+                level: 'warning',
+                code: 'DREAM_PROPOSAL_CATEGORY_UNKNOWN_FALLBACK',
+                component: 'DreamProposalValidator',
+                message: `Proposal ${proposal.id} has no resolvable sourcePath; category downgraded to unknown`
+            });
+        } else if (sourcePath && resolvedCategory === 'unknown') {
+            diagnostics.push({
+                level: 'warning',
+                code: 'DREAM_PROPOSAL_CATEGORY_UNKNOWN_FALLBACK',
+                component: 'DreamProposalValidator',
+                message: `Proposal ${proposal.id} sourcePath cannot map to configured categories; using unknown`,
+                sourcePath
+            });
+        }
+
+        return {
+            ...proposal,
+            category: resolvedCategory,
+            sourcePath: sourcePath || undefined
+        };
+    });
+}
+
+function normalizeProposalCategory(value: DreamProposal['category']) {
+    if (value === 'frontend' || value === 'backend' || value === 'core' || value === 'unknown') {
+        return value;
+    }
+    return 'unknown';
+}
+
+function normalizeProposalSourcePath(value: string | undefined) {
+    const normalized = String(value ?? '')
+        .trim()
+        .replace(/\\/g, '/')
+        .replace(/^\.?\//, '')
+        .replace(/\/{2,}/g, '/');
+    return normalized || '';
+}
+
+function extractProposalSourcePathFromProtocol(proposal: DreamProposal) {
+    const actions = Array.isArray(proposal.protocolDraft?.actions) ? proposal.protocolDraft.actions : [];
+    for (const action of actions) {
+        if (action?.op === 'create_child' && typeof action?.node?.sourcePath === 'string') {
+            const normalized = normalizeProposalSourcePath(action.node.sourcePath);
+            if (normalized) {
+                return normalized;
+            }
+        }
+        if (action?.op === 'modify' && typeof action?.sourcePath === 'string') {
+            const normalized = normalizeProposalSourcePath(action.sourcePath);
+            if (normalized) {
+                return normalized;
+            }
+        }
+    }
+    return '';
+}
+
+function extractProposalSourcePathFromEvidence(proposal: DreamProposal) {
+    for (const evidence of proposal.evidence) {
+        if (typeof evidence?.sourcePath !== 'string') {
+            continue;
+        }
+        const normalized = normalizeProposalSourcePath(evidence.sourcePath);
+        if (normalized) {
+            return normalized;
+        }
+    }
+    return '';
+}
+
 function buildSummary(
     metrics: VerifyMetrics,
     findings: DreamFinding[],
@@ -923,17 +1023,27 @@ function extractRouteHint(message: string) {
     return match ? `${match[0]} | ${message}` : message;
 }
 
-function detectHighFanoutNodes(triadNodes: TriadNodeLike[], threshold: number) {
+async function detectHighFanoutNodes(
+    triadNodes: TriadNodeLike[],
+    threshold: number,
+    options: {
+        enableYield: boolean;
+        batchSize: number;
+    }
+) {
     const answerProducers = new Map<string, string[]>();
     const downstreamByNode = new Map<string, Set<string>>();
+    const maybeYield = createLoopYieldController(options.enableYield, options.batchSize);
 
     for (const node of triadNodes) {
+        await maybeYield();
         const nodeId = String(node?.nodeId ?? '').trim();
         if (!nodeId) {
             continue;
         }
         const answers = Array.isArray(node?.fission?.answer) ? node.fission!.answer! : [];
         for (const answer of answers) {
+            await maybeYield();
             const answerKey = normalizeContractKey(answer);
             if (!answerKey) {
                 continue;
@@ -945,18 +1055,21 @@ function detectHighFanoutNodes(triadNodes: TriadNodeLike[], threshold: number) {
     }
 
     for (const node of triadNodes) {
+        await maybeYield();
         const consumerNodeId = String(node?.nodeId ?? '').trim();
         if (!consumerNodeId) {
             continue;
         }
         const demands = Array.isArray(node?.fission?.demand) ? node.fission!.demand! : [];
         for (const demand of demands) {
+            await maybeYield();
             const demandKey = normalizeContractKey(demand);
             if (!demandKey) {
                 continue;
             }
             const producers = answerProducers.get(demandKey) ?? [];
             for (const producerNodeId of producers) {
+                await maybeYield();
                 if (producerNodeId === consumerNodeId) {
                     continue;
                 }
@@ -975,6 +1088,29 @@ function detectHighFanoutNodes(triadNodes: TriadNodeLike[], threshold: number) {
         }))
         .filter((item) => item.downstreamCount >= threshold)
         .sort((left, right) => right.downstreamCount - left.downstreamCount || left.nodeId.localeCompare(right.nodeId));
+}
+
+function createLoopYieldController(enableYield: boolean, configuredBatchSize: number) {
+    if (!enableYield) {
+        return async () => {
+            // no-op
+        };
+    }
+
+    const batchSize = Math.max(50, Math.floor(configuredBatchSize || DREAM_IDLE_YIELD_BATCH_SIZE));
+    let processed = 0;
+    return async () => {
+        processed += 1;
+        if (processed < batchSize) {
+            return;
+        }
+        processed = 0;
+        await yieldToEventLoop();
+    };
+}
+
+function yieldToEventLoop() {
+    return new Promise<void>((resolve) => setImmediate(resolve));
 }
 
 function normalizeContractKey(contract: unknown) {

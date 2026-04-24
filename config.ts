@@ -407,6 +407,44 @@ export function resolveCategoryFromConfig(sourcePath: string, config: TriadConfi
     return 'core';
 }
 
+export function resolveCategoryBySourcePath(
+    sourcePath: string | undefined,
+    categories: Record<TriadCategory, string[]>
+): TriadCategory | 'unknown' {
+    const normalizedPath = normalizePath(String(sourcePath ?? '')).toLowerCase().replace(/^\/+/, '');
+    if (!normalizedPath) {
+        return 'unknown';
+    }
+
+    const categoryOrder: TriadCategory[] = ['frontend', 'backend', 'core'];
+    let bestMatch: { category: TriadCategory; score: number } | undefined;
+
+    for (const category of categoryOrder) {
+        const patterns = Array.isArray(categories[category]) ? categories[category] : [];
+        for (const rawPattern of patterns) {
+            const pattern = normalizePath(String(rawPattern ?? '')).toLowerCase().replace(/^\/+|\/+$/g, '');
+            if (!pattern) {
+                continue;
+            }
+
+            const isExactPrefix = normalizedPath === pattern || normalizedPath.startsWith(`${pattern}/`);
+            if (!isExactPrefix) {
+                continue;
+            }
+
+            const score = pattern.length;
+            if (!bestMatch || score > bestMatch.score) {
+                bestMatch = {
+                    category,
+                    score
+                };
+            }
+        }
+    }
+
+    return bestMatch?.category ?? 'unknown';
+}
+
 export function shouldExcludeSourcePath(sourcePath: string, config: TriadConfig) {
     const normalizedPath = normalizePath(sourcePath).toLowerCase();
     if (isHardExcludedSourcePath(normalizedPath)) {

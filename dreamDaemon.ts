@@ -228,7 +228,7 @@ export async function runDreamDaemonLoop(paths: WorkspacePaths, options: DreamDa
     try {
         while (!stopRequested) {
             ticks += 1;
-            const tickResult = tickDreamAutoRun(paths, {
+            const tickResult = await tickDreamAutoRun(paths, {
                 trigger: 'daemon'
             });
             const state = readDreamDaemonState(paths.dreamDaemonStateFile);

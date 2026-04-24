@@ -6,7 +6,9 @@ import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-function createDreamFixture() {
+function createDreamFixture(options?: { executeSourcePath?: string; paymentSourcePath?: string }) {
+    const executeSourcePath = options?.executeSourcePath ?? 'src/backend/order_service.py';
+    const paymentSourcePath = options?.paymentSourcePath ?? 'src/backend/payment_service.py';
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-dream-'));
     const triadDir = path.join(root, '.triadmind');
     fs.mkdirSync(triadDir, { recursive: true });
@@ -18,7 +20,7 @@ function createDreamFixture() {
                 {
                     nodeId: 'OrderService.execute',
                     category: 'backend',
-                    sourcePath: 'src/backend/order_service.py',
+                    sourcePath: executeSourcePath,
                     fission: {
                         problem: 'Execute order orchestration',
                         demand: ['OrderCommand (command)', '[Ghost:Read] Cache (orderCache)'],
@@ -28,7 +30,7 @@ function createDreamFixture() {
                 {
                     nodeId: 'PaymentService.process',
                     category: 'backend',
-                    sourcePath: 'src/backend/payment_service.py',
+                    sourcePath: paymentSourcePath,
                     fission: {
                         problem: 'Process payment',
                         demand: ['OrderResult'],
@@ -132,6 +134,36 @@ test('dream run --json writes dream artifacts and proposals', () => {
     assert.equal(fs.existsSync(path.join(triadDir, 'dream-state.json')), true);
 });
 
+test('dream (no subcommand) defaults to dream run and accepts --json', () => {
+    const root = createDreamFixture();
+    const result = runCli(root, ['dream', '--json']);
+    assert.equal(result.status, 0, `dream --json failed: ${result.stderr || result.stdout}`);
+
+    const jsonStart = result.stdout.indexOf('{');
+    assert.ok(jsonStart >= 0, 'dream --json did not emit JSON payload');
+    const report = JSON.parse(result.stdout.slice(jsonStart));
+    assert.equal(report.schemaVersion, '1.0');
+    assert.equal(report.skipped, false);
+    assert.equal(Array.isArray(report.proposals), true);
+});
+
+test('dream --json and dream run --json are both supported', () => {
+    const root1 = createDreamFixture();
+    const direct = runCli(root1, ['dream', '--json']);
+    assert.equal(direct.status, 0, `dream --json failed: ${direct.stderr || direct.stdout}`);
+    const directPayload = JSON.parse(direct.stdout.slice(direct.stdout.indexOf('{')));
+
+    const root2 = createDreamFixture();
+    const explicit = runCli(root2, ['dream', 'run', '--json']);
+    assert.equal(explicit.status, 0, `dream run --json failed: ${explicit.stderr || explicit.stdout}`);
+    const explicitPayload = JSON.parse(explicit.stdout.slice(explicit.stdout.indexOf('{')));
+
+    assert.equal(Array.isArray(directPayload.proposals), true);
+    assert.equal(Array.isArray(explicitPayload.proposals), true);
+    assert.equal(directPayload.proposals.length > 0, true);
+    assert.equal(explicitPayload.proposals.length > 0, true);
+});
+
 test('dream idle mode respects minHoursBetweenRuns gate', () => {
     const root = createDreamFixture();
 
@@ -157,6 +189,53 @@ test('dream review --json returns latest report', () => {
     const report = JSON.parse(reviewResult.stdout.slice(reviewResult.stdout.indexOf('{')));
     assert.equal(report.schemaVersion, '1.0');
     assert.equal(Array.isArray(report.summary), true);
+});
+
+test('dream proposal category follows sourcePath mapping for backend paths', () => {
+    const root = createDreamFixture({
+        executeSourcePath: 'src/backend/orders/execution.py',
+        paymentSourcePath: 'src/backend/payments/processor.py'
+    });
+    const runResult = runCli(root, ['dream', '--json']);
+    assert.equal(runResult.status, 0, `dream run failed: ${runResult.stderr || runResult.stdout}`);
+
+    const report = JSON.parse(runResult.stdout.slice(runResult.stdout.indexOf('{')));
+    const proposals = Array.isArray(report.proposals) ? report.proposals : [];
+    const backendProposal = proposals.find(
+        (proposal: { sourcePath?: string; category?: string }) =>
+            typeof proposal?.sourcePath === 'string' && proposal.sourcePath.includes('src/backend/')
+    );
+    assert.ok(backendProposal, 'expected at least one proposal with backend sourcePath');
+    assert.equal(backendProposal.category, 'backend');
+});
+
+test('dream proposal category falls back to unknown when sourcePath cannot map', () => {
+    const root = createDreamFixture({
+        executeSourcePath: 'services/order_service.py',
+        paymentSourcePath: 'domain/payment_service.py'
+    });
+    const runResult = runCli(root, ['dream', '--json']);
+    assert.equal(runResult.status, 0, `dream run failed: ${runResult.stderr || runResult.stdout}`);
+
+    const report = JSON.parse(runResult.stdout.slice(runResult.stdout.indexOf('{')));
+    const proposals = Array.isArray(report.proposals) ? report.proposals : [];
+    const unknownCategoryProposal = proposals.find(
+        (proposal: { sourcePath?: string; category?: string }) =>
+            typeof proposal?.sourcePath === 'string' &&
+            proposal.sourcePath.includes('services/order_service.py') &&
+            proposal.category === 'unknown'
+    );
+    assert.ok(unknownCategoryProposal, 'expected unmapped proposal category to downgrade to unknown');
+
+    const diagnostics = Array.isArray(report.diagnostics) ? report.diagnostics : [];
+    assert.equal(
+        diagnostics.some(
+            (item: { code?: string }) =>
+                item.code === 'DREAM_PROPOSAL_CATEGORY_MISMATCH_AUTO_FIXED' ||
+                item.code === 'DREAM_PROPOSAL_CATEGORY_UNKNOWN_FALLBACK'
+        ),
+        true
+    );
 });
 
 test('dream auto --json emits auto tick result payload', () => {

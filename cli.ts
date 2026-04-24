@@ -64,6 +64,16 @@ interface DashboardCliOptions {
     fullContractEdges?: boolean;
 }
 
+interface DreamRunCliOptions {
+    mode?: string;
+    force?: boolean;
+    maxProposals?: string;
+    minConfidence?: string;
+    visualize?: boolean;
+    theme?: string;
+    json?: boolean;
+}
+
 program.name('triadmind').description('TriadMind：顶点三元法驱动的项目拓扑规划与骨架生成工具').version('1.2.0');
 
 program
@@ -520,7 +530,11 @@ program
 
 const dreamCommand = program
     .command('dream')
-    .description('Run idle-style architecture dreaming and governance proposal generation');
+    .description('Run idle-style architecture dreaming and governance proposal generation')
+    .addHelpText(
+        'after',
+        '\nDefault behavior: `triadmind dream` is equivalent to `triadmind dream run`.\nYou can pass run flags directly, e.g. `triadmind dream --json`.'
+    );
 
 dreamCommand
     .command('run')
@@ -532,42 +546,8 @@ dreamCommand
     .option('--visualize', 'Generate dream-visualizer.html after dream run')
     .option('--theme <leaf-like|runtime-dark>', 'Dream visualizer theme', 'leaf-like')
     .option('--json', 'Emit machine-readable dream report JSON')
-    .action((options: {
-        mode?: string;
-        force?: boolean;
-        maxProposals?: string;
-        minConfidence?: string;
-        visualize?: boolean;
-        theme?: string;
-        json?: boolean;
-    }) => {
-        const paths = getWorkspacePaths(process.cwd());
-        ensureTriadSpec(paths);
-
-        const result = runDreamAnalysis(paths, {
-            mode: options.mode === 'idle' ? 'idle' : 'manual',
-            force: Boolean(options.force),
-            maxProposals: parseOptionalPositiveCliInteger(options.maxProposals),
-            minConfidence: parseOptionalRatioCliNumber(options.minConfidence)
-        });
-        if (options.visualize) {
-            generateDreamDashboard(result.report, paths.dreamVisualizerFile, {
-                theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
-            });
-        }
-
-        if (options.json) {
-            console.log(JSON.stringify(result.report, null, 2));
-            return;
-        }
-
-        console.log(formatDreamReport(result.report));
-        console.log(chalk.green(`✅ Dream report written: ${result.artifacts.reportFile}`));
-        console.log(chalk.green(`✅ Dream diagnostics written: ${result.artifacts.diagnosticsFile}`));
-        console.log(chalk.green(`✅ Dream proposals written: ${result.artifacts.proposalsFile}`));
-        if (options.visualize) {
-            console.log(chalk.green(`✅ Dream visualizer written: ${paths.dreamVisualizerFile}`));
-        }
+    .action(async (options: DreamRunCliOptions) => {
+        await executeDreamRun(options);
     });
 
 dreamCommand
@@ -576,11 +556,11 @@ dreamCommand
     .option('--trigger <name>', 'Auto trigger source label', 'manual')
     .option('--force', 'Bypass gate checks and force auto-dream execution')
     .option('--json', 'Emit machine-readable auto tick result JSON')
-    .action((options: { trigger?: string; force?: boolean; json?: boolean }) => {
+    .action(async (options: { trigger?: string; force?: boolean; json?: boolean }) => {
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
 
-        const result = tickDreamAutoRun(paths, {
+        const result = await tickDreamAutoRun(paths, {
             trigger: String(options.trigger ?? 'manual'),
             force: Boolean(options.force)
         });
@@ -1410,8 +1390,8 @@ function reportBootstrapInitResult(paths: ReturnType<typeof getWorkspacePaths>, 
 }
 
 function runAutoDreamAfterCommand(paths: ReturnType<typeof getWorkspacePaths>, trigger: string) {
-    try {
-        const result = tickDreamAutoRun(paths, { trigger });
+    void tickDreamAutoRun(paths, { trigger })
+        .then((result) => {
         if (result.status === 'run') {
             console.log(
                 chalk.gray(
@@ -1427,12 +1407,44 @@ function runAutoDreamAfterCommand(paths: ReturnType<typeof getWorkspacePaths>, t
                 )
             );
         }
-    } catch (error: any) {
-        console.log(
-            chalk.yellow(
-                `[TriadMind] dream auto trigger crashed: trigger=${trigger}, error=${error?.message ? String(error.message) : String(error)}`
-            )
-        );
+        })
+        .catch((error: any) => {
+            console.log(
+                chalk.yellow(
+                    `[TriadMind] dream auto trigger crashed: trigger=${trigger}, error=${error?.message ? String(error.message) : String(error)}`
+                )
+            );
+        });
+}
+
+async function executeDreamRun(options: DreamRunCliOptions) {
+    const paths = getWorkspacePaths(process.cwd());
+    ensureTriadSpec(paths);
+
+    const result = await runDreamAnalysis(paths, {
+        mode: options.mode === 'idle' ? 'idle' : 'manual',
+        force: Boolean(options.force),
+        maxProposals: parseOptionalPositiveCliInteger(options.maxProposals),
+        minConfidence: parseOptionalRatioCliNumber(options.minConfidence)
+    });
+
+    if (options.visualize) {
+        generateDreamDashboard(result.report, paths.dreamVisualizerFile, {
+            theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
+        });
+    }
+
+    if (options.json) {
+        console.log(JSON.stringify(result.report, null, 2));
+        return;
+    }
+
+    console.log(formatDreamReport(result.report));
+    console.log(chalk.green(`✅ Dream report written: ${result.artifacts.reportFile}`));
+    console.log(chalk.green(`✅ Dream diagnostics written: ${result.artifacts.diagnosticsFile}`));
+    console.log(chalk.green(`✅ Dream proposals written: ${result.artifacts.proposalsFile}`));
+    if (options.visualize) {
+        console.log(chalk.green(`✅ Dream visualizer written: ${paths.dreamVisualizerFile}`));
     }
 }
 
@@ -1939,4 +1951,33 @@ async function openFile(filePath: string) {
     child.unref();
 }
 
-program.parse(process.argv);
+function normalizeDreamDefaultSubcommandArgv(argv: string[]) {
+    if (!Array.isArray(argv) || argv.length < 3) {
+        return argv;
+    }
+
+    const normalized = [...argv];
+    const dreamIndex = normalized.findIndex((value, index) => index >= 2 && value === 'dream');
+    if (dreamIndex < 0) {
+        return normalized;
+    }
+
+    const nextToken = normalized[dreamIndex + 1];
+    if (!nextToken) {
+        normalized.splice(dreamIndex + 1, 0, 'run');
+        return normalized;
+    }
+
+    const explicitSubcommands = new Set(['run', 'auto', 'review', 'visualize', 'daemon', 'daemon-loop', 'help']);
+    if (explicitSubcommands.has(nextToken) || nextToken === '-h' || nextToken === '--help') {
+        return normalized;
+    }
+
+    if (nextToken.startsWith('-')) {
+        normalized.splice(dreamIndex + 1, 0, 'run');
+    }
+
+    return normalized;
+}
+
+program.parse(normalizeDreamDefaultSubcommandArgv(process.argv));
