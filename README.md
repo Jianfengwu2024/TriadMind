@@ -483,6 +483,7 @@ Reviewer controls:
 - `triadmind runtime --visualize --layout leaf-force --hide-isolated` focuses on dense main paths in large graphs
 - `triadmind runtime --visualize --theme leaf-like` aligns runtime visual style with leaf visualizer defaults
 - `triadmind runtime --visualize --max-render-edges 500` optionally enables explicit runtime edge cap (default no cap)
+- `triadmind view-map --json` generates `view-map.json` / `view-map-diagnostics.json` for runtime↔capability↔leaf cross-view links
 - `triadmind verify --json` emits machine-readable governance metrics for CI
 - `triadmind verify --strict` enforces default gates (`diagnostics_no_code`, `execute_like_ratio`, `ghost_ratio`, `rendered_edges_consistency`)
 - `triadmind verify --strict --baseline .triadmind/verify-baseline.json` enforces `runtime_unmatched_route_count <= baseline * 1.1`

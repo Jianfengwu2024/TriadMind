@@ -30,6 +30,7 @@ import { writeRuntimeMapArtifacts } from './runtime/runtimeMapWriter';
 import { generateRuntimeDashboard } from './runtime/runtimeVisualizer';
 import { formatVerifyReport, runTopologyVerify } from './verify';
 import { generateTrendArtifacts } from './trend';
+import { writeViewMapArtifacts } from './viewMap';
 
 const program = new Command();
 const BLAST_RADIUS_WARNING_THRESHOLD = 5;
@@ -65,10 +66,12 @@ program
         ensureTriadSpec(paths);
         syncProjectTopology(paths, true);
         const runtimeResult = await writeRuntimeTopologyArtifacts(paths, {}, true);
+        const viewMapResult = writeViewMapArtifactsBestEffort(paths);
         assertNoTopologicalDegradation(paths, previousMap, 'init');
         installAlwaysOnRules(paths);
         writeMasterPrompt(paths);
         reportRuntimeArtifactStatus(paths, runtimeResult);
+        reportViewMapStatus(paths, viewMapResult);
 
         console.log(chalk.green(`✅ triad-map 已同步到 ${paths.mapFile}`));
         console.log(chalk.green(`✅ triad.md 已写入 ${paths.triadSpecFile}`));
@@ -202,7 +205,9 @@ program
         ensureTriadSpec(paths);
         syncProjectTopology(paths, Boolean(options.force), normalizeScanModeOption(options.scanMode));
         const runtimeResult = await writeRuntimeTopologyArtifacts(paths, {}, true);
+        const viewMapResult = writeViewMapArtifactsBestEffort(paths);
         reportRuntimeArtifactStatus(paths, runtimeResult);
+        reportViewMapStatus(paths, viewMapResult);
         console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
         console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
     });
@@ -259,9 +264,11 @@ program
             includeInfra: options.includeInfra ?? config.runtime.includeInfra,
             frameworkHint: options.framework
         });
+        const viewMapResult = writeViewMapArtifactsBestEffort(paths);
 
         console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
         console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
+        reportViewMapStatus(paths, viewMapResult);
 
         if (options.visualize) {
             generateRuntimeDashboard(paths.runtimeMapFile, paths.runtimeVisualizerFile, {
@@ -362,6 +369,26 @@ program
         console.log(chalk.green(`✅ Trend history written: ${paths.trendFile}`));
         console.log(chalk.green(`✅ Trend report written: ${paths.trendReportFile}`));
         result.report.summary.forEach((entry) => console.log(chalk.gray(`   - ${entry}`)));
+    });
+
+program
+    .command('view-map')
+    .description('Generate cross-view mapping artifacts (runtime ↔ capability ↔ leaf)')
+    .option('--max-candidates <n>', 'Max capability candidates retained per runtime node', '3')
+    .option('--json', 'Emit machine-readable view-map JSON payload')
+    .action((options: { maxCandidates?: string; json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+        const viewMap = writeViewMapArtifacts(paths, {
+            maxCandidatesPerRuntimeNode: normalizePositiveCliInteger(options.maxCandidates, 3)
+        });
+        reportViewMapStatus(paths, {
+            recovered: false,
+            viewMap
+        });
+        if (options.json) {
+            console.log(JSON.stringify(viewMap, null, 2));
+        }
     });
 
 program
@@ -862,6 +889,40 @@ async function writeRuntimeTopologyArtifacts(
     }
 }
 
+function writeViewMapArtifactsBestEffort(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    options: { maxCandidatesPerRuntimeNode?: number } = {}
+) {
+    try {
+        const viewMap = writeViewMapArtifacts(paths, options);
+        return { viewMap, recovered: false };
+    } catch (error: any) {
+        const fallbackViewMap = {
+            schemaVersion: '1.0' as const,
+            project: path.basename(paths.projectRoot),
+            generatedAt: new Date().toISOString(),
+            stats: {
+                runtimeNodes: 0,
+                capabilityNodes: 0,
+                leafNodes: 0,
+                linkCount: 0
+            },
+            links: [],
+            diagnostics: [
+                {
+                    level: 'error' as const,
+                    code: 'VIEW_MAP_BEST_EFFORT_FAILURE',
+                    message: error?.message ? String(error.message) : String(error)
+                }
+            ]
+        };
+        fs.mkdirSync(path.dirname(paths.viewMapFile), { recursive: true });
+        fs.writeFileSync(paths.viewMapFile, JSON.stringify(fallbackViewMap, null, 2), 'utf-8');
+        fs.writeFileSync(paths.viewMapDiagnosticsFile, JSON.stringify(fallbackViewMap.diagnostics, null, 2), 'utf-8');
+        return { viewMap: fallbackViewMap, recovered: true };
+    }
+}
+
 function reportRuntimeArtifactStatus(
     paths: ReturnType<typeof getWorkspacePaths>,
     result: {
@@ -887,6 +948,39 @@ function reportRuntimeArtifactStatus(
 
     console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
     console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
+}
+
+function reportViewMapStatus(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    result: {
+        recovered: boolean;
+        viewMap: {
+            stats?: { linkCount?: number };
+            diagnostics?: Array<{ code?: string; level: 'info' | 'warning' | 'error'; message: string }>;
+        };
+    }
+) {
+    const diagnostics = result.viewMap.diagnostics ?? [];
+    const missingFileWarnings = diagnostics.filter(
+        (item) =>
+            item.code === 'VIEW_MAP_MISSING_RUNTIME_MAP' ||
+            item.code === 'VIEW_MAP_MISSING_LEAF_MAP' ||
+            item.code === 'VIEW_MAP_MISSING_TRIAD_MAP'
+    ).length;
+    if (missingFileWarnings > 0) {
+        console.log(
+            chalk.yellow(`[TriadMind] view-map generation detected ${missingFileWarnings} missing prerequisite file warning(s)`)
+        );
+    }
+    if (result.recovered) {
+        console.log(chalk.yellow('[TriadMind] view-map generation degraded to diagnostics-only mode'));
+    }
+    console.log(
+        chalk.green(
+            `✅ View map written: ${paths.viewMapFile} (links=${result.viewMap.stats?.linkCount ?? 0})`
+        )
+    );
+    console.log(chalk.green(`✅ View map diagnostics written: ${paths.viewMapDiagnosticsFile}`));
 }
 
 function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {

@@ -18,6 +18,8 @@ export interface WorkspacePaths {
     runtimeMapFile: string;
     runtimeVisualizerFile: string;
     runtimeDiagnosticsFile: string;
+    viewMapFile: string;
+    viewMapDiagnosticsFile: string;
     verifyBaselineFile: string;
     trendFile: string;
     trendReportFile: string;
@@ -81,6 +83,8 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         runtimeMapFile: path.join(triadDir, 'runtime-map.json'),
         runtimeVisualizerFile: path.join(triadDir, 'runtime-visualizer.html'),
         runtimeDiagnosticsFile: path.join(triadDir, 'runtime-diagnostics.json'),
+        viewMapFile: path.join(triadDir, 'view-map.json'),
+        viewMapDiagnosticsFile: path.join(triadDir, 'view-map-diagnostics.json'),
         verifyBaselineFile: path.join(triadDir, 'verify-baseline.json'),
         trendFile: path.join(triadDir, 'trend.json'),
         trendReportFile: path.join(triadDir, 'trend-report.md'),
