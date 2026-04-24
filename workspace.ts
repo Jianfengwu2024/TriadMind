@@ -33,6 +33,10 @@ export interface WorkspacePaths {
     verifyBaselineFile: string;
     trendFile: string;
     trendReportFile: string;
+    dreamReportFile: string;
+    dreamDiagnosticsFile: string;
+    dreamProposalsFile: string;
+    dreamStateFile: string;
     draftFile: string;
     macroSplitFile: string;
     mesoSplitFile: string;
@@ -108,6 +112,10 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         verifyBaselineFile: path.join(triadDir, 'verify-baseline.json'),
         trendFile: path.join(triadDir, 'trend.json'),
         trendReportFile: path.join(triadDir, 'trend-report.md'),
+        dreamReportFile: path.join(triadDir, 'dream-report.json'),
+        dreamDiagnosticsFile: path.join(triadDir, 'dream-diagnostics.json'),
+        dreamProposalsFile: path.join(triadDir, 'dream-proposals.json'),
+        dreamStateFile: path.join(triadDir, 'dream-state.json'),
         draftFile: path.join(triadDir, 'draft-protocol.json'),
         macroSplitFile: path.join(triadDir, 'macro-split.json'),
         mesoSplitFile: path.join(triadDir, 'meso-split.json'),

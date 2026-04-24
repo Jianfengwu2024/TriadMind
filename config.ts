@@ -71,6 +71,14 @@ export interface TriadConfig {
         requireConfidence: boolean;
     };
     runtime: RuntimeConfig;
+    dream: {
+        enabled: boolean;
+        idleOnly: boolean;
+        minHoursBetweenRuns: number;
+        minConfidence: number;
+        maxProposals: number;
+        failOnDreamError: boolean;
+    };
     runtimeHealing: {
         enabled: boolean;
         maxAutoRetries: number;
@@ -268,6 +276,14 @@ const DEFAULT_CONFIG: TriadConfig = {
         maxScannedFiles: 5000,
         failOnExtractorError: false,
         minConfidence: 0.4
+    },
+    dream: {
+        enabled: true,
+        idleOnly: false,
+        minHoursBetweenRuns: 24,
+        minConfidence: 0.55,
+        maxProposals: 5,
+        failOnDreamError: false
     },
     runtimeHealing: {
         enabled: true,
@@ -557,6 +573,17 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             ),
             failOnExtractorError: value.runtime?.failOnExtractorError ?? DEFAULT_CONFIG.runtime.failOnExtractorError,
             minConfidence: normalizeConfidence(value.runtime?.minConfidence, DEFAULT_CONFIG.runtime.minConfidence)
+        },
+        dream: {
+            enabled: value.dream?.enabled ?? DEFAULT_CONFIG.dream.enabled,
+            idleOnly: value.dream?.idleOnly ?? DEFAULT_CONFIG.dream.idleOnly,
+            minHoursBetweenRuns: normalizePositiveInteger(
+                value.dream?.minHoursBetweenRuns,
+                DEFAULT_CONFIG.dream.minHoursBetweenRuns
+            ),
+            minConfidence: normalizeConfidence(value.dream?.minConfidence, DEFAULT_CONFIG.dream.minConfidence),
+            maxProposals: normalizePositiveInteger(value.dream?.maxProposals, DEFAULT_CONFIG.dream.maxProposals),
+            failOnDreamError: value.dream?.failOnDreamError ?? DEFAULT_CONFIG.dream.failOnDreamError
         },
         runtimeHealing: {
             enabled: value.runtimeHealing?.enabled ?? DEFAULT_CONFIG.runtimeHealing.enabled,

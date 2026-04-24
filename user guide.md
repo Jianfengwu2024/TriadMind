@@ -342,3 +342,32 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - Zero-knowledge quickstart guide: `docs/dummy-user-guide.md`
 - Linux/macOS session script example: `docs/tm-session.sh`
 - Windows PowerShell session script example: `docs/tm-session.ps1`
+
+## 13. Dream Mechanism (Idle Governance Assistant)
+
+`dream` is a proposal-only governance assistant.  
+It does **not** auto-modify your code. It reads current artifacts and emits reviewable recommendations.
+
+Artifacts:
+
+- `.triadmind/dream-report.json`
+- `.triadmind/dream-proposals.json`
+- `.triadmind/dream-diagnostics.json`
+- `.triadmind/dream-state.json`
+
+Commands:
+
+```bash
+triadmind dream run
+triadmind dream run --json
+triadmind dream run --mode idle
+triadmind dream run --mode idle --force
+triadmind dream review --json
+```
+
+Recommended usage:
+
+1. `triadmind sync --force`
+2. `triadmind runtime --visualize --view full`
+3. `triadmind dream run --json`
+4. Review `dream-proposals.json`, then choose protocol/apply/govern flow.

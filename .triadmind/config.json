@@ -221,6 +221,14 @@
     "failOnExtractorError": false,
     "minConfidence": 0.4
   },
+  "dream": {
+    "enabled": true,
+    "idleOnly": false,
+    "minHoursBetweenRuns": 24,
+    "minConfidence": 0.55,
+    "maxProposals": 5,
+    "failOnDreamError": false
+  },
   "runtimeHealing": {
     "enabled": true,
     "maxAutoRetries": 3,

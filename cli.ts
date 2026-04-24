@@ -36,6 +36,7 @@ import { generateRuntimeDashboard } from './runtime/runtimeVisualizer';
 import { formatGovernReport, runGovern } from './govern';
 import { formatVerifyReport, runTopologyVerify } from './verify';
 import { generateTrendArtifacts } from './trend';
+import { formatDreamReport, loadLatestDreamReport, runDreamAnalysis } from './dream';
 import { writeViewMapArtifacts } from './viewMap';
 
 const program = new Command();
@@ -504,6 +505,69 @@ program
         console.log(chalk.green(`✅ Trend history written: ${paths.trendFile}`));
         console.log(chalk.green(`✅ Trend report written: ${paths.trendReportFile}`));
         result.report.summary.forEach((entry) => console.log(chalk.gray(`   - ${entry}`)));
+    });
+
+const dreamCommand = program
+    .command('dream')
+    .description('Run idle-style architecture dreaming and governance proposal generation');
+
+dreamCommand
+    .command('run')
+    .description('Analyze topology drift and emit dream proposals/artifacts')
+    .option('--mode <manual|idle>', 'Dream run mode', 'manual')
+    .option('--force', 'Ignore idle gate or dream.enabled=false and run immediately')
+    .option('--max-proposals <n>', 'Maximum number of dream proposals to keep')
+    .option('--min-confidence <n>', 'Minimum confidence threshold for retained proposals (0-1)')
+    .option('--json', 'Emit machine-readable dream report JSON')
+    .action((options: {
+        mode?: string;
+        force?: boolean;
+        maxProposals?: string;
+        minConfidence?: string;
+        json?: boolean;
+    }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const result = runDreamAnalysis(paths, {
+            mode: options.mode === 'idle' ? 'idle' : 'manual',
+            force: Boolean(options.force),
+            maxProposals: parseOptionalPositiveCliInteger(options.maxProposals),
+            minConfidence: parseOptionalRatioCliNumber(options.minConfidence)
+        });
+
+        if (options.json) {
+            console.log(JSON.stringify(result.report, null, 2));
+            return;
+        }
+
+        console.log(formatDreamReport(result.report));
+        console.log(chalk.green(`✅ Dream report written: ${result.artifacts.reportFile}`));
+        console.log(chalk.green(`✅ Dream diagnostics written: ${result.artifacts.diagnosticsFile}`));
+        console.log(chalk.green(`✅ Dream proposals written: ${result.artifacts.proposalsFile}`));
+    });
+
+dreamCommand
+    .command('review')
+    .description('Read the latest dream report from workspace artifacts')
+    .option('--json', 'Emit machine-readable dream report JSON')
+    .action((options: { json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const report = loadLatestDreamReport(paths);
+        if (!report) {
+            console.log(chalk.red(`❌ No dream report found: ${paths.dreamReportFile}`));
+            process.exitCode = 1;
+            return;
+        }
+
+        if (options.json) {
+            console.log(JSON.stringify(report, null, 2));
+            return;
+        }
+
+        console.log(formatDreamReport(report));
     });
 
 program

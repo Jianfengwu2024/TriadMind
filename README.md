@@ -12,6 +12,7 @@ TriadMind Core 是一个把“拓扑先行”落地到工程实践的 CLI。
 - `triadmind runtime`：刷新运行时拓扑（API/Service/Worker/Resource）
 - `triadmind plan`：生成可审阅协议（draft protocol）
 - `triadmind apply`：按协议改代码（而不是自由发挥）
+- `triadmind dream run`：空闲式“做梦”体检，输出治理建议
 - `triadmind verify`：质量指标校验
 - `triadmind govern ci`：硬门禁（fail-closed）
 
@@ -127,6 +128,13 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - `.triadmind/govern-audit.log`：审计日志
 - `.triadmind/govern-fixes.patch`：fix 模式输出的修复补丁建议
 
+### 3.4 Dream 层（空闲治理建议）
+
+- `.triadmind/dream-report.json`：本次 Dream 分析总报告
+- `.triadmind/dream-proposals.json`：建议清单（含可审阅 protocol draft）
+- `.triadmind/dream-diagnostics.json`：Dream 执行诊断
+- `.triadmind/dream-state.json`：Dream 运行状态（idle gate 使用）
+
 ---
 
 ## 4. 关键命令速查
@@ -154,7 +162,16 @@ triadmind verify --json
 triadmind verify --strict --json
 ```
 
-### 4.4 治理门禁
+### 4.4 Dream 建议生成
+
+```bash
+triadmind dream run
+triadmind dream run --json
+triadmind dream run --mode idle
+triadmind dream review --json
+```
+
+### 4.5 治理门禁
 
 ```bash
 triadmind govern check --policy .triadmind/govern-policy.json --json
@@ -162,7 +179,7 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 triadmind govern fix --policy .triadmind/govern-policy.json --llm <provider:model> --max-iterations 3 --dry-run
 ```
 
-### 4.5 会话脚手架（Bootstrap）
+### 4.6 会话脚手架（Bootstrap）
 
 ```bash
 triadmind bootstrap init
