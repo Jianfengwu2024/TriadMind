@@ -1,1664 +1,599 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TriadMind Runtime Topology - triadmind-core</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{color-scheme:dark;--bg:#0f0f1a;--panel:#1a1a2e;--line:#2a2a4e;--line2:#334155;--text:#e0e0e0;--muted:#94a3b8;--accent:#38bdf8;--chip:#0f172a;--chip-border:#475569}
-body[data-theme="runtime-dark"]{--bg:#090f1f;--panel:#101827;--line:#27354f;--line2:#344967;--accent:#7ec8ff;--chip:#101a2e;--chip-border:#3b4f70}
-body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;height:100vh;overflow:hidden}
-#graph{flex:1;min-width:0;position:relative;background:radial-gradient(circle at 24% 14%,rgba(56,189,248,.15) 0,transparent 36%),var(--bg)}
-#runtime-graph{width:100%;height:100%;display:block;cursor:grab}
-#runtime-graph.dragging{cursor:grabbing}
-#sidebar{width:390px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
-#hero{padding:16px;border-bottom:1px solid var(--line)}
-.eyebrow{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
-h1{font-size:18px;margin-bottom:8px;color:#f8fafc}
-#hero p{color:#cbd5e1;font-size:12px;line-height:1.5}
-.stats{color:var(--muted);font-size:11px;margin-top:10px;line-height:1.5}
-#search-wrap,#status-legend,#filters-panel,#info-panel,#legend-wrap{padding:14px;border-bottom:1px solid var(--line)}
-#search-wrap{display:grid;gap:8px}
-#search{width:100%;background:var(--bg);border:1px solid #3a3a5e;color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;outline:none}
-#search:focus{border-color:var(--accent)}
-#search-results{max-height:150px;overflow-y:auto;display:none;padding-top:6px}
-#legend-wrap{flex:1;overflow:auto}
-#cluster-controls{position:absolute;top:14px;left:14px;z-index:22;display:flex;gap:8px;flex-wrap:wrap}
-#cluster-controls button{background:var(--chip);border:1px solid var(--chip-border);color:#e2e8f0;padding:8px 12px;border-radius:999px;cursor:pointer;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
-#cluster-controls button:hover{filter:brightness(1.08)}
-#cluster-controls button.active{background:#082f49;border-color:#38bdf8;color:#e0f2fe;box-shadow:0 0 18px rgba(56,189,248,.28)}
-#runtime-toolbar{position:absolute;top:14px;left:14px;z-index:20;display:flex;gap:8px;flex-wrap:wrap;background:rgba(15,23,42,.92);border:1px solid var(--line2);border-radius:12px;padding:10px;box-shadow:0 12px 28px rgba(0,0,0,.28);max-width:calc(100% - 28px)}
-#runtime-toolbar button,#runtime-toolbar select,#runtime-toolbar input{background:var(--chip);border:1px solid var(--chip-border);color:#e2e8f0;padding:7px 10px;border-radius:999px;font-size:12px}
-#runtime-toolbar button{cursor:pointer}
-#runtime-toolbar button:hover,#runtime-toolbar select:hover,#runtime-toolbar input:hover{filter:brightness(1.08)}
-#runtime-toolbar .active{background:#082f49;border-color:#38bdf8;color:#e0f2fe}
-#runtime-toolbar .runtime-search-chip{width:240px;border-radius:8px}
-h3{font-size:12px;color:#a5b4fc;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
-.status-row{display:flex;align-items:center;gap:8px;color:#cbd5e1;font-size:12px;padding:3px 0;line-height:1.5}
-.status-dot{width:12px;height:12px;border-radius:999px;display:inline-block;border:2px solid currentColor;flex-shrink:0}
-.status-selected{color:#38bdf8;background:#082f49;box-shadow:0 0 14px rgba(56,189,248,.6)}
-.status-neighbor{color:#f8fafc;background:#1f2937}
-.status-trace{color:#fbbf24;background:#3f2b0a;box-shadow:0 0 14px rgba(251,191,36,.4)}
-.status-lock{color:#a78bfa;background:#312e81}
-.status-line{width:22px;height:3px;background:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,.9);display:inline-block;flex-shrink:0}
-.legend-hint{color:var(--muted);font-size:11px;line-height:1.5;margin-top:8px}
-.legend-item{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px;font-size:12px}
-.legend-item:hover{background:#2a2a4e}
-.legend-item.dimmed{opacity:.35}
-.legend-dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(226,232,240,.45)}
-.legend-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.legend-count{color:#94a3b8;font-size:11px}
-.preset-list{display:flex;gap:6px;flex-wrap:wrap}
-.preset-btn{background:var(--chip);border:1px solid var(--chip-border);color:#e2e8f0;padding:6px 10px;border-radius:999px;font-size:11px;cursor:pointer}
-.preset-btn:hover{filter:brightness(1.08)}
-.preset-btn.active{background:#082f49;border-color:#38bdf8;color:#e0f2fe}
-#detail-title{font-size:14px;color:#f8fafc;margin-bottom:10px;line-height:1.4;word-break:break-word}
-.detail-kv{display:grid;grid-template-columns:96px 1fr;gap:6px;font-size:12px;line-height:1.45}
-.detail-kv b{color:var(--muted);font-weight:500}
-.runtime-flow-card{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:10px 0}
-.flow-col{border-radius:8px;padding:8px;border:1px solid #334155;cursor:pointer;word-break:break-word;background:#0f172a;color:#cbd5e1;text-align:left}
-.flow-col:hover{filter:brightness(1.12)}
-.flow-col b{display:block;color:#f8fafc;margin-bottom:2px}
-.flow-col small{display:block;color:#94a3b8;margin-bottom:5px}
-.flow-in{background:rgba(5,46,22,.8);border-color:#22c55e}
-.flow-core{background:rgba(8,47,73,.8);border-color:#38bdf8}
-.flow-out{background:rgba(46,16,101,.8);border-color:#c084fc}
-.neighbor-link,.search-item{display:block;padding:5px 8px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.neighbor-link{padding:3px 6px;margin:3px 0;border-left:3px solid #333}
-.neighbor-link:hover,.search-item:hover{background:#2a2a4e}
-.pill{display:inline-block;padding:2px 6px;border-radius:999px;background:#0f172a;border:1px solid #334155;margin:2px 4px 2px 0;color:#cbd5e1;font-size:11px}
-pre{white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px solid var(--line2);border-radius:8px;padding:8px;color:#dce8ff;font-size:12px;max-height:190px;overflow:auto;margin-top:7px}
-.cluster-halo{fill:rgba(56,189,248,.05);stroke:rgba(125,211,252,.2);stroke-width:1.2;stroke-dasharray:6 6;pointer-events:none}
-.cluster-label{fill:#93c5fd;font-size:10px;letter-spacing:.04em;text-transform:uppercase;pointer-events:none}
-.node-shape{stroke-width:1.4;cursor:pointer;filter:drop-shadow(0 3px 8px rgba(0,0,0,.28))}
-.node-label{fill:#eff6ff;font-size:11px;font-weight:600;pointer-events:none;text-anchor:middle;dominant-baseline:central}
-.node-sub{fill:#dbeafe;font-size:9px;pointer-events:none;text-anchor:middle;dominant-baseline:central;opacity:.82}
-.edge-line{fill:none;stroke-width:1.8;marker-end:url(#arrow);cursor:pointer;opacity:.88}
-.edge-hit{fill:none;stroke:transparent;stroke-width:12;cursor:pointer}
-.edge-label{fill:#e2e8f0;font-size:9px;pointer-events:none;text-anchor:middle;paint-order:stroke;stroke:#020617;stroke-width:4px}
-.edge-bundle-label{fill:#f8fafc;font-size:9px;pointer-events:none;text-anchor:middle;paint-order:stroke;stroke:#020617;stroke-width:4px}
-.dim{opacity:.09}
-.neighbor .node-shape{stroke:#f8fafc;stroke-width:3}
-.trace .node-shape{stroke:#fbbf24;stroke-width:3}
-.selected .node-shape{stroke:#38bdf8;stroke-width:4}
-.locked .node-shape{stroke:#a78bfa;stroke-width:3}
-.hovered .node-shape{stroke:#e2e8f0;stroke-width:2.6}
-.edge-neighbor{stroke-width:3.6;opacity:1}
-.edge-trace{stroke:#fbbf24 !important;stroke-width:4;opacity:1}
-.edge-selected{stroke:#38bdf8 !important;stroke-width:4.2;opacity:1}
-.edge-hover{stroke-width:3.2;opacity:1}
-#runtime-notice{position:absolute;left:14px;bottom:14px;background:rgba(15,23,42,.92);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;color:var(--muted);font-size:12px;max-width:min(620px,calc(100% - 28px));line-height:1.45}
-.trace-input{width:66px !important;border-radius:8px !important}
-.toggle-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1}
-.toggle-chip input{accent-color:var(--accent)}
-@media (max-width:1100px){#sidebar{display:none}#runtime-toolbar .runtime-search-chip{width:180px}#cluster-controls{right:14px}}
-</style>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0f0f1a;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;height:100vh;overflow:hidden}#canvas-wrap{position:relative;flex:1;min-width:0}#graph{width:100%;height:100%;background:radial-gradient(circle at 15% 10%,rgba(56,189,248,.08) 0,transparent 38%),#0f0f1a}#sidebar{width:390px;background:#1a1a2e;border-left:1px solid #2a2a4e;display:flex;flex-direction:column;overflow:hidden}#hero{padding:16px;border-bottom:1px solid #2a2a4e}.eyebrow{color:#38bdf8;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}h1{font-size:18px;margin-bottom:8px;color:#f8fafc}#hero p{color:#cbd5e1;font-size:12px;line-height:1.5}.stats{color:#94a3b8;font-size:11px;margin-top:8px}#search-wrap,#status-legend,#filters-panel,#info-panel,#legend-wrap,#diagnostic-wrap{padding:14px;border-bottom:1px solid #2a2a4e}#legend-wrap{flex:1;overflow-y:auto}#search{width:100%;background:#0f0f1a;border:1px solid #3a3a5e;color:#e0e0e0;padding:8px 10px;border-radius:6px;font-size:13px;outline:none}#search-results{max-height:170px;overflow-y:auto;display:none;padding-top:8px}#cluster-controls{position:absolute;top:16px;left:16px;z-index:20;display:flex;gap:8px;flex-wrap:wrap}#cluster-controls button,#runtime-toolbar button,#runtime-toolbar select,#runtime-toolbar input{background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:8px 12px;border-radius:999px;cursor:pointer;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25)}#cluster-controls button.active,#runtime-toolbar button.active{background:#082f49;border-color:#38bdf8;color:#e0f2fe}#runtime-toolbar{position:absolute;top:60px;left:16px;z-index:20;display:flex;gap:8px;flex-wrap:wrap;max-width:calc(100% - 24px)}#runtime-toolbar .search-chip{width:230px;border-radius:8px}#runtime-toolbar .trace-chip{width:72px;border-radius:8px}h3{font-size:12px;color:#a5b4fc;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}.status-row{display:flex;align-items:center;gap:8px;color:#cbd5e1;font-size:12px;padding:3px 0;line-height:1.5}.status-dot{width:12px;height:12px;border-radius:999px;display:inline-block;border:2px solid currentColor;flex-shrink:0}.status-selected{color:#38bdf8;background:#082f49}.status-neighbor{color:#f8fafc;background:#1f2937}.status-trace{color:#fbbf24;background:#3f2b0a}.status-focus{color:#a78bfa;background:#2e1065}.search-item,.neighbor-link,.legend-item{display:block;padding:6px 8px;cursor:pointer;border-radius:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.search-item:hover,.neighbor-link:hover,.legend-item:hover{background:#2a2a4e}.legend-item{display:flex;align-items:center;gap:8px;padding:5px 0}.legend-item.dimmed{opacity:.3}.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}.legend-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.legend-count{color:#94a3b8;font-size:11px}.detail-grid{display:grid;grid-template-columns:96px 1fr;gap:6px;font-size:12px;line-height:1.45}.detail-grid b{color:#94a3b8;font-weight:500}.pill{display:inline-block;padding:2px 6px;border-radius:999px;background:#0f172a;border:1px solid #334155;margin:2px 4px 2px 0;color:#cbd5e1;font-size:11px}.runtime-flow-card{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:10px 0}.flow-col{border-radius:8px;padding:8px;border:1px solid #334155;background:#0f172a;color:#cbd5e1}.flow-in{background:rgba(5,46,22,.75);border-color:#22c55e}.flow-core{background:rgba(8,47,73,.75);border-color:#38bdf8}.flow-out{background:rgba(46,16,101,.75);border-color:#c084fc}.filter-row{display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;padding:2px 0}.filter-row input{accent-color:#38bdf8}.empty{color:#64748b;font-style:italic}#runtime-notice{position:absolute;left:16px;bottom:14px;z-index:20;background:rgba(15,23,42,.92);border:1px solid #334155;border-radius:10px;padding:8px 10px;color:#94a3b8;font-size:12px;max-width:min(640px,calc(100% - 24px));line-height:1.45}@media (max-width:1100px){#sidebar{display:none}#runtime-toolbar .search-chip{width:170px}}</style>
 </head>
-<body>
-<main id="graph" data-runtime-visualizer-version="2">
-  <div id="cluster-controls">
-    <button id="view-leaf" class="view-toggle active" data-view="leaf" type="button">Leaf View</button>
-    <button id="view-flow" class="view-toggle" data-view="flow" type="button">Flow View</button>
-    <button id="toggle-clusters" type="button">Collapse Resource Clusters</button>
-  </div>
+<body data-runtime-visualizer-version="3">
+<div id="canvas-wrap">
+  <div id="graph"></div>
+  <div id="cluster-controls"><button id="view-leaf" class="active" type="button">Leaf View</button><button id="view-flow" type="button">Flow View</button><button id="toggle-clusters" class="active" type="button">Edge Bundling: on</button></div>
   <div id="runtime-toolbar">
-    <input id="search" class="runtime-search-chip" placeholder="Search id / label / type / sourcePath">
+    <input id="search-inline" class="search-chip" placeholder="Search id / label / type / sourcePath">
     <select id="layout-select"><option value="leaf-force">leaf-force</option><option value="dagre">dagre</option></select>
-    <input id="trace-depth" class="trace-input" type="number" min="1" max="8" value="2">
-    <button id="trace-upstream" type="button">Upstream</button>
-    <button id="trace-downstream" type="button">Downstream</button>
-    <button id="trace-both" type="button">Both</button>
-    <button id="edge-label-toggle" type="button" class="active">Edge Labels: on</button>
-    <label class="toggle-chip"><input id="hide-isolated" type="checkbox" checked>Hide isolated</label>
-    <button id="reset-view" type="button">Reset</button>
-    <button id="fit-view" type="button">Fit</button>
+    <input id="trace-depth" class="trace-chip" type="number" min="1" max="8" value="2">
+    <button id="trace-upstream" type="button">Upstream</button><button id="trace-downstream" type="button">Downstream</button><button id="trace-both" type="button">Both</button>
+    <button id="edge-label-toggle" class="active" type="button">Edge Labels: on</button>
+    <label class="filter-row"><input id="hide-isolated" type="checkbox" checked>Hide isolated</label>
+    <button id="reset-view" type="button">Reset</button><button id="fit-view" type="button">Fit</button>
   </div>
-  <svg id="runtime-graph" role="img" aria-label="Leaf-style runtime topology graph">
-    <defs>
-      <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-        <path d="M0,0 L0,6 L9,3 z" fill="#7aa2df"></path>
-      </marker>
-    </defs>
-    <g id="viewport">
-      <g id="clusters-layer"></g>
-      <g id="edges-layer"></g>
-      <g id="edge-labels-layer"></g>
-      <g id="bundle-labels-layer"></g>
-      <g id="nodes-layer"></g>
-    </g>
-  </svg>
-  <div id="runtime-notice">Runtime visualizer v2: drag/zoom graph, click node for 1-hop, double-click to lock focus subgraph.</div>
-</main>
+  <div id="runtime-notice">Runtime graph uses vis-network and matches visualizer control semantics.</div>
+</div>
 <aside id="sidebar">
-  <section id="hero">
-    <div class="eyebrow">TriadMind Runtime Graph</div>
-    <h1>triadmind-core</h1>
-    <p>Leaf-style runtime graph: consistent controls and review flow with capability visualizer while keeping runtime semantics.</p>
-    <div class="stats">view: full · nodes: 13 · edges: 10 · normalized edges: 7</div>
-    <div class="stats">diagnostics: 1 · layout: leaf-force · interactive: on</div>
-  </section>
-  <section id="search-wrap">
-    <h3>Node Presets</h3>
-    <div id="node-presets" class="preset-list"></div>
-    <div id="search-results"></div>
-    <p class="legend-hint">Quickly narrow to ApiRoute → Service → Worker → Resource main chains.</p>
-  </section>
-  <section id="status-legend">
-    <h3>Status</h3>
-    <div class="status-row"><span class="status-dot status-selected"></span><span>selected node / edge</span></div>
-    <div class="status-row"><span class="status-dot status-neighbor"></span><span>1-hop neighbors</span></div>
-    <div class="status-row"><span class="status-dot status-trace"></span><span>trace path (upstream / downstream / both)</span></div>
-    <div class="status-row"><span class="status-dot status-lock"></span><span>double-click lock focus subgraph</span></div>
-    <div class="status-row"><span class="status-line"></span><span>directional runtime dependency edge</span></div>
-  </section>
-  <section id="filters-panel">
-    <h3>Node Types</h3>
-    <div id="node-type-filters"></div>
-    <h3 style="margin-top:12px">Edge Types</h3>
-    <div id="edge-type-filters"></div>
-  </section>
-  <section id="info-panel">
-    <h3 id="detail-title">Select a node or edge</h3>
-    <div id="detail-body" class="detail-kv"><b>Hint</b><span>Click node/edge to inspect details and evidence.</span></div>
-  </section>
-  <section id="legend-wrap">
-    <h3>Runtime Diagnostics</h3>
-    <div id="diagnostics-content"></div>
-  </section>
+  <section id="hero"><div class="eyebrow">TriadMind Runtime Graph</div><h1>triadmind-core</h1><p>Interactive runtime topology aligned with visualizer.html patterns.</p><div class="stats">view: full | nodes: 12 | edges: 7</div></section>
+  <section id="search-wrap"><input id="search" type="text" placeholder="Search nodes..." autocomplete="off"><div id="search-results"></div></section>
+  <section id="status-legend"><h3>Status</h3><div class="status-row"><span class="status-dot status-selected"></span><span>selected node / edge</span></div><div class="status-row"><span class="status-dot status-neighbor"></span><span>1-hop neighbors</span></div><div class="status-row"><span class="status-dot status-trace"></span><span>trace path</span></div><div class="status-row"><span class="status-dot status-focus"></span><span>focus lock</span></div></section>
+  <section id="filters-panel"><h3>Node Types</h3><div id="node-type-filters"></div><h3 style="margin-top:10px">Edge Types</h3><div id="edge-type-filters"></div></section>
+  <section id="info-panel"><h3 id="info-title">Node Info</h3><div id="info-content"><span class="empty">Click a node or edge to inspect.</span></div></section>
+  <section id="diagnostic-wrap"><h3>Runtime Diagnostics</h3><div id="diagnostic-content"></div></section>
+  <section id="legend-wrap"><h3>Communities</h3><div id="legend"></div></section>
 </aside>
 <script>
-const runtimeMap = {"schemaVersion":"1.0","project":"triadmind-core","generatedAt":"2026-04-23T12:37:00.943Z","view":"full","nodes":[{"id":"Config.PackageJson","type":"Config","label":"package.json","sourcePath":"package.json","category":"infra","metadata":{"scripts":["clean","build","prepare","prepack","prepublishOnly","init","prompt","pipeline","macro","meso","micro","sync","watch","protocol","finalize","legacy","converge","plan","auto","invoke","rules","self","adapters","heal","snapshots","snapshot","rollback","handoff","master","apply","typecheck","test"],"dependencies":["chalk","commander","inquirer","tree-sitter","tree-sitter-cpp","tree-sitter-go","tree-sitter-java","tree-sitter-javascript","tree-sitter-python","tree-sitter-rust","tree-sitter-typescript","ts-morph","zod"],"originalLabel":"package.json","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"evidence":[{"sourcePath":"package.json","line":1,"column":1,"kind":"manifest","text":"package.json","confidence":0.8}]},{"id":"DataStore.Postgres","type":"DataStore","label":"Postgres","category":"infra","sourcePath":"runtime/runtimeLabeling.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"import","text":"postgres","confidence":0.65}],"metadata":{"originalLabel":"Postgres","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ExternalTool.subprocess","type":"ExternalTool","label":"subprocess","category":"external","sourcePath":"cli.ts","evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"import","text":"spawn(","confidence":0.65}],"metadata":{"originalLabel":"subprocess","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ModelProvider.OpenAI","type":"ModelProvider","label":"OpenAI","category":"external","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"metadata":{"originalLabel":"OpenAI","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ObjectStore.MinIO","type":"ObjectStore","label":"MinIO","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"metadata":{"originalLabel":"MinIO","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Queue.classList","type":"Queue","label":"classList","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":593,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"runtime/runtimeVisualizer.ts","line":1650,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"classList","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Service.detect","type":"Service","label":"detect","sourcePath":"runtime/extractors/configInfraExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"metadata":{"originalLabel":"detect","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.openFile","type":"Service","label":"openFile","sourcePath":"cli.ts","category":"backend","evidence":[{"sourcePath":"cli.ts","line":1247,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}],"metadata":{"originalLabel":"openFile","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/extractors/resourceAccessExtractor","type":"Service","label":"runtime/extractors/resourceAccessExtractor","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/extractors/resourceAccessExtractor","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/runtimeLabeling","type":"Service","label":"runtime/runtimeLabeling","sourcePath":"runtime/runtimeLabeling.ts","category":"backend","evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":1,"column":1,"kind":"inferred","text":"runtime/runtimeLabeling.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/runtimeLabeling","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Task.dimmed","type":"Task","label":"dimmed","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":593,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.75},{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"dimmed","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Task.dragging","type":"Task","label":"dragging","sourcePath":"runtime/runtimeVisualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1650,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.75}],"metadata":{"originalLabel":"dragging","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true}},{"id":"Workflow.tsx_cli.ts_pipeline","type":"Workflow","label":"tsx cli.ts pipeline","sourcePath":"package.json","category":"core","evidence":[{"sourcePath":"package.json","line":23,"column":5,"kind":"manifest","text":"\"pipeline\": \"tsx cli.ts pipeline\"","confidence":0.6}],"metadata":{"originalLabel":"tsx cli.ts pipeline","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}}],"edges":[{"from":"Service.detect","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres"},{"from":"Service.detect","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO"},{"from":"Service.openFile","to":"ExternalTool.subprocess","type":"uses_tool","confidence":0.65,"evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"call","text":"spawn(","confidence":0.65}],"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","type":"uses_model","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO"},{"from":"Service.runtime/runtimeLabeling","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"call","text":"postgres","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":593,"column":13,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dimmed"},{"from":"Service.runtime/runtimeVisualizer","to":"Task.dragging","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeVisualizer.ts","line":1650,"column":13,"kind":"call","text":"classList.add('dragging'","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dragging"},{"from":"Service.visualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.visualizer.enqueues.Task.dimmed"}],"diagnostics":[{"level":"info","code":"RUNTIME_EXCLUDED_PATHS_SUMMARY","extractor":"RuntimeSourceCollector","message":"Skipped runtime paths by exclude rules: 6 [.git, .triadmind, dist, node_modules, package-lock.json (+1 more)]"}]};
-const dashboardOptions = {"interactive":true,"layout":"leaf-force","traceDepth":2,"hideIsolated":true,"maxRenderEdges":2000,"theme":"leaf-like"};
+const runtimePayload = {"runtimeMap":{"schemaVersion":"1.0","project":"triadmind-core","generatedAt":"2026-04-24T02:22:39.870Z","view":"full","nodes":[{"id":"Config.PackageJson","type":"Config","label":"package.json","sourcePath":"package.json","category":"infra","metadata":{"scripts":["clean","build","prepare","prepack","prepublishOnly","init","prompt","pipeline","macro","meso","micro","sync","watch","protocol","finalize","legacy","converge","plan","auto","invoke","rules","self","adapters","heal","snapshots","snapshot","rollback","handoff","master","apply","typecheck","test"],"dependencies":["chalk","commander","inquirer","tree-sitter","tree-sitter-cpp","tree-sitter-go","tree-sitter-java","tree-sitter-javascript","tree-sitter-python","tree-sitter-rust","tree-sitter-typescript","ts-morph","zod"],"originalLabel":"package.json","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"evidence":[{"sourcePath":"package.json","line":1,"column":1,"kind":"manifest","text":"package.json","confidence":0.8}]},{"id":"DataStore.Postgres","type":"DataStore","label":"Postgres","category":"infra","sourcePath":"runtime/runtimeLabeling.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"import","text":"postgres","confidence":0.65}],"metadata":{"originalLabel":"Postgres","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ExternalTool.subprocess","type":"ExternalTool","label":"subprocess","category":"external","sourcePath":"cli.ts","evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"import","text":"spawn(","confidence":0.65}],"metadata":{"originalLabel":"subprocess","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ModelProvider.OpenAI","type":"ModelProvider","label":"OpenAI","category":"external","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"metadata":{"originalLabel":"OpenAI","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"ObjectStore.MinIO","type":"ObjectStore","label":"MinIO","category":"infra","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"metadata":{"originalLabel":"MinIO","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Queue.classList","type":"Queue","label":"Queue visualizer.ts","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"classList","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true,"runtimeFallbackLabel":"Queue visualizer.ts"}},{"id":"Service.detect","type":"Service","label":"detect","sourcePath":"runtime/extractors/configInfraExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"metadata":{"originalLabel":"detect","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.openFile","type":"Service","label":"openFile","sourcePath":"cli.ts","category":"backend","evidence":[{"sourcePath":"cli.ts","line":1247,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}],"metadata":{"originalLabel":"openFile","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/extractors/resourceAccessExtractor","type":"Service","label":"runtime/extractors/resourceAccessExtractor","sourcePath":"runtime/extractors/resourceAccessExtractor.ts","category":"backend","evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/extractors/resourceAccessExtractor","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Service.runtime/runtimeLabeling","type":"Service","label":"runtime/runtimeLabeling","sourcePath":"runtime/runtimeLabeling.ts","category":"backend","evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":1,"column":1,"kind":"inferred","text":"runtime/runtimeLabeling.ts","confidence":0.5}],"metadata":{"originalLabel":"runtime/runtimeLabeling","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}},{"id":"Task.dimmed","type":"Task","label":"Task visualizer.ts","sourcePath":"visualizer.ts","framework":"bullmq","evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"metadata":{"originalLabel":"dimmed","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true,"runtimeFallbackLabel":"Task visualizer.ts"}},{"id":"Workflow.tsx_cli.ts_pipeline","type":"Workflow","label":"tsx cli.ts pipeline","sourcePath":"package.json","category":"core","evidence":[{"sourcePath":"package.json","line":23,"column":5,"kind":"manifest","text":"\"pipeline\": \"tsx cli.ts pipeline\"","confidence":0.6}],"metadata":{"originalLabel":"tsx cli.ts pipeline","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false}}],"edges":[{"from":"Service.detect","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres"},{"from":"Service.detect","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO"},{"from":"Service.openFile","to":"ExternalTool.subprocess","type":"uses_tool","confidence":0.65,"evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"call","text":"spawn(","confidence":0.65}],"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","type":"uses_model","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres"},{"from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}],"metadata":{},"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO"},{"from":"Service.runtime/runtimeLabeling","to":"DataStore.Postgres","type":"writes","confidence":0.65,"evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"call","text":"postgres","confidence":0.65}],"id":"RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres"},{"from":"Service.visualizer","to":"Task.dimmed","type":"enqueues","confidence":0.65,"evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.65}],"id":"RuntimeEdge.Service.visualizer.enqueues.Task.dimmed"}],"diagnostics":[{"level":"info","code":"RUNTIME_EXCLUDED_PATHS_SUMMARY","extractor":"RuntimeSourceCollector","message":"Skipped runtime paths by exclude rules: 6 [.git, .triadmind, dist, node_modules, package-lock.json (+1 more)]"}]},"nodes":[{"id":"Config.PackageJson","label":"package.json","title":"package.json [Config]\\npackage.json","shape":"dot","size":18,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#3f3f46","border":"#22d3ee","highlight":{"background":"#67e8f9","border":"#22d3ee"}},"_type":"Config","_group":"infra","_sourcePath":"package.json","_metadata":{"scripts":["clean","build","prepare","prepack","prepublishOnly","init","prompt","pipeline","macro","meso","micro","sync","watch","protocol","finalize","legacy","converge","plan","auto","invoke","rules","self","adapters","heal","snapshots","snapshot","rollback","handoff","master","apply","typecheck","test"],"dependencies":["chalk","commander","inquirer","tree-sitter","tree-sitter-cpp","tree-sitter-go","tree-sitter-java","tree-sitter-javascript","tree-sitter-python","tree-sitter-rust","tree-sitter-typescript","ts-morph","zod"],"originalLabel":"package.json","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"package.json","line":1,"column":1,"kind":"manifest","text":"package.json","confidence":0.8}],"_searchText":"config.packagejson package.json config package.json "},{"id":"DataStore.Postgres","label":"Postgres","title":"Postgres [DataStore]\\nruntime/runtimeLabeling.ts","shape":"dot","size":34,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#0f172a","border":"#94a3b8","highlight":{"background":"#cbd5e1","border":"#94a3b8"}},"_type":"DataStore","_group":"resource","_sourcePath":"runtime/runtimeLabeling.ts","_metadata":{"originalLabel":"Postgres","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"import","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"import","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"import","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"import","text":"postgres","confidence":0.65}],"_searchText":"datastore.postgres postgres datastore runtime/runtimelabeling.ts "},{"id":"ExternalTool.subprocess","label":"subprocess","title":"subprocess [ExternalTool]\\ncli.ts","shape":"dot","size":26,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#3f0d12","border":"#fb7185","highlight":{"background":"#fecdd3","border":"#fb7185"}},"_type":"ExternalTool","_group":"external","_sourcePath":"cli.ts","_metadata":{"originalLabel":"subprocess","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"import","text":"spawn(","confidence":0.65}],"_searchText":"externaltool.subprocess subprocess externaltool cli.ts "},{"id":"ModelProvider.OpenAI","label":"OpenAI","title":"OpenAI [ModelProvider]\\nruntime/extractors/resourceAccessExtractor.ts","shape":"dot","size":26,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#3f0d12","border":"#fb7185","highlight":{"background":"#fecdd3","border":"#fb7185"}},"_type":"ModelProvider","_group":"external","_sourcePath":"runtime/extractors/resourceAccessExtractor.ts","_metadata":{"originalLabel":"OpenAI","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"import","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"import","text":"OpenAI","confidence":0.65}],"_searchText":"modelprovider.openai openai modelprovider runtime/extractors/resourceaccessextractor.ts "},{"id":"ObjectStore.MinIO","label":"MinIO","title":"MinIO [ObjectStore]\\nruntime/extractors/resourceAccessExtractor.ts","shape":"dot","size":30,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#0f172a","border":"#94a3b8","highlight":{"background":"#cbd5e1","border":"#94a3b8"}},"_type":"ObjectStore","_group":"resource","_sourcePath":"runtime/extractors/resourceAccessExtractor.ts","_metadata":{"originalLabel":"MinIO","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"import","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"import","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"import","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"import","text":"MinIO","confidence":0.65}],"_searchText":"objectstore.minio minio objectstore runtime/extractors/resourceaccessextractor.ts "},{"id":"Queue.classList","label":"Queue visualizer.ts","title":"Queue visualizer.ts [Queue]\\nvisualizer.ts","shape":"dot","size":18,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#3f3f46","border":"#facc15","highlight":{"background":"#fde68a","border":"#facc15"}},"_type":"Queue","_group":"worker","_sourcePath":"visualizer.ts","_framework":"bullmq","_metadata":{"originalLabel":"classList","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true,"runtimeFallbackLabel":"Queue visualizer.ts"},"_evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"_searchText":"queue.classlist queue visualizer.ts queue visualizer.ts bullmq"},{"id":"Service.detect","label":"detect","title":"detect [Service]\\nruntime/extractors/configInfraExtractor.ts","shape":"dot","size":30,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#7c2d12","border":"#fb923c","highlight":{"background":"#fdba74","border":"#fb923c"}},"_type":"Service","_group":"service","_sourcePath":"runtime/extractors/configInfraExtractor.ts","_metadata":{"originalLabel":"detect","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":6,"column":5,"kind":"inferred","text":"detect(context) {","confidence":0.5}],"_searchText":"service.detect detect service runtime/extractors/configinfraextractor.ts "},{"id":"Service.openFile","label":"openFile","title":"openFile [Service]\\ncli.ts","shape":"dot","size":26,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#7c2d12","border":"#fb923c","highlight":{"background":"#fdba74","border":"#fb923c"}},"_type":"Service","_group":"service","_sourcePath":"cli.ts","_metadata":{"originalLabel":"openFile","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"cli.ts","line":1247,"column":7,"kind":"inferred","text":"function openFile(","confidence":0.5}],"_searchText":"service.openfile openfile service cli.ts "},{"id":"Service.runtime/extractors/resourceAccessExtractor","label":"runtime/extractors/resourceAccessExtractor","title":"runtime/extractors/resourceAccessExtractor [Service]\\nruntime/extractors/resourceAccessExtractor.ts","shape":"dot","size":34,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#7c2d12","border":"#fb923c","highlight":{"background":"#fdba74","border":"#fb923c"}},"_type":"Service","_group":"service","_sourcePath":"runtime/extractors/resourceAccessExtractor.ts","_metadata":{"originalLabel":"runtime/extractors/resourceAccessExtractor","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":1,"column":1,"kind":"inferred","text":"runtime/extractors/resourceAccessExtractor.ts","confidence":0.5}],"_searchText":"service.runtime/extractors/resourceaccessextractor runtime/extractors/resourceaccessextractor service runtime/extractors/resourceaccessextractor.ts "},{"id":"Service.runtime/runtimeLabeling","label":"runtime/runtimeLabeling","title":"runtime/runtimeLabeling [Service]\\nruntime/runtimeLabeling.ts","shape":"dot","size":26,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#7c2d12","border":"#fb923c","highlight":{"background":"#fdba74","border":"#fb923c"}},"_type":"Service","_group":"service","_sourcePath":"runtime/runtimeLabeling.ts","_metadata":{"originalLabel":"runtime/runtimeLabeling","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":1,"column":1,"kind":"inferred","text":"runtime/runtimeLabeling.ts","confidence":0.5}],"_searchText":"service.runtime/runtimelabeling runtime/runtimelabeling service runtime/runtimelabeling.ts "},{"id":"Task.dimmed","label":"Task visualizer.ts","title":"Task visualizer.ts [Task]\\nvisualizer.ts","shape":"dot","size":18,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#3f3f46","border":"#facc15","highlight":{"background":"#fde68a","border":"#facc15"}},"_type":"Task","_group":"worker","_sourcePath":"visualizer.ts","_framework":"bullmq","_metadata":{"originalLabel":"dimmed","runtimeLabelSource":"node_label","runtimeLowSignalLabel":true,"runtimeFallbackLabel":"Task visualizer.ts"},"_evidence":[{"sourcePath":"visualizer.ts","line":630,"column":556,"kind":"call","text":"classList.add('dimmed'","confidence":0.75}],"_searchText":"task.dimmed task visualizer.ts task visualizer.ts bullmq"},{"id":"Workflow.tsx_cli.ts_pipeline","label":"tsx cli.ts pipeline","title":"tsx cli.ts pipeline [Workflow]\\npackage.json","shape":"diamond","size":18,"borderWidth":1.8,"font":{"color":"#f8fafc","face":"Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","size":12,"strokeWidth":3,"strokeColor":"#0f0f1a"},"color":{"background":"#4c1d95","border":"#a78bfa","highlight":{"background":"#ddd6fe","border":"#a78bfa"}},"_type":"Workflow","_group":"workflow","_sourcePath":"package.json","_metadata":{"originalLabel":"tsx cli.ts pipeline","runtimeLabelSource":"node_label","runtimeLowSignalLabel":false},"_evidence":[{"sourcePath":"package.json","line":23,"column":5,"kind":"manifest","text":"\"pipeline\": \"tsx cli.ts pipeline\"","confidence":0.6}],"_searchText":"workflow.tsx_cli.ts_pipeline tsx cli.ts pipeline workflow package.json "}],"edges":[{"id":"RuntimeEdge.Service.detect.writes.DataStore.Postgres","from":"Service.detect","to":"DataStore.Postgres","label":"writes","title":"writes\\nconfidence: 0.65\\nevidence: 7","arrows":{"to":{"enabled":true,"scaleFactor":0.62}},"width":2.83,"dashes":[4,4],"color":{"color":"#ef4444","highlight":"#fca5a5","opacity":0.88},"font":{"align":"middle","color":"#cbd5e1","strokeWidth":3,"strokeColor":"#0f0f1a","size":11},"smooth":{"enabled":true,"type":"continuous","roundness":0.14},"_type":"writes","_confidence":0.65,"_metadata":{},"_evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":38,"kind":"call","text":"POSTGRES","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":195,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":196,"column":67,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":215,"column":25,"kind":"call","text":"postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":42,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":216,"column":67,"kind":"call","text":"Postgres","confidence":0.65}]},{"id":"RuntimeEdge.Service.detect.writes.ObjectStore.MinIO","from":"Service.detect","to":"ObjectStore.MinIO","label":"writes","title":"writes\\nconfidence: 0.65\\nevidence: 7","arrows":{"to":{"enabled":true,"scaleFactor":0.62}},"width":2.83,"dashes":[4,4],"color":{"color":"#ef4444","highlight":"#fca5a5","opacity":0.88},"font":{"align":"middle","color":"#cbd5e1","strokeWidth":3,"strokeColor":"#0f0f1a","size":11},"smooth":{"enabled":true,"type":"continuous","roundness":0.14},"_type":"writes","_confidence":0.65,"_metadata":{},"_evidence":[{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":11,"column":53,"kind":"call","text":"MINIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":201,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":202,"column":68,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":221,"column":25,"kind":"call","text":"minio","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":44,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/configInfraExtractor.ts","line":222,"column":68,"kind":"call","text":"MinIO","confidence":0.65}]},{"id":"RuntimeEdge.Service.openFile.uses_tool.ExternalTool.subprocess","from":"Service.openFile","to":"ExternalTool.subprocess","label":"uses_tool","title":"uses_tool\\nconfidence: 0.65\\nevidence: 1","arrows":{"to":{"enabled":true,"scaleFactor":0.62}},"width":2.83,"dashes":[4,6],"color":{"color":"#94a3b8","highlight":"#cbd5e1","opacity":0.88},"font":{"align":"middle","color":"#cbd5e1","strokeWidth":3,"strokeColor":"#0f0f1a","size":11},"smooth":{"enabled":true,"type":"continuous","roundness":0.14},"_type":"uses_tool","_confidence":0.65,"_metadata":{},"_evidence":[{"sourcePath":"cli.ts","line":1253,"column":19,"kind":"call","text":"spawn(","confidence":0.65}]},{"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.uses_model.ModelProvider.OpenAI","from":"Service.runtime/extractors/resourceAccessExtractor","to":"ModelProvider.OpenAI","label":"uses_model","title":"uses_model\\nconfidence: 0.65\\nevidence: 2","arrows":{"to":{"enabled":true,"scaleFactor":0.62}},"width":2.83,"dashes":[4,6],"color":{"color":"#94a3b8","highlight":"#cbd5e1","opacity":0.88},"font":{"align":"middle","color":"#cbd5e1","strokeWidth":3,"strokeColor":"#0f0f1a","size":11},"smooth":{"enabled":true,"type":"continuous","roundness":0.14},"_type":"uses_model","_confidence":0.65,"_metadata":{},"_evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":56,"column":32,"kind":"call","text":"OpenAI","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":58,"column":17,"kind":"call","text":"OpenAI","confidence":0.65}]},{"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.DataStore.Postgres","from":"Service.runtime/extractors/resourceAccessExtractor","to":"DataStore.Postgres","label":"writes","title":"writes\\nconfidence: 0.65\\nevidence: 2","arrows":{"to":{"enabled":true,"scaleFactor":0.62}},"width":2.83,"dashes":[4,4],"color":{"color":"#ef4444","highlight":"#fca5a5","opacity":0.88},"font":{"align":"middle","color":"#cbd5e1","strokeWidth":3,"strokeColor":"#0f0f1a","size":11},"smooth":{"enabled":true,"type":"continuous","roundness":0.14},"_type":"writes","_confidence":0.65,"_metadata":{},"_evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":21,"column":28,"kind":"call","text":"Postgres","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":23,"column":17,"kind":"call","text":"Postgres","confidence":0.65}]},{"id":"RuntimeEdge.Service.runtime/extractors/resourceAccessExtractor.writes.ObjectStore.MinIO","from":"Service.runtime/extractors/resourceAccessExtractor","to":"ObjectStore.MinIO","label":"writes","title":"writes\\nconfidence: 0.65\\nevidence: 2","arrows":{"to":{"enabled":true,"scaleFactor":0.62}},"width":2.83,"dashes":[4,4],"color":{"color":"#ef4444","highlight":"#fca5a5","opacity":0.88},"font":{"align":"middle","color":"#cbd5e1","strokeWidth":3,"strokeColor":"#0f0f1a","size":11},"smooth":{"enabled":true,"type":"continuous","roundness":0.14},"_type":"writes","_confidence":0.65,"_metadata":{},"_evidence":[{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":35,"column":30,"kind":"call","text":"MinIO","confidence":0.65},{"sourcePath":"runtime/extractors/resourceAccessExtractor.ts","line":37,"column":17,"kind":"call","text":"MinIO","confidence":0.65}]},{"id":"RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres","from":"Service.runtime/runtimeLabeling","to":"DataStore.Postgres","label":"writes","title":"writes\\nconfidence: 0.65\\nevidence: 1","arrows":{"to":{"enabled":true,"scaleFactor":0.62}},"width":2.83,"dashes":[4,4],"color":{"color":"#ef4444","highlight":"#fca5a5","opacity":0.88},"font":{"align":"middle","color":"#cbd5e1","strokeWidth":3,"strokeColor":"#0f0f1a","size":11},"smooth":{"enabled":true,"type":"continuous","roundness":0.14},"_type":"writes","_confidence":0.65,"_metadata":{},"_evidence":[{"sourcePath":"runtime/runtimeLabeling.ts","line":45,"column":6,"kind":"call","text":"postgres","confidence":0.65}]}],"legend":[{"cid":"service","label":"Service","color":"#fb923c","count":4},{"cid":"resource","label":"Resource","color":"#94a3b8","count":2},{"cid":"external","label":"External","color":"#fb7185","count":2},{"cid":"worker","label":"Worker","color":"#facc15","count":2},{"cid":"infra","label":"Infra","color":"#22d3ee","count":1},{"cid":"workflow","label":"Workflow","color":"#a78bfa","count":1}],"denseResourceNodeIds":[]};
+const dashboardOptions = {"interactive":true,"layout":"leaf-force","traceDepth":2,"hideIsolated":true,"maxRenderEdges":2200,"theme":"leaf-like"};
 
-const NODE_TYPE_PRESETS = {
-  All: [],
-  ApiRoute: ['ApiRoute','RpcEndpoint','CliCommand'],
-  Service: ['Service','Workflow','WorkflowNode','WorkflowEdge'],
-  Worker: ['Worker','Task','Queue','Scheduler','EventConsumer','MessageProducer'],
-  Resource: ['DataStore','ObjectStore','Cache','FileSystem'],
-  External: ['ExternalApi','ExternalTool','ModelProvider'],
-  Frontend: ['FrontendEntry','FrontendComponent'],
-  Infra: ['Config','Secret','Kernel','Plugin']
-};
-
-const NODE_COLORS = {
-  FrontendEntry:'#4cc9f0',
-  FrontendComponent:'#4cc9f0',
-  ApiRoute:'#38bdf8',
-  CliCommand:'#38bdf8',
-  RpcEndpoint:'#38bdf8',
-  Service:'#22c55e',
-  Workflow:'#a78bfa',
-  WorkflowNode:'#c084fc',
-  WorkflowEdge:'#d8b4fe',
-  Worker:'#f59e0b',
-  Task:'#fb923c',
-  Queue:'#f97316',
-  Scheduler:'#f97316',
-  EventConsumer:'#f97316',
-  MessageProducer:'#f97316',
-  DataStore:'#14b8a6',
-  ObjectStore:'#2dd4bf',
-  Cache:'#84cc16',
-  FileSystem:'#eab308',
-  Config:'#64748b',
-  Secret:'#ef4444',
-  ExternalApi:'#f43f5e',
-  ExternalTool:'#fb7185',
-  ModelProvider:'#06d6a0',
-  Kernel:'#64748b',
-  Plugin:'#64748b',
-  UnknownRuntime:'#94a3b8'
-};
-
-const EDGE_COLORS = {
-  calls:'#5bc0eb',
-  invokes:'#9bc53d',
-  dispatches:'#f6c85f',
-  publishes:'#f25f5c',
-  subscribes:'#f25f5c',
-  enqueues:'#f25f5c',
-  consumes:'#ff7f51',
-  schedules:'#ff7f51',
-  reads:'#ffe066',
-  writes:'#ff9f1c',
-  caches:'#c77dff',
-  contains:'#6c8ef5',
-  connects:'#8d99ae',
-  executes:'#2ec4b6',
-  uses_tool:'#ef476f',
-  uses_model:'#06d6a0',
-  returns_to:'#38bdf8',
-  depends_on:'#94a3b8',
-  loads_config:'#64748b',
-  uses_secret:'#ef4444'
-};
+const runtimeMap = runtimePayload.runtimeMap;
+const runtimeNodes = runtimePayload.nodes;
+const runtimeEdges = runtimePayload.edges;
+const runtimeLegend = runtimePayload.legend;
+const denseResourceNodeIds = new Set(runtimePayload.denseResourceNodeIds || []);
+const FLOW_ALLOWED = new Set(['frontend','api','service','workflow','worker','resource','external']);
 
 const dom = {
-  svg: document.getElementById('runtime-graph'),
-  viewport: document.getElementById('viewport'),
-  clustersLayer: document.getElementById('clusters-layer'),
-  nodesLayer: document.getElementById('nodes-layer'),
-  edgesLayer: document.getElementById('edges-layer'),
-  edgeLabelsLayer: document.getElementById('edge-labels-layer'),
-  bundleLabelsLayer: document.getElementById('bundle-labels-layer'),
-  notice: document.getElementById('runtime-notice'),
+  graph: document.getElementById('graph'),
   search: document.getElementById('search'),
-  layoutSelect: document.getElementById('layout-select'),
-  traceDepth: document.getElementById('trace-depth'),
-  traceUpstream: document.getElementById('trace-upstream'),
-  traceDownstream: document.getElementById('trace-downstream'),
-  traceBoth: document.getElementById('trace-both'),
-  edgeLabelToggle: document.getElementById('edge-label-toggle'),
-  hideIsolated: document.getElementById('hide-isolated'),
-  resetView: document.getElementById('reset-view'),
-  fitView: document.getElementById('fit-view'),
-  nodeFilterContainer: document.getElementById('node-type-filters'),
-  edgeFilterContainer: document.getElementById('edge-type-filters'),
-  presetContainer: document.getElementById('node-presets'),
+  searchInline: document.getElementById('search-inline'),
   searchResults: document.getElementById('search-results'),
+  infoTitle: document.getElementById('info-title'),
+  infoContent: document.getElementById('info-content'),
+  legend: document.getElementById('legend'),
+  diagnostics: document.getElementById('diagnostic-content'),
+  nodeTypeFilters: document.getElementById('node-type-filters'),
+  edgeTypeFilters: document.getElementById('edge-type-filters'),
+  hideIsolated: document.getElementById('hide-isolated'),
+  traceDepth: document.getElementById('trace-depth'),
+  layoutSelect: document.getElementById('layout-select'),
   viewLeaf: document.getElementById('view-leaf'),
   viewFlow: document.getElementById('view-flow'),
   toggleClusters: document.getElementById('toggle-clusters'),
-  detailTitle: document.getElementById('detail-title'),
-  detailBody: document.getElementById('detail-body'),
-  diagnosticsContent: document.getElementById('diagnostics-content')
+  traceUpstream: document.getElementById('trace-upstream'),
+  traceDownstream: document.getElementById('trace-downstream'),
+  traceBoth: document.getElementById('trace-both'),
+  resetView: document.getElementById('reset-view'),
+  fitView: document.getElementById('fit-view'),
+  edgeLabelToggle: document.getElementById('edge-label-toggle'),
+  notice: document.getElementById('runtime-notice')
 };
 
-const graphStore = buildGraphStore(runtimeMap);
+const nodesDS = new vis.DataSet(runtimeNodes);
+const edgesDS = new vis.DataSet(runtimeEdges);
+const network = new vis.Network(dom.graph, { nodes: nodesDS, edges: edgesDS }, buildNetworkOptions(dashboardOptions.layout));
+const adjacency = buildAdjacency(runtimeNodes, runtimeEdges);
+
 const state = {
-  layout: dashboardOptions.layout === 'dagre' ? 'dagre' : 'leaf-force',
-  query: '',
   currentView: 'leaf',
-  clustersCollapsed: false,
-  selectedNodeId: null,
-  selectedEdgeId: null,
-  hoveredNodeId: null,
-  hoveredEdgeId: null,
-  focusNodeId: null,
-  trace: null,
-  hideIsolated: Boolean(dashboardOptions.hideIsolated),
+  selectedNodeId: '',
+  selectedEdgeId: '',
+  focusRootId: '',
+  traceDirection: 'both',
+  enabledNodeTypes: new Set(runtimeNodes.map((node) => node._type)),
+  enabledEdgeTypes: new Set(runtimeEdges.map((edge) => edge._type)),
+  hiddenGroups: new Set(),
   showEdgeLabels: true,
-  activeNodeTypes: new Set(),
-  activeEdgeTypes: new Set(),
-  transform: { x: 0, y: 0, k: 1 },
-  positions: new Map(),
-  draggingNodeId: null,
-  layoutDirty: true,
-  firstRenderMs: 0
+  hideIsolated: Boolean(dashboardOptions.hideIsolated),
+  compactResourceEdges: true,
+  resourceEdgeCap: 10
 };
-const renderBootStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-const allNodeTypes = Array.from(new Set(graphStore.nodes.map(node => node.type))).sort();
-const allEdgeTypes = Array.from(new Set(graphStore.edges.map(edge => edge.type))).sort();
-const nodeTypeCounts = buildCountMap(graphStore.nodes.map(node => node.type));
-const edgeTypeCounts = buildCountMap(graphStore.edges.map(edge => edge.type));
-allNodeTypes.forEach(type => state.activeNodeTypes.add(type));
-allEdgeTypes.forEach(type => state.activeEdgeTypes.add(type));
+const firstRenderStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+wireControls();
+renderLegend();
+renderDiagnostics();
+renderTypeFilters();
+showWelcome();
+applyGraphState();
+fitGraph();
+console.log('[TriadMind] Runtime first render: ' + elapsedMs(firstRenderStartedAt) + 'ms');
 
-bootRuntimeVisualizer();
+if (dashboardOptions.interactive !== false) {
+  network.on('click', onGraphClick);
+  network.on('doubleClick', onGraphDoubleClick);
+}
+network.on('hoverNode', function() { dom.graph.style.cursor = 'pointer'; });
+network.on('blurNode', function() { dom.graph.style.cursor = 'default'; });
 
-function bootRuntimeVisualizer() {
-  applyTheme(dashboardOptions.theme);
-  hydrateControls();
-  hydrateDiagnostics();
-  renderGraph();
-  fitSoon();
+function buildNetworkOptions(layout) {
+  if (layout === 'dagre') {
+    return {
+      layout: { hierarchical: { enabled: true, direction: 'LR', sortMethod: 'directed', levelSeparation: 180, nodeSpacing: 220 } },
+      physics: { enabled: false },
+      interaction: { hover: true, tooltipDelay: 80, hideEdgesOnDrag: true, navigationButtons: true, keyboard: false },
+      edges: { selectionWidth: 4 }
+    };
+  }
+  return {
+    physics: {
+      enabled: true,
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: { gravitationalConstant: -78, centralGravity: 0.007, springLength: 150, springConstant: 0.08, damping: 0.42, avoidOverlap: 0.88 },
+      stabilization: { iterations: 240, fit: true }
+    },
+    interaction: { hover: true, tooltipDelay: 80, hideEdgesOnDrag: true, navigationButtons: true, keyboard: false },
+    nodes: { shadow: { enabled: true, color: 'rgba(0,0,0,.35)', size: 10, x: 0, y: 2 } },
+    edges: { selectionWidth: 4 }
+  };
 }
 
-function applyTheme(theme) {
-  document.body.setAttribute('data-theme', theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like');
-}
-
-function buildGraphStore(map) {
-  const nodes = Array.isArray(map?.nodes) ? map.nodes : [];
-  const nodeById = new Map(nodes.map(node => [node.id, node]));
-  const edges = (Array.isArray(map?.edges) ? map.edges : [])
-    .filter(edge => nodeById.has(edge.from) && nodeById.has(edge.to))
-    .map(edge => ({ ...edge, id: edge.id || stableEdgeId(edge) }));
-  const edgeById = new Map(edges.map(edge => [edge.id, edge]));
+function buildAdjacency(nodes, edges) {
+  const byNode = new Map();
   const incoming = new Map();
   const outgoing = new Map();
-  nodes.forEach(node => { incoming.set(node.id, []); outgoing.set(node.id, []); });
-  edges.forEach(edge => {
-    outgoing.get(edge.from)?.push(edge);
-    incoming.get(edge.to)?.push(edge);
+  nodes.forEach((node) => {
+    byNode.set(node.id, []);
+    incoming.set(node.id, []);
+    outgoing.set(node.id, []);
   });
-  return { nodes, edges, nodeById, edgeById, incoming, outgoing };
+  edges.forEach((edge) => {
+    byNode.get(edge.from).push(edge);
+    byNode.get(edge.to).push(edge);
+    outgoing.get(edge.from).push(edge);
+    incoming.get(edge.to).push(edge);
+  });
+  return { byNode, incoming, outgoing };
 }
 
-function stableEdgeId(edge) {
-  return 'RuntimeEdge.' + [edge.from, edge.type, edge.to].join('.').replace(/[^\w./:{}-]+/g, '_');
-}
-
-function hydrateControls() {
-  dom.layoutSelect.value = state.layout;
+function wireControls() {
+  dom.search.addEventListener('input', onSearchInput);
+  dom.searchInline.addEventListener('input', function(event) {
+    dom.search.value = event.target.value;
+    onSearchInput();
+  });
   dom.hideIsolated.checked = state.hideIsolated;
-  syncEdgeLabelToggle();
-  syncViewToggle();
-  syncClusterToggle();
-  setupPresetButtons();
-  buildFilterControls(dom.nodeFilterContainer, allNodeTypes, state.activeNodeTypes, type => NODE_COLORS[type] || '#64748b', nodeTypeCounts, true);
-  buildFilterControls(dom.edgeFilterContainer, allEdgeTypes, state.activeEdgeTypes, type => EDGE_COLORS[type] || '#7aa2df', edgeTypeCounts, false);
-
-  dom.search.addEventListener('input', event => {
-    state.query = String(event.target.value || '').trim().toLowerCase();
-    renderSearchResults();
-    state.layoutDirty = true;
-    renderGraph();
+  dom.hideIsolated.addEventListener('change', function() {
+    state.hideIsolated = dom.hideIsolated.checked;
+    applyGraphState();
   });
-  dom.layoutSelect.addEventListener('change', event => {
-    state.layout = event.target.value === 'dagre' ? 'dagre' : 'leaf-force';
-    state.currentView = state.layout === 'dagre' ? 'flow' : 'leaf';
-    state.positions = new Map();
-    state.layoutDirty = true;
-    syncViewToggle();
-    renderGraph();
+  dom.layoutSelect.value = dashboardOptions.layout;
+  dom.layoutSelect.addEventListener('change', function() {
+    network.setOptions(buildNetworkOptions(dom.layoutSelect.value === 'dagre' ? 'dagre' : 'leaf-force'));
+    fitGraph();
   });
-  dom.traceDepth.addEventListener('change', () => {
-    dom.traceDepth.value = String(normalizedTraceDepth());
+  dom.viewLeaf.addEventListener('click', function() {
+    state.currentView = 'leaf';
+    syncViewButtons();
+    applyGraphState();
   });
-  dom.traceUpstream.addEventListener('click', () => runTrace('upstream'));
-  dom.traceDownstream.addEventListener('click', () => runTrace('downstream'));
-  dom.traceBoth.addEventListener('click', () => runTrace('both'));
-  dom.edgeLabelToggle.addEventListener('click', () => {
+  dom.viewFlow.addEventListener('click', function() {
+    state.currentView = 'flow';
+    syncViewButtons();
+    applyGraphState();
+  });
+  dom.traceUpstream.addEventListener('click', function() {
+    state.traceDirection = 'upstream';
+    applyGraphState();
+  });
+  dom.traceDownstream.addEventListener('click', function() {
+    state.traceDirection = 'downstream';
+    applyGraphState();
+  });
+  dom.traceBoth.addEventListener('click', function() {
+    state.traceDirection = 'both';
+    applyGraphState();
+  });
+  dom.resetView.addEventListener('click', resetViewState);
+  dom.fitView.addEventListener('click', fitGraph);
+  dom.edgeLabelToggle.addEventListener('click', function() {
     state.showEdgeLabels = !state.showEdgeLabels;
-    syncEdgeLabelToggle();
-    renderGraph();
+    dom.edgeLabelToggle.classList.toggle('active', state.showEdgeLabels);
+    dom.edgeLabelToggle.textContent = state.showEdgeLabels ? 'Edge Labels: on' : 'Edge Labels: off';
+    applyGraphState();
   });
-  dom.hideIsolated.addEventListener('change', event => {
-    state.hideIsolated = Boolean(event.target.checked);
-    state.layoutDirty = true;
-    renderGraph();
+  dom.toggleClusters.addEventListener('click', function() {
+    state.compactResourceEdges = !state.compactResourceEdges;
+    dom.toggleClusters.classList.toggle('active', state.compactResourceEdges);
+    dom.toggleClusters.textContent = state.compactResourceEdges ? 'Edge Bundling: on' : 'Edge Bundling: off';
+    applyGraphState();
   });
-  dom.resetView.addEventListener('click', resetStateAndRender);
-  dom.fitView.addEventListener('click', fitView);
-  dom.viewLeaf.addEventListener('click', () => setGraphView('leaf'));
-  dom.viewFlow.addEventListener('click', () => setGraphView('flow'));
-  dom.toggleClusters.addEventListener('click', () => {
-    state.clustersCollapsed = !state.clustersCollapsed;
-    syncClusterToggle();
-    state.layoutDirty = true;
-    renderGraph();
+  dom.infoContent.addEventListener('click', function(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const nodeId = target.getAttribute('data-node-id');
+    if (!nodeId) return;
+    focusNode(nodeId);
   });
-  setupPanAndZoom();
-  renderSearchResults();
 }
 
-function setGraphView(view) {
-  state.currentView = view === 'flow' ? 'flow' : 'leaf';
-  state.layout = state.currentView === 'flow' ? 'dagre' : 'leaf-force';
-  dom.layoutSelect.value = state.layout;
-  state.layoutDirty = true;
-  syncViewToggle();
-  renderGraph();
-}
-
-function syncViewToggle() {
+function syncViewButtons() {
   dom.viewLeaf.classList.toggle('active', state.currentView === 'leaf');
   dom.viewFlow.classList.toggle('active', state.currentView === 'flow');
 }
 
-function syncClusterToggle() {
-  const button = dom.toggleClusters;
-  if (!button) {
+function onSearchInput() {
+  const query = (dom.search.value || '').trim().toLowerCase();
+  dom.searchInline.value = dom.search.value;
+  dom.searchResults.innerHTML = '';
+  if (!query) {
+    dom.searchResults.style.display = 'none';
     return;
   }
-  button.classList.toggle('active', state.clustersCollapsed);
-  button.textContent = state.clustersCollapsed ? 'Expand Resource Clusters' : 'Collapse Resource Clusters';
+  const matches = runtimeNodes.filter((node) => node._searchText.includes(query)).slice(0, 25);
+  if (!matches.length) {
+    dom.searchResults.style.display = 'none';
+    return;
+  }
+  dom.searchResults.style.display = 'block';
+  matches.forEach((node) => {
+    const item = document.createElement('div');
+    item.className = 'search-item';
+    item.textContent = node.label + ' [' + node._type + ']';
+    item.style.borderLeft = '3px solid ' + (node.color && node.color.border ? node.color.border : '#64748b');
+    item.addEventListener('click', function() {
+      focusNode(node.id);
+      dom.search.value = '';
+      dom.searchInline.value = '';
+      dom.searchResults.style.display = 'none';
+    });
+    dom.searchResults.appendChild(item);
+  });
 }
 
-function hydrateDiagnostics() {
-  const diagnostics = Array.isArray(runtimeMap?.diagnostics) ? runtimeMap.diagnostics : [];
+function renderTypeFilters() {
+  const nodeTypes = Array.from(new Set(runtimeNodes.map((node) => node._type))).sort();
+  dom.nodeTypeFilters.innerHTML = '';
+  nodeTypes.forEach((type) => {
+    const row = document.createElement('label');
+    row.className = 'filter-row';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = true;
+    input.addEventListener('change', function() {
+      if (input.checked) state.enabledNodeTypes.add(type); else state.enabledNodeTypes.delete(type);
+      applyGraphState();
+    });
+    row.appendChild(input);
+    row.appendChild(document.createTextNode(type));
+    dom.nodeTypeFilters.appendChild(row);
+  });
+  const edgeTypes = Array.from(new Set(runtimeEdges.map((edge) => edge._type))).sort();
+  dom.edgeTypeFilters.innerHTML = '';
+  edgeTypes.forEach((type) => {
+    const row = document.createElement('label');
+    row.className = 'filter-row';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = true;
+    input.addEventListener('change', function() {
+      if (input.checked) state.enabledEdgeTypes.add(type); else state.enabledEdgeTypes.delete(type);
+      applyGraphState();
+    });
+    row.appendChild(input);
+    row.appendChild(document.createTextNode(type));
+    dom.edgeTypeFilters.appendChild(row);
+  });
+}
+
+function renderLegend() {
+  dom.legend.innerHTML = '';
+  runtimeLegend.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'legend-item';
+    row.innerHTML = '<span class="legend-dot" style="background:' + esc(item.color) + '"></span><span class="legend-label">' + esc(item.label) + '</span><span class="legend-count">' + esc(item.count) + '</span>';
+    row.addEventListener('click', function() {
+      if (state.hiddenGroups.has(item.cid)) state.hiddenGroups.delete(item.cid); else state.hiddenGroups.add(item.cid);
+      row.classList.toggle('dimmed', state.hiddenGroups.has(item.cid));
+      applyGraphState();
+    });
+    dom.legend.appendChild(row);
+  });
+}
+
+function renderDiagnostics() {
+  const diagnostics = runtimeMap.diagnostics || [];
   if (!diagnostics.length) {
-    dom.diagnosticsContent.innerHTML = '<span class="pill">No runtime diagnostics</span>';
+    dom.diagnostics.innerHTML = '<span class="empty">No runtime diagnostics.</span>';
     return;
   }
-  dom.diagnosticsContent.innerHTML = diagnostics.slice(0, 80).map(diagnostic => {
-    const level = esc(String(diagnostic.level || 'info'));
-    const extractor = esc(String(diagnostic.extractor || 'runtime'));
-    const sourcePath = esc(String(diagnostic.sourcePath || '-'));
-    const message = esc(String(diagnostic.message || ''));
-    return '<pre>[' + level + '] ' + extractor + '\\n' + sourcePath + '\\n' + message + '</pre>';
+  dom.diagnostics.innerHTML = diagnostics.slice(0, 60).map((item) => {
+    const source = item.sourcePath ? ' [' + esc(item.sourcePath) + ']' : '';
+    const extractor = item.extractor ? ' (' + esc(item.extractor) + ')' : '';
+    return '<div style="font-size:12px;line-height:1.5;margin-bottom:6px">[' + esc(item.level) + ']' + extractor + ' ' + esc(item.message) + source + '</div>';
   }).join('');
 }
 
-function setupPresetButtons() {
-  const container = dom.presetContainer;
-  container.innerHTML = '';
-  Object.entries(NODE_TYPE_PRESETS).forEach(([name, types]) => {
-    const resolvedTypes = types.length ? types.filter(type => allNodeTypes.includes(type)) : [...allNodeTypes];
-    if (!resolvedTypes.length) {
-      return;
-    }
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'preset-btn';
-    button.textContent = name;
-    button.addEventListener('click', () => {
-      state.activeNodeTypes = new Set(resolvedTypes);
-      syncNodeFilterInputs();
-      markActivePreset(name);
-      state.layoutDirty = true;
-      renderGraph();
-    });
-    container.appendChild(button);
-  });
-  markActivePreset('All');
-}
-
-function markActivePreset(name) {
-  document.querySelectorAll('#node-presets .preset-btn').forEach(button => {
-    button.classList.toggle('active', button.textContent === name);
-  });
-}
-
-function syncNodeFilterInputs() {
-  allNodeTypes.forEach(type => {
-    const input = document.getElementById('node-filter-' + cssSafe(type));
-    const item = input?.closest('.legend-item');
-    const checked = state.activeNodeTypes.has(type);
-    if (input) {
-      input.checked = checked;
-    }
-    if (item) {
-      item.classList.toggle('dimmed', !checked);
-    }
-  });
-}
-
-function syncEdgeLabelToggle() {
-  dom.edgeLabelToggle.textContent = 'Edge Labels: ' + (state.showEdgeLabels ? 'on' : 'off');
-  dom.edgeLabelToggle.classList.toggle('active', state.showEdgeLabels);
-}
-
-function buildFilterControls(container, items, activeSet, colorResolver, countMap, isNodeFilter) {
-  container.innerHTML = '';
-  items.forEach(item => {
-    const safeId = (isNodeFilter ? 'node-filter-' : 'edge-filter-') + cssSafe(item);
-    const row = document.createElement('label');
-    row.className = 'legend-item';
-    row.innerHTML = '<input id="' + escAttr(safeId) + '" type="checkbox" checked>' +
-      '<span class="legend-dot" style="background:' + escAttr(colorResolver(item)) + '"></span>' +
-      '<span class="legend-label">' + esc(item) + '</span>' +
-      '<span class="legend-count">' + String(countMap.get(item) || 0) + '</span>';
-    const input = row.querySelector('input');
-    input.addEventListener('change', event => {
-      if (event.target.checked) {
-        activeSet.add(item);
-        row.classList.remove('dimmed');
-      } else {
-        activeSet.delete(item);
-        row.classList.add('dimmed');
-      }
-      if (isNodeFilter) {
-        markActivePreset('');
-      }
-      state.layoutDirty = true;
-      renderGraph();
-    });
-    container.appendChild(row);
-  });
-}
-
-function renderSearchResults() {
-  const container = dom.searchResults;
-  if (!container) {
+function onGraphClick(params) {
+  if (params.nodes && params.nodes.length > 0) {
+    selectNode(params.nodes[0]);
     return;
   }
-  if (!state.query) {
-    container.style.display = 'none';
-    container.innerHTML = '';
+  if (params.edges && params.edges.length > 0) {
+    selectEdge(params.edges[0]);
     return;
   }
-
-  const matches = graphStore.nodes
-    .filter(node => matchesSearch(node))
-    .slice(0, 20);
-
-  if (!matches.length) {
-    container.style.display = 'block';
-    container.innerHTML = '<span class="pill">No matched node</span>';
-    return;
-  }
-
-  container.style.display = 'block';
-  container.innerHTML = matches
-    .map(node => {
-      const color = NODE_COLORS[node.type] || '#64748b';
-      return '<div class="search-item" data-runtime-node-id="' + escAttr(node.id) + '" style="border-left:3px solid ' + escAttr(color) + '">' +
-        esc(node.label || node.id) +
-        '</div>';
-    })
-    .join('');
-
-  container.querySelectorAll('[data-runtime-node-id]').forEach(element => {
-    element.addEventListener('click', () => {
-      const nodeId = element.getAttribute('data-runtime-node-id');
-      if (!nodeId) {
-        return;
-      }
-      selectNode(nodeId);
-      fitView();
-      container.style.display = 'none';
-      container.innerHTML = '';
-    });
-  });
+  clearSelection();
 }
 
-function renderGraph() {
-  const graph = getVisibleGraph();
-  if (state.layoutDirty) {
-    computeLayout(graph.nodes, graph.edges);
-    state.layoutDirty = false;
-  }
-  const bundleInfo = buildEdgeBundleInfo(graph);
-  applyTransform();
-  dom.clustersLayer.innerHTML = '';
-  dom.edgesLayer.innerHTML = '';
-  dom.edgeLabelsLayer.innerHTML = '';
-  dom.bundleLabelsLayer.innerHTML = '';
-  dom.nodesLayer.innerHTML = '';
-  if (state.currentView === 'leaf' && state.layout === 'leaf-force') {
-    renderClusterHalos(graph.nodes);
-  }
-  const highlighted = computeHighlightSets();
-  graph.edges.forEach((edge, edgeIndex) => renderEdge(edge, highlighted, edgeIndex, graph.edges.length, bundleInfo));
-  renderBundleLabels(bundleInfo, highlighted);
-  graph.nodes.forEach(node => renderNode(node, highlighted));
-  if (!graph.nodes.length) {
-    dom.notice.textContent = 'No runtime nodes match current filters.';
-  } else if (bundleInfo.bundledEdgeIds.size > 0) {
-    dom.notice.textContent = 'Bundled ' + bundleInfo.bundledEdgeIds.size + ' dense resource edges for readability.';
+function onGraphDoubleClick(params) {
+  if (!params.nodes || params.nodes.length === 0) return;
+  const nodeId = params.nodes[0];
+  state.focusRootId = state.focusRootId === nodeId ? '' : nodeId;
+  applyGraphState();
+}
+
+function clearSelection() {
+  state.selectedNodeId = '';
+  state.selectedEdgeId = '';
+  showWelcome();
+  applyGraphState();
+}
+
+function focusNode(nodeId) {
+  selectNode(nodeId);
+  network.focus(nodeId, { scale: 1.3, animation: true });
+}
+
+function selectNode(nodeId) {
+  state.selectedNodeId = nodeId;
+  state.selectedEdgeId = '';
+  network.selectNodes([nodeId]);
+  showNodeInfo(nodeId);
+  applyGraphState();
+}
+
+function selectEdge(edgeId) {
+  state.selectedEdgeId = edgeId;
+  state.selectedNodeId = '';
+  network.selectEdges([edgeId]);
+  showEdgeInfo(edgeId);
+  applyGraphState();
+}
+
+function resetViewState() {
+  state.selectedNodeId = '';
+  state.selectedEdgeId = '';
+  state.focusRootId = '';
+  state.traceDirection = 'both';
+  state.currentView = 'leaf';
+  syncViewButtons();
+  showWelcome();
+  applyGraphState();
+}
+
+function showWelcome() {
+  dom.infoTitle.textContent = 'Node Info';
+  dom.infoContent.innerHTML = '<span class="empty">Click a node or edge to inspect.</span>';
+}
+
+function showNodeInfo(nodeId) {
+  const node = nodesDS.get(nodeId);
+  if (!node) return;
+  const neighbors = network.getConnectedNodes(nodeId);
+  const incomingCount = (adjacency.incoming.get(nodeId) || []).length;
+  const outgoingCount = (adjacency.outgoing.get(nodeId) || []).length;
+  const neighborsHtml = neighbors.length ? neighbors.map((id) => {
+    const target = nodesDS.get(id);
+    if (!target) return '';
+    return '<span class="neighbor-link" data-node-id="' + escAttr(id) + '" style="border-left:3px solid ' + esc(target.color && target.color.border ? target.color.border : '#64748b') + '">' + esc(target.label) + '</span>';
+  }).join('') : '<span class="empty">No neighbors</span>';
+  dom.infoTitle.textContent = 'Node Info';
+  dom.infoContent.innerHTML =
+    '<div style="font-size:14px;color:#f8fafc;margin-bottom:8px">' + esc(node.label) + '</div>' +
+    '<div class="detail-grid"><b>ID</b><span>' + esc(node.id) + '</span><b>Type</b><span><span class="pill">' + esc(node._type) + '</span></span><b>Group</b><span><span class="pill">' + esc(node._group) + '</span></span><b>Source</b><span>' + esc(node._sourcePath || '-') + '</span><b>Framework</b><span>' + esc(node._framework || '-') + '</span></div>' +
+    '<div class="runtime-flow-card"><div class="flow-col flow-in"><b>Upstream</b><small>incoming</small>' + esc(incomingCount) + '</div><div class="flow-col flow-core"><b>Node</b><small>current</small>' + esc(node.label) + '</div><div class="flow-col flow-out"><b>Downstream</b><small>outgoing</small>' + esc(outgoingCount) + '</div></div>' +
+    '<div style="margin-top:8px;font-size:11px;color:#94a3b8">Neighbors</div>' + neighborsHtml +
+    '<div style="margin-top:10px;font-size:11px;color:#94a3b8">Metadata</div>' + renderJson(node._metadata) +
+    '<div style="margin-top:10px;font-size:11px;color:#94a3b8">Evidence</div>' + renderEvidence(node._evidence);
+}
+
+function showEdgeInfo(edgeId) {
+  const edge = edgesDS.get(edgeId);
+  if (!edge) return;
+  const from = nodesDS.get(edge.from);
+  const to = nodesDS.get(edge.to);
+  dom.infoTitle.textContent = 'Edge Info';
+  dom.infoContent.innerHTML =
+    '<div style="font-size:14px;color:#f8fafc;margin-bottom:8px">' + esc(edge._type) + '</div>' +
+    '<div class="detail-grid"><b>ID</b><span>' + esc(edge.id) + '</span><b>From</b><span><span class="neighbor-link" data-node-id="' + escAttr(edge.from) + '">' + esc(from ? from.label : edge.from) + '</span></span><b>To</b><span><span class="neighbor-link" data-node-id="' + escAttr(edge.to) + '">' + esc(to ? to.label : edge.to) + '</span></span><b>Type</b><span><span class="pill">' + esc(edge._type) + '</span></span><b>Confidence</b><span>' + esc((edge._confidence || 0).toFixed(2)) + '</span></div>' +
+    '<div style="margin-top:10px;font-size:11px;color:#94a3b8">Metadata</div>' + renderJson(edge._metadata) +
+    '<div style="margin-top:10px;font-size:11px;color:#94a3b8">Evidence</div>' + renderEvidence(edge._evidence);
+}
+
+function renderJson(value) {
+  if (!value || Object.keys(value).length === 0) return '<span class="empty">None</span>';
+  return '<pre style="white-space:pre-wrap;word-break:break-word;background:#0b1224;border:1px solid #334155;border-radius:8px;padding:8px;color:#dce8ff;font-size:12px;max-height:180px;overflow:auto">' + esc(JSON.stringify(value, null, 2)) + '</pre>';
+}
+
+function renderEvidence(evidence) {
+  if (!Array.isArray(evidence) || evidence.length === 0) return '<span class="empty">No evidence</span>';
+  return evidence.slice(0, 20).map((item) => {
+    const source = item && item.sourcePath ? item.sourcePath : '-';
+    const line = item && item.line ? ':' + item.line : '';
+    const kind = item && item.kind ? item.kind : 'inferred';
+    const text = item && item.text ? item.text : '';
+    return '<div style="font-size:12px;line-height:1.5;margin-bottom:6px;border-left:2px solid #334155;padding-left:8px"><div><span class="pill">' + esc(kind) + '</span> ' + esc(source + line) + '</div><div style="color:#94a3b8">' + esc(text) + '</div></div>';
+  }).join('');
+}
+
+function applyGraphState() {
+  const visible = computeVisibleSets();
+  const highlight = computeHighlightSets(visible.nodeIds, visible.edgeIds);
+  nodesDS.update(runtimeNodes.map((node) => {
+    const isVisible = visible.nodeIds.has(node.id);
+    const isSelected = state.selectedNodeId === node.id;
+    const isNeighbor = highlight.neighborNodeIds.has(node.id);
+    const isTrace = highlight.traceNodeIds.has(node.id);
+    const isDimmed = !isSelected && !isNeighbor && !isTrace && (state.selectedNodeId || state.selectedEdgeId);
+    return {
+      id: node.id,
+      hidden: !isVisible,
+      borderWidth: isSelected ? 4 : isTrace ? 3.2 : isNeighbor ? 2.8 : 1.8,
+      color: { background: isDimmed ? withAlpha(node.color.background, 0.18) : node.color.background, border: isSelected ? '#38bdf8' : isTrace ? '#fbbf24' : isNeighbor ? '#f8fafc' : node.color.border, highlight: node.color.highlight },
+      font: { ...node.font, color: isDimmed ? 'rgba(248,250,252,0.18)' : '#f8fafc' }
+    };
+  }));
+  edgesDS.update(runtimeEdges.map((edge) => {
+    const isVisible = visible.edgeIds.has(edge.id);
+    const isSelected = state.selectedEdgeId === edge.id;
+    const isNeighbor = highlight.neighborEdgeIds.has(edge.id);
+    const isTrace = highlight.traceEdgeIds.has(edge.id);
+    const isDimmed = !isSelected && !isNeighbor && !isTrace && (state.selectedNodeId || state.selectedEdgeId);
+    return {
+      id: edge.id,
+      hidden: !isVisible,
+      label: state.showEdgeLabels ? edge.label : '',
+      width: isSelected ? Math.max(edge.width, 4.2) : isTrace ? Math.max(edge.width, 3.8) : isNeighbor ? Math.max(edge.width, 3.2) : edge.width,
+      color: { ...edge.color, color: isSelected ? '#38bdf8' : isTrace ? '#fbbf24' : edge.color.color, opacity: isDimmed ? 0.12 : edge.color.opacity },
+      font: { ...edge.font, color: isDimmed ? 'rgba(203,213,225,0.12)' : edge.font.color }
+    };
+  }));
+  if (visible.suppressedEdges > 0 && state.compactResourceEdges) {
+    dom.notice.textContent = 'Edge bundling active: hidden ' + visible.suppressedEdges + ' dense resource edges.';
   } else {
-    dom.notice.textContent = 'Runtime graph ready: click node/edge to inspect and trace.';
-  }
-  if (!state.firstRenderMs) {
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    state.firstRenderMs = Math.round(now - renderBootStartedAt);
-    console.log('[TriadMind] Runtime first render: ' + state.firstRenderMs + 'ms');
+    dom.notice.textContent = 'Runtime graph uses vis-network and matches visualizer control semantics.';
   }
 }
 
-function getVisibleGraph() {
-  let nodes = graphStore.nodes.filter(node => state.activeNodeTypes.has(node.type) && matchesSearch(node));
-  let allowedNodeIds = new Set(nodes.map(node => node.id));
-  let edges = graphStore.edges.filter(edge =>
-    allowedNodeIds.has(edge.from) &&
-    allowedNodeIds.has(edge.to) &&
-    state.activeEdgeTypes.has(edge.type)
-  );
-
-  if (state.focusNodeId) {
-    const focusTrace = traceFromNode(state.focusNodeId, 'both', 1);
-    nodes = nodes.filter(node => focusTrace.nodeIds.has(node.id));
-    allowedNodeIds = new Set(nodes.map(node => node.id));
-    edges = edges.filter(edge =>
-      focusTrace.edgeIds.has(edge.id) &&
-      allowedNodeIds.has(edge.from) &&
-      allowedNodeIds.has(edge.to)
-    );
-  }
-
-  if (state.clustersCollapsed) {
-    const highlightedNodeIds = new Set();
-    if (state.selectedNodeId) highlightedNodeIds.add(state.selectedNodeId);
-    if (state.focusNodeId) highlightedNodeIds.add(state.focusNodeId);
-    if (state.trace) state.trace.nodeIds.forEach(nodeId => highlightedNodeIds.add(nodeId));
-    const suppressedClusters = new Set(['Resource', 'External', 'Infra']);
-    nodes = nodes.filter(node => {
-      if (highlightedNodeIds.has(node.id)) {
-        return true;
-      }
-      const cluster = getLeafClusterName(node.type);
-      return !suppressedClusters.has(cluster);
-    });
-    allowedNodeIds = new Set(nodes.map(node => node.id));
-    edges = edges.filter(edge => allowedNodeIds.has(edge.from) && allowedNodeIds.has(edge.to));
-  }
-
+function computeVisibleSets() {
+  const nodeIds = new Set();
+  runtimeNodes.forEach((node) => {
+    if (!state.enabledNodeTypes.has(node._type)) return;
+    if (state.hiddenGroups.has(node._group)) return;
+    if (state.currentView === 'flow' && !FLOW_ALLOWED.has(node._group)) return;
+    nodeIds.add(node.id);
+  });
+  let edgeIds = new Set();
+  runtimeEdges.forEach((edge) => {
+    if (!state.enabledEdgeTypes.has(edge._type)) return;
+    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) return;
+    edgeIds.add(edge.id);
+  });
   if (state.hideIsolated) {
     const connected = new Set();
-    edges.forEach(edge => { connected.add(edge.from); connected.add(edge.to); });
-    nodes = nodes.filter(node => connected.has(node.id));
+    edgeIds.forEach((id) => {
+      const edge = edgesDS.get(id);
+      if (!edge) return;
+      connected.add(edge.from); connected.add(edge.to);
+    });
+    Array.from(nodeIds).forEach((id) => { if (!connected.has(id)) nodeIds.delete(id); });
+    edgeIds = new Set(Array.from(edgeIds).filter((id) => {
+      const edge = edgesDS.get(id);
+      return edge && nodeIds.has(edge.from) && nodeIds.has(edge.to);
+    }));
   }
-
-  if (edges.length > dashboardOptions.maxRenderEdges) {
-    edges = edges.slice(0, dashboardOptions.maxRenderEdges);
-    dom.notice.textContent = 'Edge cap active: rendering first ' + edges.length + ' edges. Narrow by search/filter for full detail.';
+  if (state.focusRootId && nodeIds.has(state.focusRootId)) {
+    const focused = traceFrom(state.focusRootId, 'both', normalizedDepth(), edgeIds);
+    edgeIds = focused.edgeIds;
+    Array.from(nodeIds).forEach((id) => { if (!focused.nodeIds.has(id)) nodeIds.delete(id); });
   }
-
-  return { nodes, edges };
+  let suppressedEdges = 0;
+  if (state.compactResourceEdges) {
+    const keep = new Set(edgeIds);
+    denseResourceNodeIds.forEach((resourceId) => {
+      if (!nodeIds.has(resourceId) || state.selectedNodeId === resourceId) return;
+      const connected = (adjacency.byNode.get(resourceId) || []).map((edge) => edge.id).filter((id) => keep.has(id));
+      if (connected.length <= state.resourceEdgeCap) return;
+      const preferred = connected
+        .map((id) => edgesDS.get(id))
+        .filter(Boolean)
+        .sort((a, b) => (b._confidence || 0) - (a._confidence || 0))
+        .slice(0, state.resourceEdgeCap)
+        .map((edge) => edge.id);
+      const preferredSet = new Set(preferred);
+      connected.forEach((id) => {
+        if (!preferredSet.has(id)) { keep.delete(id); suppressedEdges += 1; }
+      });
+    });
+    edgeIds = keep;
+  }
+  return { nodeIds, edgeIds, suppressedEdges };
 }
 
-function matchesSearch(node) {
-  if (!state.query) {
-    return true;
-  }
-  return [node.id, node.label, node.type, node.sourcePath || '', node.framework || '']
-    .join(' ')
-    .toLowerCase()
-    .includes(state.query);
-}
-
-function computeHighlightSets() {
+function computeHighlightSets(nodeIds, edgeIds) {
   const neighborNodeIds = new Set();
   const neighborEdgeIds = new Set();
   const traceNodeIds = new Set();
   const traceEdgeIds = new Set();
-  const hoveredNodeIds = new Set();
-  const hoveredEdgeIds = new Set();
-
-  if (state.selectedNodeId) {
+  if (state.selectedNodeId && nodeIds.has(state.selectedNodeId)) {
     neighborNodeIds.add(state.selectedNodeId);
-    const edges = [...(graphStore.incoming.get(state.selectedNodeId) || []), ...(graphStore.outgoing.get(state.selectedNodeId) || [])];
-    edges.forEach(edge => {
+    (adjacency.byNode.get(state.selectedNodeId) || []).forEach((edge) => {
+      if (!edgeIds.has(edge.id)) return;
       neighborEdgeIds.add(edge.id);
       neighborNodeIds.add(edge.from);
       neighborNodeIds.add(edge.to);
     });
+    const trace = traceFrom(state.selectedNodeId, state.traceDirection, normalizedDepth(), edgeIds);
+    trace.nodeIds.forEach((id) => traceNodeIds.add(id));
+    trace.edgeIds.forEach((id) => traceEdgeIds.add(id));
   }
-
-  if (state.selectedEdgeId) {
-    const edge = graphStore.edgeById.get(state.selectedEdgeId);
+  if (state.selectedEdgeId && edgeIds.has(state.selectedEdgeId)) {
+    const edge = edgesDS.get(state.selectedEdgeId);
     if (edge) {
       neighborEdgeIds.add(edge.id);
       neighborNodeIds.add(edge.from);
       neighborNodeIds.add(edge.to);
     }
   }
-
-  if (state.trace) {
-    state.trace.nodeIds.forEach(id => traceNodeIds.add(id));
-    state.trace.edgeIds.forEach(id => traceEdgeIds.add(id));
-  }
-
-  if (state.hoveredNodeId) {
-    hoveredNodeIds.add(state.hoveredNodeId);
-    const hoverEdges = [
-      ...(graphStore.incoming.get(state.hoveredNodeId) || []),
-      ...(graphStore.outgoing.get(state.hoveredNodeId) || [])
-    ];
-    hoverEdges.forEach(edge => {
-      hoveredEdgeIds.add(edge.id);
-      hoveredNodeIds.add(edge.from);
-      hoveredNodeIds.add(edge.to);
-    });
-  }
-
-  if (state.hoveredEdgeId) {
-    const hoverEdge = graphStore.edgeById.get(state.hoveredEdgeId);
-    if (hoverEdge) {
-      hoveredEdgeIds.add(hoverEdge.id);
-      hoveredNodeIds.add(hoverEdge.from);
-      hoveredNodeIds.add(hoverEdge.to);
-    }
-  }
-
-  return {
-    neighborNodeIds,
-    neighborEdgeIds,
-    traceNodeIds,
-    traceEdgeIds,
-    hoveredNodeIds,
-    hoveredEdgeIds,
-    hasFocus: Boolean(state.selectedNodeId || state.selectedEdgeId || state.trace)
-  };
+  return { neighborNodeIds, neighborEdgeIds, traceNodeIds, traceEdgeIds };
 }
 
-function runTrace(direction) {
-  const startId = state.selectedNodeId || state.focusNodeId;
-  if (!startId) {
-    dom.notice.textContent = 'Select a node before trace.';
-    return;
-  }
-  const previouslyFocused = Boolean(state.focusNodeId);
-  state.trace = traceFromNode(startId, direction, normalizedTraceDepth());
-  state.focusNodeId = null;
-  if (previouslyFocused) {
-    state.layoutDirty = true;
-  }
-  dom.notice.textContent = direction + ' trace depth=' + normalizedTraceDepth() + ': ' + state.trace.nodeIds.size + ' nodes / ' + state.trace.edgeIds.size + ' edges';
-  renderGraph();
-}
-
-function traceFromNode(startNodeId, direction, depth) {
+function traceFrom(startNodeId, direction, depth, edgeIdFilter) {
   const nodeIds = new Set([startNodeId]);
   const edgeIds = new Set();
-  const queue = [{ nodeId: startNodeId, depth: 0 }];
+  const queue = [{ id: startNodeId, depth: 0 }];
   const visited = new Set([startNodeId + ':0']);
-
-  while (queue.length) {
+  while (queue.length > 0) {
     const current = queue.shift();
-    if (!current || current.depth >= depth) {
-      continue;
-    }
-
-    const edges = direction === 'upstream'
-      ? (graphStore.incoming.get(current.nodeId) || [])
-      : direction === 'downstream'
-        ? (graphStore.outgoing.get(current.nodeId) || [])
-        : [...(graphStore.incoming.get(current.nodeId) || []), ...(graphStore.outgoing.get(current.nodeId) || [])];
-
-    edges.forEach(edge => {
-      const nextNodeId = edge.from === current.nodeId ? edge.to : edge.from;
+    if (!current || current.depth >= depth) continue;
+    const candidates = getTraceEdges(current.id, direction);
+    candidates.forEach((edge) => {
+      if (edgeIdFilter && !edgeIdFilter.has(edge.id)) return;
       edgeIds.add(edge.id);
       nodeIds.add(edge.from);
       nodeIds.add(edge.to);
-      const visitKey = nextNodeId + ':' + (current.depth + 1);
-      if (!visited.has(visitKey)) {
-        visited.add(visitKey);
-        queue.push({ nodeId: nextNodeId, depth: current.depth + 1 });
-      }
+      const next = edge.from === current.id ? edge.to : edge.from;
+      const key = next + ':' + (current.depth + 1);
+      if (!visited.has(key)) { visited.add(key); queue.push({ id: next, depth: current.depth + 1 }); }
     });
   }
-
-  return { nodeIds, edgeIds, direction, depth };
+  return { nodeIds, edgeIds };
 }
 
-function normalizedTraceDepth() {
-  const parsed = Number(dom.traceDepth.value || dashboardOptions.traceDepth || 2);
-  const normalized = Math.max(1, Math.min(8, Number.isFinite(parsed) ? Math.floor(parsed) : 2));
-  dom.traceDepth.value = String(normalized);
-  return normalized;
+function getTraceEdges(nodeId, direction) {
+  if (direction === 'upstream') return adjacency.incoming.get(nodeId) || [];
+  if (direction === 'downstream') return adjacency.outgoing.get(nodeId) || [];
+  return [...(adjacency.incoming.get(nodeId) || []), ...(adjacency.outgoing.get(nodeId) || [])];
 }
 
-function renderNode(node, highlighted) {
-  const position = state.positions.get(node.id) || { x: 0, y: 0 };
-  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const isSelected = state.selectedNodeId === node.id;
-  const isTrace = highlighted.traceNodeIds.has(node.id);
-  const isNeighbor = highlighted.neighborNodeIds.has(node.id);
-  const isLocked = state.focusNodeId === node.id;
-  const isHovered = highlighted.hoveredNodeIds.has(node.id);
-  group.setAttribute(
-    'class',
-    'runtime-node' +
-      (isSelected ? ' selected' : '') +
-      (isTrace ? ' trace' : '') +
-      (isNeighbor ? ' neighbor' : '') +
-      (isHovered ? ' hovered' : '') +
-      (isLocked ? ' locked' : '') +
-      (highlighted.hasFocus && !isNeighbor && !isTrace && !isSelected ? ' dim' : '')
-  );
-  group.setAttribute('transform', 'translate(' + position.x + ',' + position.y + ')');
-  group.dataset.nodeId = node.id;
-
-  const nodeWidth = 168;
-  const nodeHeight = 54;
-  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  rect.setAttribute('class', 'node-shape');
-  rect.setAttribute('x', String(-nodeWidth / 2));
-  rect.setAttribute('y', String(-nodeHeight / 2));
-  rect.setAttribute('rx', '12');
-  rect.setAttribute('width', String(nodeWidth));
-  rect.setAttribute('height', String(nodeHeight));
-  rect.setAttribute('fill', NODE_COLORS[node.type] || '#64748b');
-  rect.setAttribute('stroke', '#1e293b');
-
-  const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  title.setAttribute('class', 'node-label');
-  title.setAttribute('y', '-7');
-  title.textContent = truncate(node.label || node.id, 30);
-
-  const subtitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  subtitle.setAttribute('class', 'node-sub');
-  subtitle.setAttribute('y', '12');
-  subtitle.textContent = node.type;
-
-  group.append(rect, title, subtitle);
-  group.addEventListener('click', event => {
-    event.stopPropagation();
-    selectNode(node.id);
-  });
-  group.addEventListener('mouseenter', () => {
-    state.hoveredNodeId = node.id;
-    renderGraph();
-  });
-  group.addEventListener('mouseleave', () => {
-    if (state.hoveredNodeId === node.id) {
-      state.hoveredNodeId = null;
-      renderGraph();
-    }
-  });
-  group.addEventListener('dblclick', event => {
-    event.stopPropagation();
-    state.focusNodeId = node.id;
-    state.selectedNodeId = node.id;
-    state.selectedEdgeId = null;
-    state.trace = null;
-    state.layoutDirty = true;
-    dom.notice.textContent = 'Focus mode locked around ' + (node.label || node.id);
-    showNodeDetail(node);
-    renderGraph();
-  });
-  group.addEventListener('pointerdown', event => startNodeDrag(event, node.id));
-  dom.nodesLayer.appendChild(group);
+function normalizedDepth() {
+  const value = Number(dom.traceDepth.value);
+  if (Number.isFinite(value) && value > 0) return Math.min(8, Math.floor(value));
+  return 2;
 }
 
-function renderEdge(edge, highlighted, edgeIndex, totalEdges, bundleInfo) {
-  const from = state.positions.get(edge.from);
-  const to = state.positions.get(edge.to);
-  if (!from || !to) {
-    return;
+function fitGraph() {
+  network.fit({ animation: true });
+}
+
+function withAlpha(color, alpha) {
+  if (!color || typeof color !== 'string') return color;
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    const expanded = hex.length === 3 ? hex.split('').map((ch) => ch + ch).join('') : hex.slice(0, 6);
+    const safeAlpha = Math.max(0, Math.min(1, alpha));
+    const alphaHex = Math.round(safeAlpha * 255).toString(16).padStart(2, '0');
+    return '#' + expanded + alphaHex;
   }
-  const geometry = resolveEdgeGeometry(edge, from, to, bundleInfo);
-  const color = EDGE_COLORS[edge.type] || '#7aa2df';
-  const isSelected = state.selectedEdgeId === edge.id;
-  const isTrace = highlighted.traceEdgeIds.has(edge.id);
-  const isNeighbor = highlighted.neighborEdgeIds.has(edge.id);
-  const isHovered = highlighted.hoveredEdgeIds.has(edge.id);
-  const pathData = geometry.pathData;
-
-  const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  line.setAttribute(
-    'class',
-    'edge-line' +
-      (isSelected ? ' edge-selected' : '') +
-      (isTrace ? ' edge-trace' : '') +
-      (isNeighbor ? ' edge-neighbor' : '') +
-      (isHovered ? ' edge-hover' : '') +
-      (highlighted.hasFocus && !isSelected && !isNeighbor && !isTrace ? ' dim' : '')
-  );
-  line.setAttribute('d', pathData);
-  line.setAttribute('stroke', color);
-
-  const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  hit.setAttribute('class', 'edge-hit');
-  hit.setAttribute('d', pathData);
-  hit.addEventListener('click', event => {
-    event.stopPropagation();
-    selectEdge(edge.id);
-  });
-  hit.addEventListener('mouseenter', () => {
-    state.hoveredEdgeId = edge.id;
-    renderGraph();
-  });
-  hit.addEventListener('mouseleave', () => {
-    if (state.hoveredEdgeId === edge.id) {
-      state.hoveredEdgeId = null;
-      renderGraph();
-    }
-  });
-
-  dom.edgesLayer.append(line, hit);
-
-  if (!shouldRenderEdgeLabel(edge, edgeIndex, totalEdges, bundleInfo, isSelected || isTrace || isNeighbor)) {
-    return;
-  }
-  const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  label.setAttribute('class', 'edge-label' + (highlighted.hasFocus && !isSelected && !isNeighbor && !isTrace ? ' dim' : ''));
-  label.setAttribute('x', String(geometry.labelPoint.x));
-  label.setAttribute('y', String(geometry.labelPoint.y));
-  label.textContent = edge.type + (edge.confidence !== undefined ? ' ' + Number(edge.confidence).toFixed(2) : '');
-  dom.edgeLabelsLayer.appendChild(label);
+  return color;
 }
 
-function shouldRenderEdgeLabel(edge, edgeIndex, totalEdges, bundleInfo, forceVisible) {
-  if (!state.showEdgeLabels) {
-    return false;
-  }
-  if (forceVisible) {
-    return true;
-  }
-  if (bundleInfo.bundledEdgeIds.has(edge.id)) {
-    return false;
-  }
-  if (state.transform.k < 0.55) {
-    return false;
-  }
-  const maxLabels = 500;
-  const sampling = totalEdges > maxLabels ? Math.ceil(totalEdges / maxLabels) : 1;
-  return edgeIndex % sampling === 0;
-}
-
-function edgePoints(from, to) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-  const offsetX = dx / length * 84;
-  const offsetY = dy / length * 30;
-  return {
-    x1: from.x + offsetX,
-    y1: from.y + offsetY,
-    x2: to.x - offsetX,
-    y2: to.y - offsetY
-  };
-}
-
-function resolveEdgeGeometry(edge, from, to, bundleInfo) {
-  const bundled = bundleInfo.edgeGeometry.get(edge.id);
-  if (!bundled) {
-    const points = edgePoints(from, to);
-    return {
-      pathData: 'M' + points.x1 + ',' + points.y1 + ' L' + points.x2 + ',' + points.y2,
-      labelPoint: { x: (points.x1 + points.x2) / 2, y: (points.y1 + points.y2) / 2 - 5 }
-    };
-  }
-
-  const sourceSegment = edgePoints(from, bundled.bundlePoint);
-  const targetSegment = edgePoints(to, bundled.bundlePoint);
-  const start = { x: sourceSegment.x1, y: sourceSegment.y1 };
-  const end = { x: targetSegment.x1, y: targetSegment.y1 };
-  const mid = { x: (start.x + bundled.bundlePoint.x) / 2, y: (start.y + bundled.bundlePoint.y) / 2 };
-  const normal = normalizeNormal(start, bundled.bundlePoint);
-  const control = {
-    x: mid.x + normal.x * bundled.curveOffset,
-    y: mid.y + normal.y * bundled.curveOffset
-  };
-  const labelPoint = {
-    x: (control.x + bundled.bundlePoint.x) / 2,
-    y: (control.y + bundled.bundlePoint.y) / 2 - 6
-  };
-  return {
-    pathData:
-      'M' + start.x + ',' + start.y +
-      ' Q' + control.x + ',' + control.y + ' ' + bundled.bundlePoint.x + ',' + bundled.bundlePoint.y +
-      ' L' + end.x + ',' + end.y,
-    labelPoint
-  };
-}
-
-function buildEdgeBundleInfo(graph) {
-  const edgeGeometry = new Map();
-  const bundledEdgeIds = new Set();
-  const summaries = [];
-  const nodeById = new Map(graph.nodes.map(node => [node.id, node]));
-  const incomingByTarget = new Map();
-
-  graph.edges.forEach(edge => {
-    const list = incomingByTarget.get(edge.to) || [];
-    list.push(edge);
-    incomingByTarget.set(edge.to, list);
-  });
-
-  incomingByTarget.forEach((incomingEdges, targetId) => {
-    const targetNode = nodeById.get(targetId);
-    if (!targetNode || !isResourceLikeType(targetNode.type) || incomingEdges.length < 6) {
-      return;
-    }
-
-    const targetPosition = state.positions.get(targetId);
-    if (!targetPosition) {
-      return;
-    }
-
-    const sourceX = incomingEdges
-      .map(edge => state.positions.get(edge.from)?.x)
-      .filter(value => Number.isFinite(value));
-    const averageSourceX = sourceX.length
-      ? sourceX.reduce((total, value) => total + value, 0) / sourceX.length
-      : targetPosition.x - 1;
-    const direction = averageSourceX <= targetPosition.x ? -1 : 1;
-    const bundlePoint = {
-      x: targetPosition.x + direction * 130,
-      y: targetPosition.y
-    };
-
-    incomingEdges
-      .slice()
-      .sort((left, right) => (left.from + left.type).localeCompare(right.from + right.type))
-      .forEach((edge, index) => {
-        edgeGeometry.set(edge.id, {
-          bundlePoint,
-          curveOffset: (index - (incomingEdges.length - 1) / 2) * 5.5
-        });
-        bundledEdgeIds.add(edge.id);
-      });
-
-    summaries.push({
-      targetId,
-      bundlePoint,
-      edgeCount: incomingEdges.length
-    });
-  });
-
-  return { edgeGeometry, bundledEdgeIds, summaries };
-}
-
-function renderBundleLabels(bundleInfo, highlighted) {
-  if (!state.showEdgeLabels || state.transform.k < 0.5) {
-    return;
-  }
-  bundleInfo.summaries.forEach(summary => {
-    const isHighlighted =
-      highlighted.traceNodeIds.has(summary.targetId) ||
-      highlighted.neighborNodeIds.has(summary.targetId) ||
-      state.selectedNodeId === summary.targetId;
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute(
-      'class',
-      'edge-bundle-label' + (highlighted.hasFocus && !isHighlighted ? ' dim' : '')
-    );
-    label.setAttribute('x', String(summary.bundlePoint.x));
-    label.setAttribute('y', String(summary.bundlePoint.y - 8));
-    label.textContent = 'bundle × ' + summary.edgeCount;
-    dom.bundleLabelsLayer.appendChild(label);
-  });
-}
-
-function renderClusterHalos(nodes) {
-  const groups = new Map();
-  nodes.forEach(node => {
-    const clusterName = getLeafClusterName(node.type);
-    if (clusterName === 'Other') {
-      return;
-    }
-    const list = groups.get(clusterName) || [];
-    list.push(node);
-    groups.set(clusterName, list);
-  });
-
-  groups.forEach((groupNodes, clusterName) => {
-    if (groupNodes.length < 2) {
-      return;
-    }
-    const points = groupNodes
-      .map(node => state.positions.get(node.id))
-      .filter(position => Boolean(position));
-    if (!points.length) {
-      return;
-    }
-    const centroid = {
-      x: points.reduce((total, point) => total + point.x, 0) / points.length,
-      y: points.reduce((total, point) => total + point.y, 0) / points.length
-    };
-    const radius =
-      Math.max(
-        ...points.map(point => Math.sqrt((point.x - centroid.x) ** 2 + (point.y - centroid.y) ** 2))
-      ) + 70;
-
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('class', 'cluster-halo');
-    circle.setAttribute('cx', String(centroid.x));
-    circle.setAttribute('cy', String(centroid.y));
-    circle.setAttribute('r', String(Math.max(120, radius)));
-    dom.clustersLayer.appendChild(circle);
-
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('class', 'cluster-label');
-    label.setAttribute('x', String(centroid.x - 36));
-    label.setAttribute('y', String(centroid.y - Math.max(120, radius) + 18));
-    label.textContent = clusterName;
-    dom.clustersLayer.appendChild(label);
-  });
-}
-
-function getLeafClusterName(nodeType) {
-  if (['FrontendEntry', 'FrontendComponent'].includes(nodeType)) return 'Frontend';
-  if (['ApiRoute', 'CliCommand', 'RpcEndpoint'].includes(nodeType)) return 'API';
-  if (['Service', 'Workflow', 'WorkflowNode', 'WorkflowEdge'].includes(nodeType)) return 'Service';
-  if (['Worker', 'Task', 'Queue', 'Scheduler', 'EventConsumer', 'MessageProducer'].includes(nodeType)) return 'Worker';
-  if (['DataStore', 'ObjectStore', 'Cache', 'FileSystem'].includes(nodeType)) return 'Resource';
-  if (['ExternalApi', 'ExternalTool', 'ModelProvider'].includes(nodeType)) return 'External';
-  if (['Config', 'Secret', 'Kernel', 'Plugin'].includes(nodeType)) return 'Infra';
-  return 'Other';
-}
-
-function isResourceLikeType(nodeType) {
-  return (
-    ['DataStore', 'ObjectStore', 'Cache', 'FileSystem', 'ExternalApi', 'ExternalTool', 'ModelProvider'].includes(nodeType)
-  );
-}
-
-function normalizeNormal(from, to) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-  return { x: -dy / length, y: dx / length };
-}
-
-function selectNode(nodeId) {
-  state.selectedNodeId = nodeId;
-  state.selectedEdgeId = null;
-  state.hoveredEdgeId = null;
-  state.trace = null;
-  state.focusNodeId = null;
-  const node = graphStore.nodeById.get(nodeId);
-  showNodeDetail(node);
-  renderGraph();
-}
-
-function selectEdge(edgeId) {
-  state.selectedEdgeId = edgeId;
-  state.selectedNodeId = null;
-  state.hoveredNodeId = null;
-  state.trace = null;
-  state.focusNodeId = null;
-  const edge = graphStore.edgeById.get(edgeId);
-  showEdgeDetail(edge);
-  renderGraph();
-}
-
-function resetStateAndRender() {
-  state.selectedNodeId = null;
-  state.selectedEdgeId = null;
-  state.hoveredNodeId = null;
-  state.hoveredEdgeId = null;
-  state.focusNodeId = null;
-  state.trace = null;
-  state.layoutDirty = true;
-  dom.notice.textContent = 'Graph reset.';
-  showWelcome();
-  renderGraph();
-}
-
-function showNodeDetail(node) {
-  if (!node) {
-    return;
-  }
-  const incoming = graphStore.incoming.get(node.id) || [];
-  const outgoing = graphStore.outgoing.get(node.id) || [];
-  const neighborIds = Array.from(
-    new Set([
-      ...incoming.map(edge => edge.from),
-      ...outgoing.map(edge => edge.to)
-    ])
-  ).filter(nodeId => nodeId !== node.id);
-  dom.detailTitle.textContent = node.label || node.id;
-  dom.detailBody.innerHTML =
-    renderKeyValue({
-      id: node.id,
-      type: node.type,
-      sourcePath: node.sourcePath || '-',
-      framework: node.framework || '-',
-      incoming: incoming.length,
-      outgoing: outgoing.length,
-      originalLabel: node.metadata?.originalLabel || '-'
-    }) +
-    renderNodeFlowCard(node.id, incoming.length, outgoing.length) +
-    '<h3 style="margin-top:10px">Neighbors</h3>' + renderNeighborLinks(neighborIds) +
-    '<h3 style="margin-top:10px">Metadata</h3><pre>' + esc(JSON.stringify(node.metadata || {}, null, 2)) + '</pre>' +
-    '<h3 style="margin-top:10px">Evidence</h3>' + renderEvidence(node.evidence || []);
-  bindDetailInteractions();
-}
-
-function showEdgeDetail(edge) {
-  if (!edge) {
-    return;
-  }
-  const fromNode = graphStore.nodeById.get(edge.from);
-  const toNode = graphStore.nodeById.get(edge.to);
-  dom.detailTitle.textContent = edge.type + ': ' + edge.from + ' -> ' + edge.to;
-  dom.detailBody.innerHTML =
-    renderKeyValue({
-      id: edge.id,
-      from: edge.from,
-      to: edge.to,
-      type: edge.type,
-      confidence: edge.confidence ?? '-',
-      label: edge.label || '-'
-    }) +
-    '<div class="runtime-flow-card">' +
-      '<button type="button" class="flow-col flow-in" data-runtime-node-id="' + escAttr(edge.from) + '">' +
-        '<b>From</b><small>' + esc(fromNode?.type || '-') + '</small><span>' + esc(fromNode?.label || edge.from) + '</span>' +
-      '</button>' +
-      '<button type="button" class="flow-col flow-core">' +
-        '<b>Edge</b><small>' + esc(edge.type) + '</small><span>' + esc(edge.id || '') + '</span>' +
-      '</button>' +
-      '<button type="button" class="flow-col flow-out" data-runtime-node-id="' + escAttr(edge.to) + '">' +
-        '<b>To</b><small>' + esc(toNode?.type || '-') + '</small><span>' + esc(toNode?.label || edge.to) + '</span>' +
-      '</button>' +
-    '</div>' +
-    '<h3 style="margin-top:10px">Evidence</h3>' + renderEvidence(edge.evidence || []) +
-    '<h3 style="margin-top:10px">Metadata</h3><pre>' + esc(JSON.stringify(edge.metadata || {}, null, 2)) + '</pre>';
-  bindDetailInteractions();
-}
-
-function showWelcome() {
-  dom.detailTitle.textContent = 'Select a node or edge';
-  dom.detailBody.innerHTML = '<div class="detail-kv"><b>Hint</b><span>Click node/edge to inspect details and evidence.</span></div>';
-}
-
-function renderEvidence(evidence) {
-  const entries = Array.isArray(evidence) ? evidence : [];
-  if (!entries.length) {
-    return '<span class="pill">No evidence recorded</span>';
-  }
-  try {
-    return entries.map(item => {
-      const lines = [
-        typeof item?.sourcePath === 'string' ? item.sourcePath : '-',
-        Number.isFinite(item?.line) ? 'line ' + item.line : '',
-        Number.isFinite(item?.column) ? 'column ' + item.column : '',
-        typeof item?.kind === 'string' ? item.kind : 'unknown',
-        typeof item?.text === 'string' ? item.text : ''
-      ].filter(Boolean);
-      return '<pre>' + esc(lines.join('\\n')) + '</pre>';
-    }).join('');
-  } catch {
-    return '<span class="pill">Evidence rendering fallback</span>';
-  }
-}
-
-function renderKeyValue(value) {
-  return '<div class="detail-kv">' + Object.entries(value)
-    .map(([key, data]) => '<b>' + esc(key) + '</b><span>' + esc(String(data)) + '</span>')
-    .join('') + '</div>';
-}
-
-function renderNodeFlowCard(nodeId, incomingCount, outgoingCount) {
-  return '<div class="runtime-flow-card">' +
-    '<button type="button" class="flow-col flow-in" data-runtime-action="trace-upstream" data-runtime-node-id="' + escAttr(nodeId) + '">' +
-      '<b>Upstream</b><small>dependency providers</small><span>' + esc(String(incomingCount)) + ' edge(s)</span>' +
-    '</button>' +
-    '<button type="button" class="flow-col flow-core" data-runtime-action="focus-node" data-runtime-node-id="' + escAttr(nodeId) + '">' +
-      '<b>Current Node</b><small>lock focus subgraph</small><span>' + esc(nodeId) + '</span>' +
-    '</button>' +
-    '<button type="button" class="flow-col flow-out" data-runtime-action="trace-downstream" data-runtime-node-id="' + escAttr(nodeId) + '">' +
-      '<b>Downstream</b><small>dependent consumers</small><span>' + esc(String(outgoingCount)) + ' edge(s)</span>' +
-    '</button>' +
-  '</div>';
-}
-
-function renderNeighborLinks(nodeIds) {
-  if (!nodeIds.length) {
-    return '<span class="pill">No direct neighbors</span>';
-  }
-  return nodeIds
-    .slice(0, 60)
-    .map(nodeId => {
-      const node = graphStore.nodeById.get(nodeId);
-      const color = NODE_COLORS[node?.type] || '#64748b';
-      return '<span class="neighbor-link" data-runtime-node-id="' + escAttr(nodeId) + '" style="border-left-color:' + escAttr(color) + '">' +
-        esc(node?.label || nodeId) +
-      '</span>';
-    })
-    .join('');
-}
-
-function bindDetailInteractions() {
-  dom.detailBody.querySelectorAll('[data-runtime-node-id]:not([data-runtime-action])').forEach(element => {
-    element.addEventListener('click', () => {
-      const nodeId = element.getAttribute('data-runtime-node-id');
-      if (!nodeId) {
-        return;
-      }
-      selectNode(nodeId);
-    });
-  });
-
-  dom.detailBody.querySelectorAll('[data-runtime-action="trace-upstream"]').forEach(element => {
-    element.addEventListener('click', event => {
-      event.stopPropagation();
-      const nodeId = element.getAttribute('data-runtime-node-id');
-      if (!nodeId) {
-        return;
-      }
-      state.selectedNodeId = nodeId;
-      runTrace('upstream');
-    });
-  });
-
-  dom.detailBody.querySelectorAll('[data-runtime-action="trace-downstream"]').forEach(element => {
-    element.addEventListener('click', event => {
-      event.stopPropagation();
-      const nodeId = element.getAttribute('data-runtime-node-id');
-      if (!nodeId) {
-        return;
-      }
-      state.selectedNodeId = nodeId;
-      runTrace('downstream');
-    });
-  });
-
-  dom.detailBody.querySelectorAll('[data-runtime-action="focus-node"]').forEach(element => {
-    element.addEventListener('click', event => {
-      event.stopPropagation();
-      const nodeId = element.getAttribute('data-runtime-node-id');
-      if (!nodeId) {
-        return;
-      }
-      state.focusNodeId = nodeId;
-      state.selectedNodeId = nodeId;
-      state.selectedEdgeId = null;
-      state.trace = null;
-      state.layoutDirty = true;
-      renderGraph();
-    });
-  });
-}
-
-function computeLayout(nodes, edges) {
-  if (!nodes.length) {
-    return;
-  }
-  if (state.layout === 'dagre') {
-    computeDagreLayout(nodes, edges);
-    return;
-  }
-  computeLeafForceLayout(nodes, edges);
-}
-
-function computeDagreLayout(nodes, edges) {
-  const ids = new Set(nodes.map(node => node.id));
-  const indegree = new Map(nodes.map(node => [node.id, 0]));
-  const outgoing = new Map(nodes.map(node => [node.id, []]));
-
-  edges.forEach(edge => {
-    if (!ids.has(edge.from) || !ids.has(edge.to)) {
-      return;
-    }
-    indegree.set(edge.to, (indegree.get(edge.to) || 0) + 1);
-    outgoing.get(edge.from).push(edge.to);
-  });
-
-  const layer = new Map();
-  const queue = [];
-  indegree.forEach((degree, nodeId) => {
-    if (degree === 0) {
-      layer.set(nodeId, 0);
-      queue.push(nodeId);
-    }
-  });
-  if (!queue.length && nodes.length) {
-    layer.set(nodes[0].id, 0);
-    queue.push(nodes[0].id);
-  }
-
-  while (queue.length) {
-    const nodeId = queue.shift();
-    const nextLayer = (layer.get(nodeId) || 0) + 1;
-    outgoing.get(nodeId).forEach(nextId => {
-      if ((layer.get(nextId) ?? -1) < nextLayer) {
-        layer.set(nextId, nextLayer);
-      }
-      indegree.set(nextId, (indegree.get(nextId) || 0) - 1);
-      if ((indegree.get(nextId) || 0) <= 0) {
-        queue.push(nextId);
-      }
-    });
-  }
-
-  nodes.forEach(node => {
-    if (!layer.has(node.id)) {
-      layer.set(node.id, 0);
-    }
-  });
-
-  const lanes = new Map();
-  nodes.forEach(node => {
-    const currentLayer = layer.get(node.id) || 0;
-    const list = lanes.get(currentLayer) || [];
-    list.push(node);
-    lanes.set(currentLayer, list);
-  });
-
-  lanes.forEach((laneNodes, lane) => {
-    laneNodes
-      .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id)))
-      .forEach((node, index) => {
-        state.positions.set(node.id, {
-          x: 140 + lane * 280,
-          y: 90 + index * 94
-        });
-      });
-  });
-}
-
-function computeLeafForceLayout(nodes, edges) {
-  const nodeIds = new Set(nodes.map(node => node.id));
-  if (state.positions.size === 0 || nodes.some(node => !state.positions.has(node.id))) {
-    seedLeafForcePositions(nodes);
-  }
-
-  const iterations = nodes.length > 500 ? 28 : 78;
-  const clusterAnchors = buildClusterAnchors(nodes);
-
-  for (let iteration = 0; iteration < iterations; iteration += 1) {
-    const deltas = new Map(nodes.map(node => [node.id, { x: 0, y: 0 }]));
-
-    for (let i = 0; i < nodes.length; i += 1) {
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const leftPos = state.positions.get(nodes[i].id);
-        const rightPos = state.positions.get(nodes[j].id);
-        if (!leftPos || !rightPos) {
-          continue;
-        }
-        const dx = leftPos.x - rightPos.x;
-        const dy = leftPos.y - rightPos.y;
-        const distanceSquared = Math.max(110, dx * dx + dy * dy);
-        const force = 7400 / distanceSquared;
-        deltas.get(nodes[i].id).x += dx * force;
-        deltas.get(nodes[i].id).y += dy * force;
-        deltas.get(nodes[j].id).x -= dx * force;
-        deltas.get(nodes[j].id).y -= dy * force;
-      }
-    }
-
-    edges.forEach(edge => {
-      if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-        return;
-      }
-      const fromPos = state.positions.get(edge.from);
-      const toPos = state.positions.get(edge.to);
-      const fromDelta = deltas.get(edge.from);
-      const toDelta = deltas.get(edge.to);
-      if (!fromPos || !toPos || !fromDelta || !toDelta) {
-        return;
-      }
-      const dx = toPos.x - fromPos.x;
-      const dy = toPos.y - fromPos.y;
-      const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-      const force = (distance - 240) * 0.013;
-      fromDelta.x += dx / distance * force;
-      fromDelta.y += dy / distance * force;
-      toDelta.x -= dx / distance * force;
-      toDelta.y -= dy / distance * force;
-    });
-
-    nodes.forEach(node => {
-      const current = state.positions.get(node.id);
-      const delta = deltas.get(node.id);
-      if (!current || !delta) {
-        return;
-      }
-      const anchor = clusterAnchors.get(node.id);
-      if (anchor) {
-        delta.x += (anchor.x - current.x) * 0.016;
-        delta.y += (anchor.y - current.y) * 0.016;
-      }
-      state.positions.set(node.id, {
-        x: current.x + Math.max(-9, Math.min(9, delta.x)),
-        y: current.y + Math.max(-9, Math.min(9, delta.y))
-      });
-    });
-  }
-}
-
-function seedLeafForcePositions(nodes) {
-  const lanes = new Map();
-  nodes.forEach(node => {
-    const lane = getLeafTier(node.type);
-    const list = lanes.get(lane) || [];
-    list.push(node);
-    lanes.set(lane, list);
-  });
-
-  const center = { x: 540, y: 360 };
-  lanes.forEach((laneNodes, lane) => {
-    const radius = lane * 140 + 40;
-    laneNodes
-      .slice()
-      .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id)))
-      .forEach((node, index) => {
-        const angle = (Math.PI * 2 * index) / Math.max(1, laneNodes.length) - Math.PI / 2;
-        state.positions.set(node.id, {
-          x: center.x + Math.cos(angle) * radius + lane * 12,
-          y: center.y + Math.sin(angle) * radius
-        });
-      });
-  });
-}
-
-function buildClusterAnchors(nodes) {
-  const center = { x: 540, y: 360 };
-  const anchors = new Map();
-  const groups = new Map();
-
-  nodes.forEach(node => {
-    const cluster = getLeafClusterName(node.type);
-    const list = groups.get(cluster) || [];
-    list.push(node);
-    groups.set(cluster, list);
-  });
-
-  const orderedClusters = ['Frontend', 'API', 'Service', 'Worker', 'Resource', 'External', 'Infra', 'Other'];
-  orderedClusters.forEach((clusterName, clusterIndex) => {
-    const members = groups.get(clusterName) || [];
-    if (!members.length) {
-      return;
-    }
-    const ring = Math.max(1, Math.floor(clusterIndex / 2) + 1);
-    const baseRadius = 120 + ring * 130;
-    const baseAngle = ((clusterIndex % 8) / 8) * Math.PI * 2 - Math.PI / 2;
-    members
-      .slice()
-      .sort((left, right) => String(left.label || left.id).localeCompare(String(right.label || right.id)))
-      .forEach((node, memberIndex) => {
-        const spread = members.length <= 1 ? 0 : (memberIndex - (members.length - 1) / 2) * 0.18;
-        const radius = baseRadius + (memberIndex % 3) * 18;
-        anchors.set(node.id, {
-          x: center.x + Math.cos(baseAngle + spread) * radius,
-          y: center.y + Math.sin(baseAngle + spread) * radius
-        });
-      });
-  });
-
-  return anchors;
-}
-
-function getLeafTier(nodeType) {
-  if (['Service', 'Workflow', 'WorkflowNode', 'WorkflowEdge'].includes(nodeType)) return 1;
-  if (['ApiRoute', 'CliCommand', 'RpcEndpoint', 'FrontendEntry', 'FrontendComponent'].includes(nodeType)) return 2;
-  if (['Worker', 'Task', 'Queue', 'Scheduler', 'EventConsumer', 'MessageProducer'].includes(nodeType)) return 3;
-  if (['DataStore', 'ObjectStore', 'Cache', 'FileSystem', 'ExternalApi', 'ExternalTool', 'ModelProvider', 'Config', 'Secret', 'Kernel', 'Plugin'].includes(nodeType)) return 4;
-  return 5;
-}
-
-function setupPanAndZoom() {
-  let panning = false;
-  let last = null;
-
-  dom.svg.addEventListener('pointerdown', event => {
-    if (event.target.closest && event.target.closest('.runtime-node')) {
-      return;
-    }
-    panning = true;
-    last = { x: event.clientX, y: event.clientY };
-    dom.svg.classList.add('dragging');
-  });
-
-  window.addEventListener('pointermove', event => {
-    if (state.draggingNodeId) {
-      dragNode(event);
-      return;
-    }
-    if (!panning || !last) {
-      return;
-    }
-    state.transform.x += event.clientX - last.x;
-    state.transform.y += event.clientY - last.y;
-    last = { x: event.clientX, y: event.clientY };
-    applyTransform();
-  });
-
-  window.addEventListener('pointerup', () => {
-    panning = false;
-    state.draggingNodeId = null;
-    dom.svg.classList.remove('dragging');
-  });
-
-  dom.svg.addEventListener('wheel', event => {
-    event.preventDefault();
-    const scale = event.deltaY > 0 ? 0.9 : 1.1;
-    state.transform.k = Math.max(0.15, Math.min(3, state.transform.k * scale));
-    applyTransform();
-  }, { passive: false });
-
-  dom.svg.addEventListener('click', event => {
-    if (event.target === dom.svg) {
-      resetStateAndRender();
-    }
-  });
-}
-
-function startNodeDrag(event, nodeId) {
-  state.draggingNodeId = nodeId;
-  event.stopPropagation();
-}
-
-function dragNode(event) {
-  if (!state.draggingNodeId) {
-    return;
-  }
-  const position = clientToGraph(event.clientX, event.clientY);
-  state.positions.set(state.draggingNodeId, position);
-  renderGraph();
-}
-
-function clientToGraph(clientX, clientY) {
-  const rect = dom.svg.getBoundingClientRect();
-  return {
-    x: (clientX - rect.left - state.transform.x) / state.transform.k,
-    y: (clientY - rect.top - state.transform.y) / state.transform.k
-  };
-}
-
-function applyTransform() {
-  dom.viewport.setAttribute(
-    'transform',
-    'translate(' + state.transform.x + ',' + state.transform.y + ') scale(' + state.transform.k + ')'
-  );
-}
-
-function fitSoon() {
-  setTimeout(fitView, 40);
-}
-
-function fitView() {
-  const graph = getVisibleGraph();
-  if (!graph.nodes.length) {
-    return;
-  }
-  const xs = graph.nodes.map(node => state.positions.get(node.id)?.x || 0);
-  const ys = graph.nodes.map(node => state.positions.get(node.id)?.y || 0);
-  const minX = Math.min(...xs) - 150;
-  const maxX = Math.max(...xs) + 150;
-  const minY = Math.min(...ys) - 90;
-  const maxY = Math.max(...ys) + 90;
-  const rect = dom.svg.getBoundingClientRect();
-  const scale = Math.max(
-    0.15,
-    Math.min(
-      1.5,
-      Math.min(rect.width / Math.max(1, maxX - minX), rect.height / Math.max(1, maxY - minY))
-    )
-  );
-  state.transform.k = scale;
-  state.transform.x = (rect.width - (minX + maxX) * scale) / 2;
-  state.transform.y = (rect.height - (minY + maxY) * scale) / 2;
-  applyTransform();
-}
-
-function buildCountMap(values) {
-  const map = new Map();
-  values.forEach(value => map.set(value, (map.get(value) || 0) + 1));
-  return map;
-}
-
-function truncate(value, maxLength) {
-  const text = String(value || '');
-  return text.length > maxLength ? text.slice(0, maxLength - 3) + '...' : text;
-}
-
-function cssSafe(value) {
-  return String(value || '').replace(/[^\w-]/g, '_');
+function elapsedMs(startedAt) {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  return Math.max(0, Math.round(now - startedAt));
 }
 
 function esc(value) {
-  return String(value ?? '').replace(/[&<>"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[char]));
+  return String(value ?? '').replace(/[&<>"]/g, function(char) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]); });
 }
 
 function escAttr(value) {
@@ -1666,5 +601,4 @@ function escAttr(value) {
 }
 
 </script>
-</body>
-</html>
+</body></html>

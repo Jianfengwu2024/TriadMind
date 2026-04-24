@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "project": "triadmind-core",
-  "generatedAt": "2026-04-23T12:37:00.943Z",
+  "generatedAt": "2026-04-24T02:22:39.870Z",
   "view": "full",
   "nodes": [
     {
@@ -295,22 +295,6 @@
       "framework": "bullmq",
       "evidence": [
         {
-          "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 593,
-          "column": 13,
-          "kind": "call",
-          "text": "classList.add('dimmed'",
-          "confidence": 0.75
-        },
-        {
-          "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1650,
-          "column": 13,
-          "kind": "call",
-          "text": "classList.add('dragging'",
-          "confidence": 0.75
-        },
-        {
           "sourcePath": "visualizer.ts",
           "line": 630,
           "column": 556,
@@ -318,8 +302,7 @@
           "text": "classList.add('dimmed'",
           "confidence": 0.75
         }
-      ],
-      "metadata": {}
+      ]
     },
     {
       "id": "Service.detect",
@@ -399,37 +382,11 @@
       "framework": "bullmq",
       "evidence": [
         {
-          "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 593,
-          "column": 13,
-          "kind": "call",
-          "text": "classList.add('dimmed'",
-          "confidence": 0.75
-        },
-        {
           "sourcePath": "visualizer.ts",
           "line": 630,
           "column": 556,
           "kind": "call",
           "text": "classList.add('dimmed'",
-          "confidence": 0.75
-        }
-      ],
-      "metadata": {}
-    },
-    {
-      "id": "Task.dragging",
-      "type": "Task",
-      "label": "dragging",
-      "sourcePath": "runtime/runtimeVisualizer.ts",
-      "framework": "bullmq",
-      "evidence": [
-        {
-          "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1650,
-          "column": 13,
-          "kind": "call",
-          "text": "classList.add('dragging'",
           "confidence": 0.75
         }
       ]
@@ -696,40 +653,6 @@
         }
       ],
       "id": "RuntimeEdge.Service.runtime/runtimeLabeling.writes.DataStore.Postgres"
-    },
-    {
-      "from": "Service.runtime/runtimeVisualizer",
-      "to": "Task.dimmed",
-      "type": "enqueues",
-      "confidence": 0.65,
-      "evidence": [
-        {
-          "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 593,
-          "column": 13,
-          "kind": "call",
-          "text": "classList.add('dimmed'",
-          "confidence": 0.65
-        }
-      ],
-      "id": "RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dimmed"
-    },
-    {
-      "from": "Service.runtime/runtimeVisualizer",
-      "to": "Task.dragging",
-      "type": "enqueues",
-      "confidence": 0.65,
-      "evidence": [
-        {
-          "sourcePath": "runtime/runtimeVisualizer.ts",
-          "line": 1650,
-          "column": 13,
-          "kind": "call",
-          "text": "classList.add('dragging'",
-          "confidence": 0.65
-        }
-      ],
-      "id": "RuntimeEdge.Service.runtime/runtimeVisualizer.enqueues.Task.dragging"
     },
     {
       "from": "Service.visualizer",
