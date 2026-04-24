@@ -183,6 +183,11 @@ bash .triadmind/session-bootstrap.sh
 .triadmind\session-bootstrap.cmd
 ```
 
+仓库还提供可直接复用的会话脚本示例：
+
+- `docs/tm-session.sh`
+- `docs/tm-session.ps1`
+
 `govern` 退出码：
 
 - `0`: pass
@@ -279,6 +284,9 @@ triadmind sync --force && triadmind runtime --visualize --view full && triadmind
 ## 9. 相关文档
 
 - `user guide.md`
+- `docs/dummy-user-guide.md`
+- `docs/tm-session.sh`
+- `docs/tm-session.ps1`
 - `docs/upgrade.md`
 - `.github/workflows/triadmind-verify.yml`
 - `.triadmind/govern-policy.json`

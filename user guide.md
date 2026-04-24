@@ -336,3 +336,9 @@ Recommended CI order:
 triadmind bootstrap doctor --json
 triadmind govern ci --policy .triadmind/govern-policy.json --json
 ```
+
+## 12. Quickstart Docs Added
+
+- Zero-knowledge quickstart guide: `docs/dummy-user-guide.md`
+- Linux/macOS session script example: `docs/tm-session.sh`
+- Windows PowerShell session script example: `docs/tm-session.ps1`
