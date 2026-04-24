@@ -8,6 +8,15 @@ export type TriadLanguage = 'typescript' | 'javascript' | 'python' | 'go' | 'rus
 export type TriadParserEngine = 'native' | 'tree-sitter';
 export type TriadScanMode = 'leaf' | 'capability' | 'module' | 'domain';
 export type HelperVerbPolicy = 'suppress' | 'allow';
+export type GhostPolicyLanguageKey = TriadLanguage | 'default';
+
+export interface GhostLanguagePolicy {
+    includeInDemand: boolean;
+    topK: number;
+    minConfidence: number;
+}
+
+export type GhostPolicyByLanguage = Partial<Record<GhostPolicyLanguageKey, GhostLanguagePolicy>>;
 
 export interface TriadConfig {
     schemaVersion: string;
@@ -35,6 +44,7 @@ export interface TriadConfig {
         ignoreGenericContracts: boolean;
         genericContractIgnoreList: string[];
         includeUntaggedExports: boolean;
+        ghostPolicyByLanguage: GhostPolicyByLanguage;
         jsDocTags: {
             triadNode: string;
             leftBranch: string;
@@ -162,6 +172,48 @@ const DEFAULT_CONFIG: TriadConfig = {
             'list[any]'
         ],
         includeUntaggedExports: true,
+        ghostPolicyByLanguage: {
+            default: {
+                includeInDemand: true,
+                topK: 5,
+                minConfidence: 4
+            },
+            python: {
+                includeInDemand: false,
+                topK: 0,
+                minConfidence: 5
+            },
+            javascript: {
+                includeInDemand: false,
+                topK: 0,
+                minConfidence: 5
+            },
+            typescript: {
+                includeInDemand: true,
+                topK: 4,
+                minConfidence: 4
+            },
+            java: {
+                includeInDemand: true,
+                topK: 4,
+                minConfidence: 4
+            },
+            go: {
+                includeInDemand: true,
+                topK: 4,
+                minConfidence: 4
+            },
+            rust: {
+                includeInDemand: true,
+                topK: 4,
+                minConfidence: 5
+            },
+            cpp: {
+                includeInDemand: true,
+                topK: 3,
+                minConfidence: 4
+            }
+        },
         jsDocTags: {
             triadNode: 'TriadNode',
             leftBranch: 'LeftBranch',
@@ -431,6 +483,7 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             genericContractIgnoreList: mergeGenericContractIgnoreList(value.parser?.genericContractIgnoreList),
             includeUntaggedExports:
                 value.parser?.includeUntaggedExports ?? DEFAULT_CONFIG.parser.includeUntaggedExports,
+            ghostPolicyByLanguage: normalizeGhostPolicyByLanguage(value.parser?.ghostPolicyByLanguage),
             jsDocTags: {
                 triadNode: value.parser?.jsDocTags?.triadNode ?? DEFAULT_CONFIG.parser.jsDocTags.triadNode,
                 leftBranch: value.parser?.jsDocTags?.leftBranch ?? DEFAULT_CONFIG.parser.jsDocTags.leftBranch,
@@ -574,6 +627,27 @@ function normalizeRelativeOutputFile(value: string | undefined, fallback: string
 
 function mergeGenericContractIgnoreList(value: string[] | undefined) {
     return mergeStringList(value, DEFAULT_CONFIG.parser.genericContractIgnoreList);
+}
+
+function normalizeGhostPolicyByLanguage(value: GhostPolicyByLanguage | undefined): GhostPolicyByLanguage {
+    const merged: GhostPolicyByLanguage = {
+        ...DEFAULT_CONFIG.parser.ghostPolicyByLanguage,
+        ...(value ?? {})
+    };
+
+    const normalized: GhostPolicyByLanguage = {};
+    const keys: GhostPolicyLanguageKey[] = ['default', 'typescript', 'javascript', 'python', 'go', 'rust', 'cpp', 'java'];
+    for (const key of keys) {
+        const policy = merged[key];
+        const fallback = DEFAULT_CONFIG.parser.ghostPolicyByLanguage[key] ?? DEFAULT_CONFIG.parser.ghostPolicyByLanguage.default!;
+        normalized[key] = {
+            includeInDemand: policy?.includeInDemand ?? fallback.includeInDemand,
+            topK: normalizeNonNegativeInteger(policy?.topK, fallback.topK),
+            minConfidence: normalizeNonNegativeInteger(policy?.minConfidence, fallback.minConfidence)
+        };
+    }
+
+    return normalized;
 }
 
 function matchesSourcePathPattern(normalizedPath: string, pattern: string) {

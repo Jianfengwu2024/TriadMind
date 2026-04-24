@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { loadTriadConfig, TriadLanguage } from './config';
 import { RuntimeMap } from './runtime/types';
 import { calculateRuntimeRenderStats } from './runtime/runtimeVisualizer';
 import { WorkspacePaths } from './workspace';
@@ -17,6 +18,9 @@ export interface VerifyMetrics {
     runtime_unmatched_route_count: number;
     diagnostics_total: number;
     diagnostics_no_code: number;
+    ghost_ratio_by_language: Record<string, number>;
+    ghost_in_demand_count_by_language: Record<string, number>;
+    ghost_policy_violations: number;
 }
 
 export interface VerifyThresholds {
@@ -25,6 +29,7 @@ export interface VerifyThresholds {
     ghost_ratio: number;
     rendered_edges_consistency: boolean;
     runtime_unmatched_route_count?: number;
+    ghost_policy_compliance: boolean;
 }
 
 export interface VerifyCheckResult {
@@ -66,8 +71,16 @@ export interface VerifyOptions {
 
 type TriadNodeLike = {
     nodeId?: string;
+    sourcePath?: string;
     fission?: {
         demand?: unknown[];
+        evidence?: {
+            ghostReads?: Array<{
+                raw?: string;
+                retainedInDemand?: boolean;
+                score?: number;
+            }>;
+        };
     };
 };
 
@@ -84,6 +97,7 @@ const GHOST_DEMAND_PATTERN = /^\[Ghost:[^\]]+\]/i;
 
 export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions = {}): VerifyReport {
     const triadNodes = readTriadNodes(paths.mapFile);
+    const config = loadTriadConfig(paths);
     const runtimeMap = readRuntimeMap(paths.runtimeMapFile);
     const runtimeDiagnostics = readRuntimeDiagnostics(paths.runtimeDiagnosticsFile);
     const runtimeRenderStats = runtimeMap
@@ -99,6 +113,14 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
     const runtimeEdges = runtimeMap?.edges?.length ?? 0;
     const renderedRuntimeEdges = runtimeRenderStats.renderedEdges;
     const renderedEdgesConsistency = runtimeMap ? renderedRuntimeEdges === runtimeEdges : false;
+    const ghostByLanguage = collectGhostMetricsByLanguage(triadNodes);
+    const ghostPolicyViolations = evaluateGhostPolicyViolations(
+        triadNodes,
+        config.parser.ghostPolicyByLanguage as Record<
+            string,
+            { includeInDemand: boolean; topK: number; minConfidence: number } | undefined
+        >
+    );
 
     const baseline = readVerifyBaseline(resolveBaselinePath(paths, options.baselinePath));
     const unresolvedUnmatchedLimit =
@@ -110,7 +132,8 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
         execute_like_ratio: normalizeRatioThreshold(options.maxExecuteLikeRatio, 0.1),
         ghost_ratio: normalizeRatioThreshold(options.maxGhostRatio, 0.4),
         rendered_edges_consistency: true,
-        runtime_unmatched_route_count: unresolvedUnmatchedLimit
+        runtime_unmatched_route_count: unresolvedUnmatchedLimit,
+        ghost_policy_compliance: true
     };
 
     const metrics: VerifyMetrics = {
@@ -125,7 +148,10 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
         rendered_edges_consistency: renderedEdgesConsistency,
         runtime_unmatched_route_count: runtimeUnmatchedRouteCount,
         diagnostics_total: runtimeDiagnostics.length,
-        diagnostics_no_code: diagnosticsNoCode
+        diagnostics_no_code: diagnosticsNoCode,
+        ghost_ratio_by_language: ghostByLanguage.ghostRatioByLanguage,
+        ghost_in_demand_count_by_language: ghostByLanguage.ghostInDemandCountByLanguage,
+        ghost_policy_violations: ghostPolicyViolations.length
     };
 
     const checks: VerifyCheckResult[] = [
@@ -155,6 +181,16 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
             'runtime_unmatched_route_count',
             metrics.runtime_unmatched_route_count,
             thresholds.runtime_unmatched_route_count
+        )
+    );
+    checks.push(
+        evaluateBooleanThreshold(
+            'ghost_policy_compliance',
+            metrics.ghost_policy_violations === 0,
+            thresholds.ghost_policy_compliance,
+            metrics.ghost_policy_violations > 0
+                ? ghostPolicyViolations.join('; ')
+                : 'Language ghost policy constraints satisfied'
         )
     );
 
@@ -202,7 +238,10 @@ export function formatVerifyReport(report: VerifyReport) {
         `generatedAt=${report.generatedAt}`,
         `triad_nodes=${report.metrics.triad_nodes}, runtime_nodes=${report.metrics.runtime_nodes}, runtime_edges=${report.metrics.runtime_edges}`,
         `execute_like_ratio=${report.metrics.execute_like_ratio.toFixed(3)}, ghost_ratio=${report.metrics.ghost_ratio.toFixed(3)}`,
+        `ghost_ratio_by_language=${JSON.stringify(report.metrics.ghost_ratio_by_language)}`,
+        `ghost_in_demand_count_by_language=${JSON.stringify(report.metrics.ghost_in_demand_count_by_language)}`,
         `diagnostics_no_code=${report.metrics.diagnostics_no_code}, runtime_unmatched_route_count=${report.metrics.runtime_unmatched_route_count}`,
+        `ghost_policy_violations=${report.metrics.ghost_policy_violations}`,
         `rendered_runtime_edges=${report.metrics.rendered_runtime_edges}, rendered_edges_consistency=${report.metrics.rendered_edges_consistency}`,
         ...checkLines
     ].join('\n');
@@ -227,7 +266,8 @@ function evaluateNumericThreshold(
 function evaluateBooleanThreshold(
     key: keyof VerifyThresholds,
     actual: boolean,
-    expected: boolean
+    expected: boolean,
+    detailHint?: string
 ): VerifyCheckResult {
     const pass = actual === expected;
     return {
@@ -235,7 +275,7 @@ function evaluateBooleanThreshold(
         status: pass ? 'pass' : 'fail',
         expected,
         actual,
-        detail: `must equal ${expected}`
+        detail: detailHint ?? `must equal ${expected}`
     };
 }
 
@@ -353,6 +393,103 @@ function isExecuteLikeNodeId(nodeId: string | undefined) {
 function hasGhostDemand(node: TriadNodeLike) {
     const demand = node.fission?.demand ?? [];
     return Array.isArray(demand) && demand.some((entry) => GHOST_DEMAND_PATTERN.test(String(entry ?? '').trim()));
+}
+
+function collectGhostMetricsByLanguage(triadNodes: TriadNodeLike[]) {
+    const totalByLanguage = new Map<string, number>();
+    const ghostDemandByLanguage = new Map<string, number>();
+
+    for (const node of triadNodes) {
+        const language = inferLanguageFromSourcePath(node.sourcePath);
+        totalByLanguage.set(language, (totalByLanguage.get(language) ?? 0) + 1);
+        if (hasGhostDemand(node)) {
+            ghostDemandByLanguage.set(language, (ghostDemandByLanguage.get(language) ?? 0) + 1);
+        }
+    }
+
+    const ghostRatioByLanguage: Record<string, number> = {};
+    const ghostInDemandCountByLanguage: Record<string, number> = {};
+    for (const [language, total] of totalByLanguage.entries()) {
+        const ghostCount = ghostDemandByLanguage.get(language) ?? 0;
+        ghostRatioByLanguage[language] = safeRatio(ghostCount, total);
+        ghostInDemandCountByLanguage[language] = ghostCount;
+    }
+
+    return {
+        ghostRatioByLanguage,
+        ghostInDemandCountByLanguage
+    };
+}
+
+function evaluateGhostPolicyViolations(
+    triadNodes: TriadNodeLike[],
+    policyByLanguage: Record<string, { includeInDemand: boolean; topK: number; minConfidence: number } | undefined>
+) {
+    const violations: string[] = [];
+    for (const node of triadNodes) {
+        const language = inferLanguageFromSourcePath(node.sourcePath);
+        const policy = resolveLanguageGhostPolicy(language, policyByLanguage);
+        const demandEntries = Array.isArray(node.fission?.demand) ? node.fission!.demand! : [];
+        const ghostDemandEntries = demandEntries.filter((entry) =>
+            GHOST_DEMAND_PATTERN.test(String(entry ?? '').trim())
+        );
+        if (!policy.includeInDemand && ghostDemandEntries.length > 0) {
+            violations.push(`${language}:${node.nodeId ?? 'unknown'} disallows ghost in demand`);
+            continue;
+        }
+        if (policy.includeInDemand && ghostDemandEntries.length > policy.topK) {
+            violations.push(
+                `${language}:${node.nodeId ?? 'unknown'} ghost demand ${ghostDemandEntries.length} exceeds topK=${policy.topK}`
+            );
+        }
+
+        const retainedGhostReads = (node.fission?.evidence?.ghostReads ?? []).filter((entry) => entry?.retainedInDemand);
+        const lowConfidenceGhost = retainedGhostReads.find(
+            (entry) => Number(entry?.score ?? 0) < policy.minConfidence
+        );
+        if (lowConfidenceGhost) {
+            violations.push(
+                `${language}:${node.nodeId ?? 'unknown'} retained ghost score ${Number(
+                    lowConfidenceGhost.score ?? 0
+                )} below minConfidence=${policy.minConfidence}`
+            );
+        }
+    }
+
+    return dedupeStrings(violations).slice(0, 50);
+}
+
+function resolveLanguageGhostPolicy(
+    language: string,
+    policyByLanguage: Record<string, { includeInDemand: boolean; topK: number; minConfidence: number } | undefined>
+) {
+    const fallback = policyByLanguage.default ?? {
+        includeInDemand: true,
+        topK: 5,
+        minConfidence: 4
+    };
+    const policy = policyByLanguage[language] ?? fallback;
+    return {
+        includeInDemand: policy.includeInDemand,
+        topK: Math.max(0, Math.floor(policy.topK)),
+        minConfidence: Math.max(0, Number(policy.minConfidence))
+    };
+}
+
+function inferLanguageFromSourcePath(sourcePath: string | undefined): TriadLanguage | 'unknown' {
+    const normalized = String(sourcePath ?? '').toLowerCase();
+    if (/\.(ts|tsx|mts|cts)$/.test(normalized)) return 'typescript';
+    if (/\.(js|jsx|mjs|cjs)$/.test(normalized)) return 'javascript';
+    if (/\.py$/.test(normalized)) return 'python';
+    if (/\.go$/.test(normalized)) return 'go';
+    if (/\.rs$/.test(normalized)) return 'rust';
+    if (/\.(cc|cpp|cxx|hpp|hh|h)$/.test(normalized)) return 'cpp';
+    if (/\.java$/.test(normalized)) return 'java';
+    return 'unknown';
+}
+
+function dedupeStrings(values: string[]) {
+    return Array.from(new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean)));
 }
 
 function safeRatio(part: number, total: number) {

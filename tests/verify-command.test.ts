@@ -101,6 +101,8 @@ test('verify --json reports runtime edge consistency and governance metrics', ()
     assert.equal(report.metrics.rendered_runtime_edges, 1);
     assert.equal(report.metrics.rendered_edges_consistency, true);
     assert.equal(report.metrics.runtime_unmatched_route_count, 1);
+    assert.ok(typeof report.metrics.ghost_ratio_by_language === 'object');
+    assert.ok(typeof report.metrics.ghost_in_demand_count_by_language === 'object');
 });
 
 test('verify --strict fails when diagnostics contain missing code', () => {
@@ -116,4 +118,26 @@ test('verify --strict fails when diagnostics contain missing code', () => {
     assert.equal(result.status, 1, `verify --strict should fail but returned ${result.status}`);
     assert.match(result.stdout, /diagnostics_no_code/i);
     assert.match(result.stdout, /\[FAIL\]/);
+});
+
+test('verify --strict fails when language ghost policy is violated', () => {
+    const root = createVerifyFixture([
+        {
+            level: 'info',
+            code: 'RUNTIME_FRONTEND_API_ROUTE_UNMATCHED',
+            extractor: 'FrontendApiCallExtractor',
+            message: 'baseline warning'
+        }
+    ]);
+
+    const result = runCli(root, ['verify', '--strict', '--json']);
+    assert.equal(result.status, 1, `verify --strict should fail on language ghost policy violations`);
+    const jsonStart = result.stdout.indexOf('{');
+    assert.ok(jsonStart >= 0, 'verify --strict --json did not emit json payload');
+    const report = JSON.parse(result.stdout.slice(jsonStart));
+    assert.equal(report.metrics.ghost_policy_violations > 0, true);
+    assert.equal(
+        report.checks.some((check: { key?: string; status?: string }) => check.key === 'ghost_policy_compliance' && check.status === 'fail'),
+        true
+    );
 });

@@ -124,6 +124,48 @@
       "list[any]"
     ],
     "includeUntaggedExports": true,
+    "ghostPolicyByLanguage": {
+      "default": {
+        "includeInDemand": true,
+        "topK": 5,
+        "minConfidence": 4
+      },
+      "typescript": {
+        "includeInDemand": true,
+        "topK": 4,
+        "minConfidence": 4
+      },
+      "javascript": {
+        "includeInDemand": false,
+        "topK": 0,
+        "minConfidence": 5
+      },
+      "python": {
+        "includeInDemand": false,
+        "topK": 0,
+        "minConfidence": 5
+      },
+      "go": {
+        "includeInDemand": true,
+        "topK": 4,
+        "minConfidence": 4
+      },
+      "rust": {
+        "includeInDemand": true,
+        "topK": 4,
+        "minConfidence": 5
+      },
+      "cpp": {
+        "includeInDemand": true,
+        "topK": 3,
+        "minConfidence": 4
+      },
+      "java": {
+        "includeInDemand": true,
+        "topK": 4,
+        "minConfidence": 4
+      }
+    },
     "jsDocTags": {
       "triadNode": "TriadNode",
       "leftBranch": "LeftBranch",

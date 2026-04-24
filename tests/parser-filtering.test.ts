@@ -97,6 +97,16 @@ function createTestConfig(): TriadConfig {
                 'list[any]'
             ],
             includeUntaggedExports: true,
+            ghostPolicyByLanguage: {
+                default: { includeInDemand: true, topK: 5, minConfidence: 4 },
+                python: { includeInDemand: false, topK: 0, minConfidence: 5 },
+                javascript: { includeInDemand: false, topK: 0, minConfidence: 5 },
+                typescript: { includeInDemand: true, topK: 4, minConfidence: 4 },
+                java: { includeInDemand: true, topK: 4, minConfidence: 4 },
+                go: { includeInDemand: true, topK: 4, minConfidence: 4 },
+                rust: { includeInDemand: true, topK: 4, minConfidence: 5 },
+                cpp: { includeInDemand: true, topK: 3, minConfidence: 4 }
+            },
             jsDocTags: {
                 triadNode: 'TriadNode',
                 leftBranch: 'LeftBranch',
@@ -201,7 +211,7 @@ class TestUserService:
     assert.equal(nodes.some((node) => node.sourcePath.includes('tests/')), false);
 });
 
-test('magic, private, and helper methods fold into execute instead of becoming capability nodes', () => {
+test('magic/private/helper methods fold into aggregate capability instead of execute entrypoints', () => {
     const nodes = parseFixture({
         'src/backend/nodes/geo_recon_node.py': `
 class GeoReconNode:
@@ -221,7 +231,7 @@ class GeoReconNode:
 `
     });
 
-    assert.deepEqual(nodes.map((node) => node.nodeId), ['GeoReconNode.execute']);
+    assert.deepEqual(nodes.map((node) => node.nodeId), ['GeoReconNode.capability']);
     assert.deepEqual(nodes[0].topology?.foldedLeaves?.sort(), ['GeoReconNode._load_manifest', 'GeoReconNode.build_cache_key', 'GeoReconNode.execute']);
 });
 
@@ -261,7 +271,7 @@ class UserService:
     assert.equal(nodes.some((node) => /types|schemas/.test(node.sourcePath)), false);
 });
 
-test('utils default to no promotion except explicit execution-style actions', () => {
+test('utils default to module aggregate capability when evidence is insufficient', () => {
     const nodes = parseFixture({
         'src/backend/utils/cache_tools.py': `
 def get_cache_key(entry: CacheEntry) -> str:
@@ -272,7 +282,7 @@ def run_cache_gc(command: CacheCommand) -> CacheResult:
 `
     });
 
-    assert.deepEqual(nodes.map((node) => node.nodeId), ['CacheTools.run_cache_gc']);
+    assert.deepEqual(nodes.map((node) => node.nodeId), ['CacheTools.module_pipeline']);
 });
 
 test('leaf-map stores implementation detail while triad-map stores promoted capabilities', () => {
@@ -290,7 +300,7 @@ class GeoReconNode:
 `
     });
 
-    assert.deepEqual(triadMap.map((node) => node.nodeId), ['GeoReconNode.execute']);
+    assert.deepEqual(triadMap.map((node) => node.nodeId), ['GeoReconNode.capability']);
     assert.deepEqual(leafMap.map((node) => node.nodeId).sort(), [
         'GeoReconNode._load_manifest',
         'GeoReconNode.build_cache_key',
@@ -327,7 +337,7 @@ test('ghost demand governance moves low-signal ghost demand into evidence', () =
 test('ghost demand governance keeps top-k high-signal runtime ghosts', () => {
     const governed = applyGhostDemandGovernance(
         'WorkflowService.dispatch',
-        'src/backend/workflows/dispatch_service.py',
+        'src/backend/workflows/dispatch_service.ts',
         [
             'RunCommand (command)',
             '[Ghost:ReadWrite] RedisClient (cache.redis)',
@@ -347,4 +357,74 @@ test('ghost demand governance keeps top-k high-signal runtime ghosts', () => {
         governed.demand.some((entry) => /^\[Ghost:/.test(entry)),
         'expected at least one retained ghost demand entry'
     );
+});
+
+test('language-aware ghost policy keeps python/javascript ghost only in evidence', () => {
+    const config = createTestConfig();
+    const pythonGoverned = applyGhostDemandGovernance(
+        'WorkflowService.run',
+        'src/backend/workflows/run_workflow.py',
+        ['RunCommand (command)', '[Ghost:ReadWrite] RedisClient (cache.redis)'],
+        ['RunResult'],
+        config
+    );
+    const javascriptGoverned = applyGhostDemandGovernance(
+        'WorkflowService.run',
+        'src/frontend/workflow/run_workflow.js',
+        ['RunCommand (command)', '[Ghost:ReadWrite] RedisClient (cache.redis)'],
+        ['RunResult'],
+        config
+    );
+
+    assert.equal(pythonGoverned.demand.some((entry) => /^\[Ghost:/.test(entry)), false);
+    assert.equal(javascriptGoverned.demand.some((entry) => /^\[Ghost:/.test(entry)), false);
+    assert.equal(pythonGoverned.ghostReads.length > 0, true);
+    assert.equal(javascriptGoverned.ghostReads.length > 0, true);
+    assert.equal(pythonGoverned.ghostReads.every((entry) => entry.retainedInDemand === false), true);
+    assert.equal(javascriptGoverned.ghostReads.every((entry) => entry.retainedInDemand === false), true);
+});
+
+test('language-aware ghost policy keeps top-k high-confidence ghost for ts/java/go/rust', () => {
+    const config = createTestConfig();
+    const demand = [
+        'RunCommand (command)',
+        '[Ghost:ReadWrite] RedisClient (cache.redis)',
+        '[Ghost:Read] PostgresSession (db.session)',
+        '[Ghost:Read] QueueClient (queue.dispatch)',
+        '[Ghost:Read] MinioClient (storage.minio)',
+        '[Ghost:Read] HttpClient (external.api)',
+        '[Ghost:Read] ModelProvider (model.provider)'
+    ];
+    const languages = [
+        'src/backend/services/runtime.ts',
+        'src/backend/services/runtime.java',
+        'src/backend/services/runtime.go',
+        'src/backend/services/runtime.rs'
+    ];
+
+    languages.forEach((sourcePath) => {
+        const governed = applyGhostDemandGovernance(
+            'WorkflowService.dispatch',
+            sourcePath,
+            demand,
+            ['RunResult'],
+            config
+        );
+        const retainedGhostCount = governed.ghostReads.filter((entry) => entry.retainedInDemand).length;
+        assert.ok(retainedGhostCount > 0);
+        assert.ok(retainedGhostCount <= 4);
+        assert.ok(governed.demand.some((entry) => /^\[Ghost:/.test(entry)));
+    });
+});
+
+test('base or abstract execute-like classes are suppressed from capability promotion', () => {
+    const nodes = parseFixture({
+        'src/backend/services/base_processor.py': `
+class BaseProcessor:
+    def execute(self, payload: dict) -> dict:
+        return payload
+`
+    });
+
+    assert.equal(nodes.some((node) => node.nodeId === 'BaseProcessor.execute'), false);
 });

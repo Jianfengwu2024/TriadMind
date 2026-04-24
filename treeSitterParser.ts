@@ -12,6 +12,7 @@ import chalk from 'chalk';
 import {
     createSourcePathFilter,
     describeSourceScanScope,
+    GhostLanguagePolicy,
     isIgnorableFsError,
     shouldSkipWalkPath,
     TriadConfig,
@@ -38,6 +39,7 @@ interface TriadNode {
                 retainedInDemand: boolean;
                 score: number;
             }>;
+            promotionReasons?: string[];
         };
     };
     topology?: {
@@ -105,12 +107,15 @@ const FILE_PATTERNS: Record<TriadLanguage, RegExp> = {
     java: /\.java$/i
 };
 
+let ACTIVE_PARSER_CONFIG: TriadConfig | undefined;
+
 export function runTreeSitterParser(
     language: TriadLanguage,
     targetDir: string,
     outputPath: string,
     config: TriadConfig
 ) {
+    ACTIVE_PARSER_CONFIG = config;
     console.log(chalk.gray(`   - [Parser] scanning ${language} via tree-sitter...`));
 
     const parser = new Parser();
@@ -1807,6 +1812,7 @@ type CapabilityCandidateRecord = {
     answer?: string[];
     isExported?: boolean;
     decorators?: string[];
+    promotionReasons?: string[];
 };
 
 type SourceCapabilityPolicy = 'api' | 'services' | 'nodes' | 'tasks' | 'utils' | 'types' | 'migrations' | 'tests' | 'other';
@@ -1821,9 +1827,12 @@ const HARD_SUPPRESSED_HELPER_PREFIXES = [
 const CONDITIONAL_HELPER_PREFIXES = ['get', 'list', 'create', 'load', 'save', 'ensure', 'read', 'write', 'sync'];
 const UTILS_ALLOWED_CAPABILITY_PREFIXES = ['run', 'detect', 'analyze', 'apply'];
 const NODE_ENTRYPOINT_PREFIXES = ['execute', 'run', 'process'];
-const EXECUTE_LIKE_METHOD_PATTERN = /^(execute|run|handle|process|dispatch|apply|invoke|orchestrate|schedule|plan)(?:$|[_A-Z])/i;
-const GHOST_DEMAND_TOP_K = 5;
-const GHOST_DEMAND_KEEP_SCORE = 4;
+const EXECUTE_LIKE_METHOD_PATTERN = /^(execute|run|handle|process|dispatch|apply|invoke|orchestrate|schedule|plan|do)(?:$|[_A-Z])/i;
+const DEFAULT_GHOST_POLICY: GhostLanguagePolicy = {
+    includeInDemand: true,
+    topK: 5,
+    minConfidence: 4
+};
 
 function isConfiguredNoiseCapability(name: string, config?: TriadConfig) {
     const trimmedName = name.trim();
@@ -2011,7 +2020,6 @@ function shouldPromoteCapabilityByScore(
         return false;
     }
 
-    let score = 0;
     const decorators = record?.decorators ?? [];
     const demand = record?.demand ?? [];
     const answer = record?.answer ?? [];
@@ -2021,25 +2029,94 @@ function shouldPromoteCapabilityByScore(
     const hasDomainSignal = hasDomainContract(demand, config) || hasDomainContract(answer, config);
     const hasWorkflowSignal = isWorkflowLikeName(name) || (className ? isWorkflowLikeName(className) : false);
     const isExecuteLike = isExecuteLikeMethodName(name);
-    const isAbstractContainer = Boolean(className) && /^(base|abstract)/i.test(className ?? '');
+    const isSuppressedOwner = isSuppressedPromotionOwner(className);
+    const evidenceReasons = derivePromotionEvidenceReasons(name, sourcePath, className, demand, answer, decorators);
 
-    if (isExported || record?.isExported) score += 2;
-    if (hasDecoratorSignal) score += 4;
-    if (isPrimary) score += 2;
-    if (hasWorkflowSignal) score += 3;
-    if (isContainer) score += 1;
+    if (isSuppressedOwner) {
+        return false;
+    }
+    if (evidenceReasons.length < 2) {
+        return false;
+    }
+    if (isExecuteLike && !hasDomainSignal && !hasDecoratorSignal && !hasWorkflowSignal) {
+        return false;
+    }
+
+    let score = 0;
+    if (isExported || record?.isExported) score += 1;
+    if (hasDecoratorSignal) score += 3;
+    if (isPrimary) score += 1;
+    if (hasWorkflowSignal) score += 2;
+    if (isContainer && !isExecuteLike) score += 1;
     if (CAPABILITY_ACTION_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 1;
-    if (hasDomainSignal) score += 4;
-    if (sourcePolicy === 'api' && hasCapabilityDecorator(record)) score += 3;
+    if (hasDomainSignal) score += 3;
+    if (sourcePolicy === 'api' && hasCapabilityDecorator(record)) score += 2;
     if ((sourcePolicy === 'tasks' || sourcePolicy === 'nodes') && (isPrimary || hasWorkflowSignal)) score += 2;
-    if (sourcePolicy === 'services' && (hasDomainSignal || hasWorkflowSignal)) score += 2;
+    if (sourcePolicy === 'services' && (hasDomainSignal || hasWorkflowSignal)) score += 1;
     if (sourcePolicy === 'utils' && UTILS_ALLOWED_CAPABILITY_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 1;
     if (helperClass === 'conditional') score -= 2;
     if (hasOnlyGenericContracts([...demand, ...answer], config)) score -= 3;
-    if (isAbstractContainer) score -= 3;
-    if (isExecuteLike && !hasDomainSignal && !hasDecoratorSignal) score -= 4;
+    if (isExecuteLike) score -= 3;
 
-    return score >= (config?.parser.capabilityThreshold ?? 4);
+    const threshold = config?.parser.capabilityThreshold ?? 4;
+    const promoted = score >= threshold;
+    if (promoted && record) {
+        record.promotionReasons = evidenceReasons;
+    }
+    return promoted;
+}
+
+function isSuppressedPromotionOwner(className?: string) {
+    if (!className) {
+        return false;
+    }
+    return /(base|abstract|container|wrapper)/i.test(className);
+}
+
+function derivePromotionEvidenceReasons(
+    methodName: string,
+    sourcePath: string,
+    className: string | undefined,
+    demand: string[],
+    answer: string[],
+    decorators: string[]
+) {
+    const reasons: string[] = [];
+    if (hasDomainContract(demand, ACTIVE_PARSER_CONFIG) || hasDomainContract(answer, ACTIVE_PARSER_CONFIG)) {
+        reasons.push('external_contract');
+    }
+    if (decorators.some((decorator) => CAPABILITY_DECORATOR_PATTERN.test(decorator)) || isWorkflowLikeName(methodName)) {
+        reasons.push('runtime_signal');
+    }
+    if (hasBusinessSemanticSignal(methodName, className, sourcePath)) {
+        reasons.push('business_semantic');
+    }
+    if (hasCrossModuleCallSignal(demand)) {
+        reasons.push('cross_module_call');
+    }
+    return dedupeStringEntries(reasons);
+}
+
+function hasBusinessSemanticSignal(methodName: string, className: string | undefined, sourcePath: string) {
+    const tokens = tokenizeSemanticName(`${methodName} ${className ?? ''} ${getSemanticSourcePathTail(sourcePath)}`);
+    const meaningfulTokens = tokens.filter((token) => !GENERIC_SUBJECT_TOKENS.has(token) && !GENERIC_METHOD_TOKENS.has(token));
+    return meaningfulTokens.length >= 2;
+}
+
+function hasCrossModuleCallSignal(demand: string[]) {
+    return demand
+        .filter((entry) => /^\[Ghost:/i.test(String(entry ?? '').trim()))
+        .some((entry) => {
+            const parsed = parseGhostDemandEntry(entry);
+            if (/^(self|this|ctx|context|state|data)$/i.test(parsed.target)) {
+                return false;
+            }
+            return (
+                parsed.target.includes('.') ||
+                isRuntimeResourceTarget(parsed.target) ||
+                !isUnknownLikeType(parsed.valueType)
+            );
+        });
 }
 
 function isWorkflowLikeName(value: string) {
@@ -5160,7 +5237,23 @@ function createTriadNode(
     foldedLeaves: string[] = []
 ): TriadNode {
     const methodName = nodeId.split('.').pop() ?? 'execute';
-    const governedContracts = applyGhostDemandGovernance(nodeId, sourcePath, demand, answer);
+    const governedContracts = applyGhostDemandGovernance(nodeId, sourcePath, demand, answer, ACTIVE_PARSER_CONFIG);
+    const promotionReasons = derivePromotionEvidenceReasons(methodName, sourcePath, nodeId.split('.').slice(0, -1).join('.'), demand, answer, []);
+    const evidence =
+        governedContracts.ghostReads.length > 0 || promotionReasons.length > 0
+            ? {
+                  ...(governedContracts.ghostReads.length > 0
+                      ? {
+                            ghostReads: governedContracts.ghostReads
+                        }
+                      : {}),
+                  ...(promotionReasons.length > 0
+                      ? {
+                            promotionReasons
+                        }
+                      : {})
+              }
+            : undefined;
     return {
         nodeId,
         category,
@@ -5169,20 +5262,22 @@ function createTriadNode(
             problem: deriveCapabilityProblem(nodeId, sourcePath, demand, answer, problem ?? `execute ${methodName} flow`),
             demand: governedContracts.demand.length > 0 ? governedContracts.demand : ['None'],
             answer: answer.length > 0 ? answer : ['void'],
-            evidence:
-                governedContracts.ghostReads.length > 0
-                    ? {
-                          ghostReads: governedContracts.ghostReads
-                      }
-                    : undefined
+            evidence
         },
         topology: foldedLeaves.length > 0 ? { foldedLeaves } : undefined
     };
 }
 
-export function applyGhostDemandGovernance(nodeId: string, sourcePath: string, demand: string[], answer: string[]) {
+export function applyGhostDemandGovernance(
+    nodeId: string,
+    sourcePath: string,
+    demand: string[],
+    answer: string[],
+    config?: TriadConfig
+) {
     const normalizedDemand = demand.length > 0 ? demand.map((entry) => String(entry ?? '').trim()).filter(Boolean) : [];
     const nonGhostDemand = normalizedDemand.filter((entry) => !isGhostDemandEntry(entry) && !/^none$/i.test(entry));
+    const ghostPolicy = resolveGhostPolicyForSourcePath(sourcePath, config ?? ACTIVE_PARSER_CONFIG);
     const ghostRecords = normalizedDemand
         .filter((entry) => isGhostDemandEntry(entry))
         .map((entry) => {
@@ -5196,9 +5291,10 @@ export function applyGhostDemandGovernance(nodeId: string, sourcePath: string, d
         })
         .sort((left, right) => right.score - left.score);
 
-    const keepGhostInDemand = shouldKeepGhostInDemand(nodeId, sourcePath, nonGhostDemand, answer);
+    const keepGhostInDemand =
+        ghostPolicy.includeInDemand && shouldKeepGhostInDemand(nodeId, sourcePath, nonGhostDemand, answer);
     const keptGhostRecords = keepGhostInDemand
-        ? ghostRecords.filter((entry) => entry.score >= GHOST_DEMAND_KEEP_SCORE).slice(0, GHOST_DEMAND_TOP_K)
+        ? ghostRecords.filter((entry) => entry.score >= ghostPolicy.minConfidence).slice(0, ghostPolicy.topK)
         : [];
     const keptGhostSet = new Set(keptGhostRecords.map((entry) => entry.raw));
     const governedDemand = dedupeStringEntries([...nonGhostDemand, ...keptGhostRecords.map((entry) => entry.raw)]);
@@ -5214,6 +5310,30 @@ export function applyGhostDemandGovernance(nodeId: string, sourcePath: string, d
             score: entry.score
         }))
     };
+}
+
+function resolveGhostPolicyForSourcePath(sourcePath: string, config?: TriadConfig) {
+    const language = detectSourceLanguageFromPath(sourcePath);
+    const policyByLanguage = config?.parser.ghostPolicyByLanguage ?? {};
+    const fallback = policyByLanguage.default ?? DEFAULT_GHOST_POLICY;
+    const languagePolicy = language ? policyByLanguage[language] : undefined;
+    return {
+        includeInDemand: languagePolicy?.includeInDemand ?? fallback.includeInDemand ?? DEFAULT_GHOST_POLICY.includeInDemand,
+        topK: Math.max(0, languagePolicy?.topK ?? fallback.topK ?? DEFAULT_GHOST_POLICY.topK),
+        minConfidence: Math.max(0, languagePolicy?.minConfidence ?? fallback.minConfidence ?? DEFAULT_GHOST_POLICY.minConfidence)
+    };
+}
+
+function detectSourceLanguageFromPath(sourcePath: string): TriadLanguage | undefined {
+    const normalized = normalizePath(String(sourcePath ?? '').toLowerCase());
+    if (/\.(ts|tsx|mts|cts)$/.test(normalized)) return 'typescript';
+    if (/\.(js|jsx|mjs|cjs)$/.test(normalized)) return 'javascript';
+    if (/\.py$/.test(normalized)) return 'python';
+    if (/\.go$/.test(normalized)) return 'go';
+    if (/\.rs$/.test(normalized)) return 'rust';
+    if (/\.(cc|cpp|cxx|hpp|hh|h)$/.test(normalized)) return 'cpp';
+    if (/\.java$/.test(normalized)) return 'java';
+    return undefined;
 }
 
 function deriveCapabilityProblem(
