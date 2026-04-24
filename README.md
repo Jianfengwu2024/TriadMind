@@ -490,6 +490,7 @@ Reviewer controls:
 - `triadmind govern check --policy .triadmind/govern-policy.json --json` runs fail-closed hard gate checks and writes `govern-report.json` / `govern-audit.log`
 - `triadmind govern ci --policy .triadmind/govern-policy.json --json` is CI fail-fast entrypoint with explicit exit codes (2/3/4/5/6/7)
 - `triadmind govern fix --policy .triadmind/govern-policy.json --llm <provider:model> --max-iterations 3 --dry-run` emits `govern-fixes.patch` without changing policy/baseline
+- hard gate baseline lives at `.triadmind/verify-baseline.json` and should be reviewed via CODEOWNERS before updates
 - `triadmind trend` generates `.triadmind/trend.json` + `.triadmind/trend-report.md` for drift weekly reporting
 - CI sample is included at `.github/workflows/triadmind-verify.yml`
 - capability visualizer now defaults to fast fallback unless strict fingerprint is explicitly requested

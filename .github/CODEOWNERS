@@ -1,0 +1,3 @@
+# TriadMind governance gate files require manual maintainer approval.
+/.triadmind/govern-policy.json @Jianfengwu2024
+/.triadmind/verify-baseline.json @Jianfengwu2024
