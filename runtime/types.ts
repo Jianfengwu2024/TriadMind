@@ -86,10 +86,10 @@ export type RuntimeView = 'workflow' | 'request-flow' | 'resources' | 'events' |
 
 export interface RuntimeDiagnostic {
     level: 'info' | 'warning' | 'error';
+    code: string;
+    extractor: string;
     message: string;
     sourcePath?: string;
-    extractor?: string;
-    code?: string;
 }
 
 export interface RuntimeMap {

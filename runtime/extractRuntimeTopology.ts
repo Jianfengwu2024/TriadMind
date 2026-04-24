@@ -17,6 +17,7 @@ import { workflowRegistryExtractor } from './extractors/workflowRegistryExtracto
 import { resourceAccessExtractor } from './extractors/resourceAccessExtractor';
 import { configInfraExtractor } from './extractors/configInfraExtractor';
 import { collectRuntimeSourceFiles } from './collectRuntimeSourceFiles';
+import { normalizeRuntimeDiagnostics } from './runtimeDiagnostics';
 
 export async function extractRuntimeTopology(
     projectRoot: string,
@@ -57,7 +58,7 @@ export async function extractRuntimeTopology(
             const patch = await extractor.extract(context);
             nodes.push(...(patch.nodes ?? []));
             edges.push(...(patch.edges ?? []));
-            diagnostics.push(...(patch.diagnostics ?? []));
+            diagnostics.push(...normalizeRuntimeDiagnostics(patch.diagnostics ?? [], extractor.name));
         } catch (error: any) {
             const diagnostic: RuntimeDiagnostic = {
                 level: 'error',
@@ -88,7 +89,7 @@ export async function extractRuntimeTopology(
         view,
         nodes: mergeRuntimeNodes(nodes),
         edges: mergeRuntimeEdges(edges),
-        diagnostics
+        diagnostics: normalizeRuntimeDiagnostics(diagnostics, 'RuntimeOrchestrator')
     };
 
     return filterRuntimeMapByView(fullMap, view);

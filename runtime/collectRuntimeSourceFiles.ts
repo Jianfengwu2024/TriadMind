@@ -20,7 +20,7 @@ export function collectRuntimeSourceFiles(
         onDiagnostic(diagnostic) {
             diagnostics.push({
                 level: diagnostic.level,
-                code: diagnostic.code,
+                code: diagnostic.code ?? `RUNTIME_SOURCE_WALK_${diagnostic.level.toUpperCase()}`,
                 sourcePath: diagnostic.sourcePath,
                 extractor: 'RuntimeSourceCollector',
                 message: diagnostic.message

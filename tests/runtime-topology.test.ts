@@ -53,6 +53,30 @@ export async function runItem() {
     assert.ok(runtimeMap.edges.some((edge) => edge.type === 'calls' && /ApiRoute\.(POST|UNKNOWN)\./.test(edge.to)));
 });
 
+test('frontend api call matcher resolves template/query/prefix variants without warning', async () => {
+    const root = writeFixture({
+        'backend/api/items.py': `
+from fastapi import APIRouter
+router = APIRouter(prefix="/api/v1")
+
+@router.post("/items/{id}/run")
+async def run_item(id: str):
+    return {"ok": True}
+`,
+        'frontend/src/pages/items.tsx': `
+const id = "123";
+fetch(\`/api/v1/items/\${id}/run?x=1\`, { method: "POST" });
+`
+    });
+
+    const runtimeMap = await extractRuntimeTopology(root, { includeFrontend: true, frameworkHint: 'fastapi' });
+    assert.ok(runtimeMap.edges.some((edge) => edge.type === 'calls' && edge.to === 'ApiRoute.POST./api/v1/items/{id}/run'));
+    assert.equal(
+        runtimeMap.diagnostics?.some((diagnostic) => diagnostic.code === 'RUNTIME_FRONTEND_API_ROUTE_UNMATCHED'),
+        false
+    );
+});
+
 test('Celery task extraction creates task worker queue and executes edge', async () => {
     const root = writeFixture({
         'backend/tasks.py': `
@@ -149,7 +173,32 @@ def ok():
 
     const runtimeMap = await extractRuntimeTopology(root, { extractors: [brokenExtractor] });
     assert.equal(runtimeMap.schemaVersion, '1.0');
-    assert.ok(runtimeMap.diagnostics?.some((diagnostic) => diagnostic.extractor === 'BrokenExtractor' && diagnostic.level === 'error'));
+    assert.ok(
+        runtimeMap.diagnostics?.some(
+            (diagnostic) =>
+                diagnostic.extractor === 'BrokenExtractor' &&
+                diagnostic.level === 'error' &&
+                diagnostic.code === 'RUNTIME_EXTRACTOR_FAILED'
+        )
+    );
+});
+
+test('runtime diagnostics are normalized with required code/extractor/message fields', async () => {
+    const root = writeFixture({
+        'frontend/src/app.tsx': `
+fetch("/api/unknown/path", { method: "POST" });
+`
+    });
+
+    const runtimeMap = await extractRuntimeTopology(root, { includeFrontend: true });
+    const diagnostics = runtimeMap.diagnostics ?? [];
+    assert.ok(diagnostics.length > 0);
+    diagnostics.forEach((diagnostic) => {
+        assert.ok(diagnostic.level === 'info' || diagnostic.level === 'warning' || diagnostic.level === 'error');
+        assert.ok(typeof diagnostic.code === 'string' && diagnostic.code.length > 0);
+        assert.ok(typeof diagnostic.extractor === 'string' && diagnostic.extractor.length > 0);
+        assert.ok(typeof diagnostic.message === 'string' && diagnostic.message.length > 0);
+    });
 });
 
 test('runtime source collection tolerates recoverable fs permission errors', async () => {

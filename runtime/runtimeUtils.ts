@@ -163,11 +163,57 @@ export function labelFromPath(relativePath: string) {
 }
 
 export function normalizeApiPath(pathValue: string) {
-    let value = pathValue.trim();
+    let value = String(pathValue ?? '').trim();
+    if (!value) {
+        return '/';
+    }
+
+    value = value.replace(/\$\{[^}]+\}/g, ':param');
+
+    if (/^https?:\/\//i.test(value)) {
+        try {
+            const parsed = new URL(value);
+            value = parsed.pathname;
+        } catch {
+            // keep raw value when URL parsing fails
+        }
+    }
+
+    value = value.split(/[?#]/)[0] ?? value;
+
     if (!value.startsWith('/')) {
         value = `/${value}`;
     }
-    return value.replace(/\/+/g, '/');
+    value = value.replace(/\/+/g, '/');
+    if (value.length > 1 && value.endsWith('/')) {
+        value = value.slice(0, -1);
+    }
+    return value;
+}
+
+export function normalizeApiComparablePath(pathValue: string) {
+    return normalizeApiPath(pathValue).replace(/\{[^/}]+\}|\[[^/\]]+\]|:[A-Za-z_][\w-]*/g, ':param');
+}
+
+export function buildApiPathVariants(pathValue: string) {
+    const normalized = normalizeApiPath(pathValue);
+    const variants = new Set<string>([normalized, normalizeApiComparablePath(normalized)]);
+
+    const withoutApiPrefix = normalized.replace(/^\/api(?:\/v\d+)?(?=\/|$)/i, '');
+    if (withoutApiPrefix && withoutApiPrefix !== normalized) {
+        const candidate = normalizeApiPath(withoutApiPrefix);
+        variants.add(candidate);
+        variants.add(normalizeApiComparablePath(candidate));
+    }
+
+    const withoutVersionPrefix = normalized.replace(/^\/v\d+(?=\/|$)/i, '');
+    if (withoutVersionPrefix && withoutVersionPrefix !== normalized) {
+        const candidate = normalizeApiPath(withoutVersionPrefix);
+        variants.add(candidate);
+        variants.add(normalizeApiComparablePath(candidate));
+    }
+
+    return Array.from(variants);
 }
 
 export function apiRouteId(method: string, routePath: string) {

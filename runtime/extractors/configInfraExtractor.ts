@@ -62,6 +62,7 @@ function extractDockerCompose(
         if (!node) {
             diagnostics.push({
                 level: 'info',
+                code: 'RUNTIME_INFRA_SERVICE_SKIPPED_UNKNOWN_CATEGORY',
                 extractor: 'ConfigInfraExtractor',
                 message: `Skipped docker-compose service without known runtime category: ${serviceName}`,
                 sourcePath: file.relativePath
@@ -181,6 +182,7 @@ function extractKubernetes(
     });
     diagnostics.push({
         level: 'info',
+        code: 'RUNTIME_INFRA_K8S_RESOURCE_CAPTURED',
         extractor: 'ConfigInfraExtractor',
         message: `Captured Kubernetes ${kind} ${name}`,
         sourcePath: file.relativePath

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "project": "triadmind-core",
-  "generatedAt": "2026-04-24T02:22:39.870Z",
+  "generatedAt": "2026-04-24T03:04:43.058Z",
   "view": "full",
   "nodes": [
     {
@@ -89,7 +89,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 195,
+          "line": 197,
           "column": 25,
           "kind": "import",
           "text": "postgres",
@@ -97,7 +97,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 196,
+          "line": 198,
           "column": 42,
           "kind": "import",
           "text": "Postgres",
@@ -105,7 +105,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 196,
+          "line": 198,
           "column": 67,
           "kind": "import",
           "text": "Postgres",
@@ -113,7 +113,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 215,
+          "line": 217,
           "column": 25,
           "kind": "import",
           "text": "postgres",
@@ -121,7 +121,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 216,
+          "line": 218,
           "column": 42,
           "kind": "import",
           "text": "Postgres",
@@ -129,7 +129,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 216,
+          "line": 218,
           "column": 67,
           "kind": "import",
           "text": "Postgres",
@@ -171,7 +171,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1253,
+          "line": 1264,
           "column": 19,
           "kind": "import",
           "text": "spawn(",
@@ -222,7 +222,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 201,
+          "line": 203,
           "column": 25,
           "kind": "import",
           "text": "minio",
@@ -230,7 +230,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 202,
+          "line": 204,
           "column": 44,
           "kind": "import",
           "text": "MinIO",
@@ -238,7 +238,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 202,
+          "line": 204,
           "column": 68,
           "kind": "import",
           "text": "MinIO",
@@ -246,7 +246,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 221,
+          "line": 223,
           "column": 25,
           "kind": "import",
           "text": "minio",
@@ -254,7 +254,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 222,
+          "line": 224,
           "column": 44,
           "kind": "import",
           "text": "MinIO",
@@ -262,7 +262,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 222,
+          "line": 224,
           "column": 68,
           "kind": "import",
           "text": "MinIO",
@@ -331,7 +331,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1247,
+          "line": 1258,
           "column": 7,
           "kind": "inferred",
           "text": "function openFile(",
@@ -426,7 +426,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 195,
+          "line": 197,
           "column": 25,
           "kind": "call",
           "text": "postgres",
@@ -434,7 +434,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 196,
+          "line": 198,
           "column": 42,
           "kind": "call",
           "text": "Postgres",
@@ -442,7 +442,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 196,
+          "line": 198,
           "column": 67,
           "kind": "call",
           "text": "Postgres",
@@ -450,7 +450,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 215,
+          "line": 217,
           "column": 25,
           "kind": "call",
           "text": "postgres",
@@ -458,7 +458,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 216,
+          "line": 218,
           "column": 42,
           "kind": "call",
           "text": "Postgres",
@@ -466,7 +466,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 216,
+          "line": 218,
           "column": 67,
           "kind": "call",
           "text": "Postgres",
@@ -492,7 +492,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 201,
+          "line": 203,
           "column": 25,
           "kind": "call",
           "text": "minio",
@@ -500,7 +500,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 202,
+          "line": 204,
           "column": 44,
           "kind": "call",
           "text": "MinIO",
@@ -508,7 +508,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 202,
+          "line": 204,
           "column": 68,
           "kind": "call",
           "text": "MinIO",
@@ -516,7 +516,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 221,
+          "line": 223,
           "column": 25,
           "kind": "call",
           "text": "minio",
@@ -524,7 +524,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 222,
+          "line": 224,
           "column": 44,
           "kind": "call",
           "text": "MinIO",
@@ -532,7 +532,7 @@
         },
         {
           "sourcePath": "runtime/extractors/configInfraExtractor.ts",
-          "line": 222,
+          "line": 224,
           "column": 68,
           "kind": "call",
           "text": "MinIO",
@@ -550,7 +550,7 @@
       "evidence": [
         {
           "sourcePath": "cli.ts",
-          "line": 1253,
+          "line": 1264,
           "column": 19,
           "kind": "call",
           "text": "spawn(",

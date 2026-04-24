@@ -68,6 +68,12 @@ function writeRuntimeFixture(root: string) {
     };
 }
 
+function readRuntimePayloadFromHtml(html: string) {
+    const match = html.match(/const runtimePayload = (\{[\s\S]*?\});\s*const dashboardOptions = /);
+    assert.ok(match, 'runtimePayload bootstrap not found in generated html');
+    return JSON.parse(match[1]);
+}
+
 test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-runtime-v2-'));
     const fixture = writeRuntimeFixture(root);
@@ -106,6 +112,49 @@ test('runtime visualizer v2 html contains interactive graph bootstrap', () => {
     assert.match(html, /"theme":"runtime-dark"/);
 });
 
+test('runtime visualizer renders all runtime-map edges by default', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-runtime-v2-edge-default-'));
+    const fixture = writeRuntimeFixture(root);
+    const map = JSON.parse(fs.readFileSync(fixture.runtimeMapPath, 'utf-8'));
+    map.edges.push({
+        from: 'Service.ItemService.run',
+        to: 'UnknownRuntime.MissingNode',
+        type: 'depends_on',
+        confidence: 0.4
+    });
+    fs.writeFileSync(fixture.runtimeMapPath, JSON.stringify(map, null, 2), 'utf-8');
+
+    generateRuntimeDashboard(fixture.runtimeMapPath, fixture.runtimeVisualizerPath, {
+        layout: 'leaf-force'
+    });
+
+    const html = fs.readFileSync(fixture.runtimeVisualizerPath, 'utf-8');
+    const payload = readRuntimePayloadFromHtml(html);
+    assert.equal(payload.edges.length, map.edges.length);
+});
+
+test('runtime visualizer applies explicit maxRenderEdges cap only when provided', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-runtime-v2-edge-cap-'));
+    const fixture = writeRuntimeFixture(root);
+    const map = JSON.parse(fs.readFileSync(fixture.runtimeMapPath, 'utf-8'));
+    map.edges.push({
+        from: 'Service.ItemService.run',
+        to: 'ApiRoute.POST./items/{id}/run',
+        type: 'depends_on',
+        confidence: 0.2
+    });
+    fs.writeFileSync(fixture.runtimeMapPath, JSON.stringify(map, null, 2), 'utf-8');
+
+    generateRuntimeDashboard(fixture.runtimeMapPath, fixture.runtimeVisualizerPath, {
+        layout: 'leaf-force',
+        maxRenderEdges: 1
+    });
+
+    const html = fs.readFileSync(fixture.runtimeVisualizerPath, 'utf-8');
+    const payload = readRuntimePayloadFromHtml(html);
+    assert.equal(payload.edges.length, 1);
+});
+
 test('cli runtime --visualize smoke test writes interactive visualizer html', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-runtime-cli-'));
     fs.mkdirSync(path.join(root, 'backend'), { recursive: true });
@@ -137,6 +186,8 @@ async def run_item(id: str):
             'dagre',
             '--trace-depth',
             '2',
+            '--max-render-edges',
+            '1000',
             '--hide-isolated',
             '--theme',
             'runtime-dark'

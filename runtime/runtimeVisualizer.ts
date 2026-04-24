@@ -68,6 +68,8 @@ interface RuntimeDashboardPayload {
     edges: RuntimeVisualEdge[];
     legend: RuntimeLegendItem[];
     denseResourceNodeIds: string[];
+    sourceEdgeCount: number;
+    edgeCapApplied: boolean;
 }
 
 const GROUP_THEME: Record<RuntimeNodeGroup, { label: string; color: string; border: string; highlight: string }> = {
@@ -110,18 +112,20 @@ export function generateRuntimeDashboard(runtimeMapPath: string, outputPath: str
     console.log(
         `[TriadMind] Runtime visualizer mode: interactive=${dashboardOptions.interactive} layout=${dashboardOptions.layout} theme=${dashboardOptions.theme} view=${runtimeMapForView.view ?? 'full'} nodes=${payload.nodes.length} edges=${payload.edges.length} diagnostics=${(runtimeMapForView.diagnostics ?? []).length}`
     );
-    if (runtimeMapForView.edges.length > payload.edges.length) {
-        console.log(`[TriadMind] Runtime visualizer edge cap active: ${payload.edges.length}/${runtimeMapForView.edges.length}`);
+    if (payload.edgeCapApplied) {
+        console.log(`[TriadMind] Runtime visualizer edge cap active: ${payload.edges.length}/${payload.sourceEdgeCount}`);
     }
     console.log(`[TriadMind] Runtime dashboard generated in ${Date.now() - startedAt}ms`);
 }
 
-function buildRuntimeDashboardPayload(runtimeMap: RuntimeMap, maxRenderEdges: number): RuntimeDashboardPayload {
-    const graphIndex = buildRuntimeGraphIndex(runtimeMap);
+function buildRuntimeDashboardPayload(runtimeMap: RuntimeMap, maxRenderEdges?: number): RuntimeDashboardPayload {
+    const hydratedMap = ensureRuntimeMapHasEdgeEndpoints(runtimeMap);
+    const graphIndex = buildRuntimeGraphIndex(hydratedMap);
+    const edgeLimit = maxRenderEdges && maxRenderEdges > 0 ? maxRenderEdges : graphIndex.edges.length;
     const selectedEdges = graphIndex.edges
         .slice()
         .sort((left, right) => (right.confidence ?? 0) - (left.confidence ?? 0))
-        .slice(0, Math.max(1, maxRenderEdges));
+        .slice(0, Math.max(1, edgeLimit));
     const edgeIds = new Set(selectedEdges.map((edge) => edge.id));
     const degree = new Map<string, number>();
     selectedEdges.forEach((edge) => {
@@ -129,12 +133,20 @@ function buildRuntimeDashboardPayload(runtimeMap: RuntimeMap, maxRenderEdges: nu
         degree.set(edge.to, (degree.get(edge.to) ?? 0) + 1);
     });
 
-    const nodes: RuntimeVisualNode[] = runtimeMap.nodes.map((node) => toVisualNode(node, degree));
+    const nodes: RuntimeVisualNode[] = hydratedMap.nodes.map((node) => toVisualNode(node, degree));
     const nodeById = new Set(nodes.map((node) => node.id));
     const edges: RuntimeVisualEdge[] = selectedEdges.filter((edge) => nodeById.has(edge.from) && nodeById.has(edge.to) && edgeIds.has(edge.id)).map((edge) => toVisualEdge(edge));
     const legend = buildLegend(nodes);
     const denseResourceNodeIds = nodes.filter((node) => node._group === 'resource' && (degree.get(node.id) ?? 0) >= 12).map((node) => node.id);
-    return { runtimeMap, nodes, edges, legend, denseResourceNodeIds };
+    return {
+        runtimeMap: hydratedMap,
+        nodes,
+        edges,
+        legend,
+        denseResourceNodeIds,
+        sourceEdgeCount: graphIndex.edges.length,
+        edgeCapApplied: Boolean(maxRenderEdges && maxRenderEdges > 0 && graphIndex.edges.length > edgeLimit)
+    };
 }
 
 function toVisualNode(node: RuntimeNode, degreeMap: Map<string, number>): RuntimeVisualNode {
@@ -230,6 +242,43 @@ function normalizeRuntimeMapForVisualizer(runtimeMap: RuntimeMap): RuntimeMap {
     };
 }
 
+function ensureRuntimeMapHasEdgeEndpoints(runtimeMap: RuntimeMap): RuntimeMap {
+    const nodeById = new Map(runtimeMap.nodes.map((node) => [node.id, node]));
+    const nodes = [...runtimeMap.nodes];
+
+    for (const edge of runtimeMap.edges) {
+        for (const endpoint of [edge.from, edge.to]) {
+            if (nodeById.has(endpoint)) {
+                continue;
+            }
+            const inferredNode: RuntimeNode = {
+                id: endpoint,
+                type: 'UnknownRuntime',
+                label: endpoint,
+                category: 'core',
+                metadata: {
+                    generatedBy: 'RuntimeVisualizer',
+                    reason: 'dangling-edge-endpoint'
+                },
+                evidence: [
+                    {
+                        kind: 'inferred',
+                        text: `Synthesized runtime node for edge endpoint: ${endpoint}`,
+                        confidence: 0.4
+                    }
+                ]
+            };
+            nodeById.set(endpoint, inferredNode);
+            nodes.push(inferredNode);
+        }
+    }
+
+    return {
+        ...runtimeMap,
+        nodes
+    };
+}
+
 function buildLowSignalFallbackLabel(node: RuntimeNode) {
     const sourceName = node.sourcePath ? path.basename(node.sourcePath) : '';
     const handler =
@@ -247,18 +296,24 @@ function buildLowSignalFallbackLabel(node: RuntimeNode) {
     return `${node.type} ${node.id.split('.').slice(0, 2).join('.')}`;
 }
 
-function normalizeRuntimeDashboardOptions(options: RuntimeDashboardOptions): Required<Omit<RuntimeDashboardOptions, 'title'>> {
+function normalizeRuntimeDashboardOptions(
+    options: RuntimeDashboardOptions
+): Omit<Required<Omit<RuntimeDashboardOptions, 'title'>>, 'maxRenderEdges'> & { maxRenderEdges?: number } {
     return {
         interactive: options.interactive ?? true,
         layout: options.layout === 'dagre' ? 'dagre' : 'leaf-force',
         traceDepth: normalizePositiveInteger(options.traceDepth, 2),
         hideIsolated: options.hideIsolated ?? false,
-        maxRenderEdges: normalizePositiveInteger(options.maxRenderEdges, 2200),
+        maxRenderEdges: normalizeOptionalPositiveInteger(options.maxRenderEdges),
         theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
     };
 }
 
-function renderRuntimeDashboard(payload: RuntimeDashboardPayload, options: Required<Omit<RuntimeDashboardOptions, 'title'>>, title: string) {
+function renderRuntimeDashboard(
+    payload: RuntimeDashboardPayload,
+    options: Omit<Required<Omit<RuntimeDashboardOptions, 'title'>>, 'maxRenderEdges'> & { maxRenderEdges?: number },
+    title: string
+) {
     const safePayload = JSON.stringify(payload).replace(/</g, '\\u003c');
     const safeOptions = JSON.stringify(options).replace(/</g, '\\u003c');
     return `<!DOCTYPE html>
@@ -885,6 +940,10 @@ function truncate(value: string, maxLength: number) {
 
 function normalizePositiveInteger(value: number | undefined, fallback: number) {
     return Number.isFinite(value) && (value as number) > 0 ? Math.floor(value as number) : fallback;
+}
+
+function normalizeOptionalPositiveInteger(value: number | undefined) {
+    return Number.isFinite(value) && (value as number) > 0 ? Math.floor(value as number) : undefined;
 }
 
 function escapeHtml(value: string) {

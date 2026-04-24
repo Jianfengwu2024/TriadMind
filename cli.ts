@@ -225,6 +225,7 @@ program
     .option('--interactive', 'Generate interactive runtime topology visualizer', true)
     .option('--layout <leaf-force|dagre>', 'Runtime visualizer layout (legacy "force" maps to leaf-force)', 'leaf-force')
     .option('--trace-depth <n>', 'Default runtime trace depth', '2')
+    .option('--max-render-edges <n>', 'Optional runtime visualizer edge cap (default: no cap)')
     .option('--hide-isolated', 'Hide isolated runtime nodes in the visualizer')
     .option('--theme <leaf-like|runtime-dark>', 'Runtime visualizer theme', 'leaf-like')
     .action(async (options: {
@@ -236,6 +237,7 @@ program
         interactive?: boolean;
         layout?: string;
         traceDepth?: string;
+        maxRenderEdges?: string;
         hideIsolated?: boolean;
         theme?: string;
     }) => {
@@ -264,6 +266,7 @@ program
                 interactive: options.interactive !== false,
                 layout: options.layout === 'dagre' ? 'dagre' : 'leaf-force',
                 traceDepth: normalizePositiveCliInteger(options.traceDepth, 2),
+                maxRenderEdges: parseOptionalPositiveCliInteger(options.maxRenderEdges),
                 hideIsolated: Boolean(options.hideIsolated),
                 theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
             });
@@ -829,6 +832,14 @@ function normalizePositiveCliInteger(value: string | undefined, fallback: number
         return parsed;
     }
     return fallback;
+}
+
+function parseOptionalPositiveCliInteger(value: string | undefined) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+    }
+    return undefined;
 }
 
 function sniffProjectLanguage(projectRoot: string): TriadLanguage {
