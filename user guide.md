@@ -318,7 +318,11 @@ TypeScript 会保留显式业务类型，例如 `GeoTarget`、`GeoResult`；Java
 - `@triadmind runtime --visualize --layout dagre --trace-depth 2`：启用 Runtime Visualizer v2 交互链路图默认布局。
 - `@triadmind runtime --visualize --layout leaf-force --hide-isolated`：在大图中优先查看关键主链路。
 - `@triadmind runtime --visualize --theme leaf-like`：运行时图默认贴齐 `visualizer.html` 的 leaf 风格；`runtime-dark` 用于更强对比。
+- `@triadmind runtime --visualize --max-render-edges 500`：仅在显式配置时启用边截断；默认不截断。
 - `@triadmind sync` / `@triadmind init`：runtime 提取默认走 best-effort，权限目录和超大文件会写入 `runtime-diagnostics.json`，不会拖垮主流程。
+- `@triadmind verify --json`：输出可机读质量指标（diagnostics / execute-like / ghost / unmatched-route / rendered-edge consistency）。
+- `@triadmind verify --strict`：启用门禁阈值并在失败时返回非 0 退出码。
+- `@triadmind verify --strict --baseline .triadmind/verify-baseline.json`：启用 unmatched route 基线 +10% 规则。
 - capability `visualizer.html`：默认使用 fast fallback；只有显式 strict 模式才会走重指纹路径。
 - `visualizer.html` 页面左上角现在自带 `Architecture / Leaf` 按钮，可随时切换。
 

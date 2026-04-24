@@ -17,6 +17,13 @@ export interface RuntimeDashboardOptions {
     theme?: RuntimeVisualizerTheme;
 }
 
+export interface RuntimeRenderStats {
+    sourceEdges: number;
+    renderedEdges: number;
+    edgeCapApplied: boolean;
+    nodeCount: number;
+}
+
 type RuntimeNodeGroup = 'frontend' | 'api' | 'service' | 'workflow' | 'worker' | 'resource' | 'external' | 'infra' | 'other';
 
 interface RuntimeLegendItem {
@@ -116,6 +123,17 @@ export function generateRuntimeDashboard(runtimeMapPath: string, outputPath: str
         console.log(`[TriadMind] Runtime visualizer edge cap active: ${payload.edges.length}/${payload.sourceEdgeCount}`);
     }
     console.log(`[TriadMind] Runtime dashboard generated in ${Date.now() - startedAt}ms`);
+}
+
+export function calculateRuntimeRenderStats(runtimeMap: RuntimeMap, maxRenderEdges?: number): RuntimeRenderStats {
+    const runtimeMapForView = normalizeRuntimeMapForVisualizer(runtimeMap);
+    const payload = buildRuntimeDashboardPayload(runtimeMapForView, maxRenderEdges);
+    return {
+        sourceEdges: payload.sourceEdgeCount,
+        renderedEdges: payload.edges.length,
+        edgeCapApplied: payload.edgeCapApplied,
+        nodeCount: payload.nodes.length
+    };
 }
 
 function buildRuntimeDashboardPayload(runtimeMap: RuntimeMap, maxRenderEdges?: number): RuntimeDashboardPayload {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { runTreeSitterParser } from '../treeSitterParser';
+import { applyGhostDemandGovernance, runTreeSitterParser } from '../treeSitterParser';
 import { shouldExcludeSourcePath, TriadConfig } from '../config';
 
 type ParsedTriadNode = {
@@ -296,4 +296,55 @@ class GeoReconNode:
         'GeoReconNode.build_cache_key',
         'GeoReconNode.execute'
     ]);
+});
+
+test('execute-like generic service entrypoint is downgraded to aggregate capability', () => {
+    const nodes = parseFixture({
+        'src/backend/services/generic_service.py': `
+class GenericService:
+    def execute(self, payload: dict) -> dict:
+        return payload
+`
+    });
+
+    assert.equal(nodes.some((node) => node.nodeId === 'GenericService.execute'), false);
+    assert.equal(nodes.some((node) => node.nodeId === 'GenericService.capability'), true);
+});
+
+test('ghost demand governance moves low-signal ghost demand into evidence', () => {
+    const governed = applyGhostDemandGovernance(
+        'GenericService.execute',
+        'src/backend/services/generic_service.py',
+        ['dict (payload)', '[Ghost:Read] unknown (self.cache)'],
+        ['dict']
+    );
+
+    assert.deepEqual(governed.demand, ['dict (payload)']);
+    assert.equal(governed.ghostReads.length, 1);
+    assert.equal(governed.ghostReads[0].retainedInDemand, false);
+});
+
+test('ghost demand governance keeps top-k high-signal runtime ghosts', () => {
+    const governed = applyGhostDemandGovernance(
+        'WorkflowService.dispatch',
+        'src/backend/workflows/dispatch_service.py',
+        [
+            'RunCommand (command)',
+            '[Ghost:ReadWrite] RedisClient (cache.redis)',
+            '[Ghost:Read] PostgresSession (db.session)',
+            '[Ghost:Read] QueueClient (queue.dispatch)',
+            '[Ghost:Read] MinioClient (storage.minio)',
+            '[Ghost:Read] HttpClient (external.api)',
+            '[Ghost:Read] ModelProvider (model.provider)'
+        ],
+        ['RunResult']
+    );
+
+    const retainedGhostCount = governed.ghostReads.filter((entry) => entry.retainedInDemand).length;
+    assert.ok(retainedGhostCount > 0);
+    assert.ok(retainedGhostCount <= 5);
+    assert.ok(
+        governed.demand.some((entry) => /^\[Ghost:/.test(entry)),
+        'expected at least one retained ghost demand entry'
+    );
 });

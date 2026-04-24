@@ -1,7 +1,7 @@
 import { RuntimeDiagnostic } from './types';
 
 const DEFAULT_EXTRACTOR = 'RuntimeOrchestrator';
-const DEFAULT_CODE = 'RUNTIME_DIAGNOSTIC_UNCODED';
+const DEFAULT_CODE = 'RUNTIME_UNKNOWN_DIAGNOSTIC';
 
 type RuntimeDiagnosticInput = Partial<RuntimeDiagnostic> & {
     level?: RuntimeDiagnostic['level'];

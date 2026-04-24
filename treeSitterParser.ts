@@ -29,6 +29,16 @@ interface TriadNode {
         problem: string;
         demand: string[];
         answer: string[];
+        evidence?: {
+            ghostReads?: Array<{
+                raw: string;
+                mode: 'read' | 'read_write';
+                target: string;
+                valueType: string;
+                retainedInDemand: boolean;
+                score: number;
+            }>;
+        };
     };
     topology?: {
         foldedLeaves?: string[];
@@ -1382,7 +1392,10 @@ function collectTypeScriptClassCapabilityNodes(
     }
 
     const entrypoint = promotable.find((record) => isTypeScriptPrimaryCapabilityMethod(record.name, config));
-    if (entrypoint) {
+    if (
+        entrypoint &&
+        shouldPromoteTypeScriptCapability(entrypoint.name, sourcePath, className, false, config, entrypoint)
+    ) {
         const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, TYPESCRIPT_MAGIC_METHODS);
         return [
             createTriadNode(
@@ -1553,7 +1566,10 @@ function collectJavaScriptClassCapabilityNodes(
     }
 
     const entrypoint = promotable.find((record) => isJavaScriptPrimaryCapabilityMethod(record.name, config));
-    if (entrypoint) {
+    if (
+        entrypoint &&
+        shouldPromoteJavaScriptCapability(entrypoint.name, sourcePath, className, entrypoint.isExported, config, entrypoint)
+    ) {
         const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, JAVASCRIPT_MAGIC_METHODS);
         return [
             createTriadNode(
@@ -1805,6 +1821,9 @@ const HARD_SUPPRESSED_HELPER_PREFIXES = [
 const CONDITIONAL_HELPER_PREFIXES = ['get', 'list', 'create', 'load', 'save', 'ensure', 'read', 'write', 'sync'];
 const UTILS_ALLOWED_CAPABILITY_PREFIXES = ['run', 'detect', 'analyze', 'apply'];
 const NODE_ENTRYPOINT_PREFIXES = ['execute', 'run', 'process'];
+const EXECUTE_LIKE_METHOD_PATTERN = /^(execute|run|handle|process|dispatch|apply|invoke|orchestrate|schedule|plan)(?:$|[_A-Z])/i;
+const GHOST_DEMAND_TOP_K = 5;
+const GHOST_DEMAND_KEEP_SCORE = 4;
 
 function isConfiguredNoiseCapability(name: string, config?: TriadConfig) {
     const trimmedName = name.trim();
@@ -1998,21 +2017,27 @@ function shouldPromoteCapabilityByScore(
     const answer = record?.answer ?? [];
     const sourcePolicy = inferSourceCapabilityPolicy(sourcePath);
     const helperClass = classifyHelperVerb(name);
+    const hasDecoratorSignal = decorators.some((decorator) => CAPABILITY_DECORATOR_PATTERN.test(decorator));
+    const hasDomainSignal = hasDomainContract(demand, config) || hasDomainContract(answer, config);
+    const hasWorkflowSignal = isWorkflowLikeName(name) || (className ? isWorkflowLikeName(className) : false);
+    const isExecuteLike = isExecuteLikeMethodName(name);
+    const isAbstractContainer = Boolean(className) && /^(base|abstract)/i.test(className ?? '');
 
-    if (isExported || record?.isExported) score += 3;
-    if (decorators.some((decorator) => CAPABILITY_DECORATOR_PATTERN.test(decorator))) score += 4;
-    if (isPrimary) score += 4;
-    if (isWorkflowLikeName(name) || (className && isWorkflowLikeName(className))) score += 2;
-    if (isContainer) score += 2;
-    if (CAPABILITY_ACTION_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 2;
-    if (hasDomainContract(demand, config) || hasDomainContract(answer, config)) score += 2;
-    if (demand.some((entry) => /^\[Ghost/i.test(String(entry ?? '').trim()))) score += 2;
+    if (isExported || record?.isExported) score += 2;
+    if (hasDecoratorSignal) score += 4;
+    if (isPrimary) score += 2;
+    if (hasWorkflowSignal) score += 3;
+    if (isContainer) score += 1;
+    if (CAPABILITY_ACTION_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 1;
+    if (hasDomainSignal) score += 4;
     if (sourcePolicy === 'api' && hasCapabilityDecorator(record)) score += 3;
-    if ((sourcePolicy === 'tasks' || sourcePolicy === 'nodes') && isPrimary) score += 3;
-    if (sourcePolicy === 'services' && (isPrimary || isContainer)) score += 2;
-    if (sourcePolicy === 'utils' && UTILS_ALLOWED_CAPABILITY_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 2;
+    if ((sourcePolicy === 'tasks' || sourcePolicy === 'nodes') && (isPrimary || hasWorkflowSignal)) score += 2;
+    if (sourcePolicy === 'services' && (hasDomainSignal || hasWorkflowSignal)) score += 2;
+    if (sourcePolicy === 'utils' && UTILS_ALLOWED_CAPABILITY_PREFIXES.some((prefix) => hasNamePrefix(name, prefix))) score += 1;
     if (helperClass === 'conditional') score -= 2;
-    if (hasOnlyGenericContracts([...demand, ...answer], config)) score -= 2;
+    if (hasOnlyGenericContracts([...demand, ...answer], config)) score -= 3;
+    if (isAbstractContainer) score -= 3;
+    if (isExecuteLike && !hasDomainSignal && !hasDecoratorSignal) score -= 4;
 
     return score >= (config?.parser.capabilityThreshold ?? 4);
 }
@@ -2033,6 +2058,10 @@ function hasOnlyGenericContracts(entries: string[], config?: TriadConfig) {
         .map((entry) => extractContractTypeText(entry))
         .filter((entry): entry is string => Boolean(entry));
     return typeTexts.length > 0 && typeTexts.every((entry) => isIgnoredContractType(entry, config));
+}
+
+function isExecuteLikeMethodName(value: string) {
+    return EXECUTE_LIKE_METHOD_PATTERN.test(String(value ?? '').trim());
 }
 
 function extractContractTypeText(entry: string) {
@@ -2399,7 +2428,10 @@ function collectPythonClassCapabilityNodes(
     }
 
     const entrypoint = promotable.find((record) => isPythonPrimaryCapabilityMethod(record.name, config));
-    if (entrypoint) {
+    if (
+        entrypoint &&
+        shouldPromotePythonCapability(entrypoint.name, sourcePath, className, entrypoint.decorators, config, entrypoint)
+    ) {
         const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, PYTHON_MAGIC_METHODS);
         return [
             createTriadNode(
@@ -3362,7 +3394,7 @@ function collectGoCapabilityNodes(
         }
 
         const entrypoint = promotable.find((record) => isGoPrimaryCapabilityMethod(record.name, config));
-        if (entrypoint) {
+        if (entrypoint && shouldPromoteGoCapability(entrypoint.name, sourcePath, receiverType, config, entrypoint)) {
             const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, new Set<string>());
             triadGraph.push(
                 createTriadNode(
@@ -4355,7 +4387,7 @@ function collectCppCapabilityNodes(
         }
 
         const entrypoint = promotable.find((record) => isCppPrimaryCapabilityMethod(record.name, config));
-        if (entrypoint) {
+        if (entrypoint && shouldPromoteCppCapability(entrypoint.name, sourcePath, className, config, entrypoint)) {
             const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, CPP_MAGIC_METHODS);
             triadGraph.push(
                 createTriadNode(
@@ -4504,7 +4536,7 @@ function collectRustCapabilityNodes(
         }
 
         const entrypoint = promotable.find((record) => isRustPrimaryCapabilityMethod(record.name, config));
-        if (entrypoint) {
+        if (entrypoint && shouldPromoteRustCapability(entrypoint.name, sourcePath, implType, config, entrypoint)) {
             const foldedRecords = getFoldableCapabilityRecords(records, promotable, config, new Set<string>());
             triadGraph.push(
                 createTriadNode(
@@ -4610,7 +4642,7 @@ function collectJavaCapabilityNodes(
         }
 
         const entrypoint = records.find((record) => isJavaPrimaryCapabilityMethod(record.name, config));
-        if (entrypoint) {
+        if (entrypoint && shouldPromoteJavaCapability(entrypoint.name, sourcePath, className, config, entrypoint)) {
             const foldedRecords = getFoldableCapabilityRecords(records, records, config, JAVA_MAGIC_METHODS);
             triadGraph.push(
                 createTriadNode(
@@ -5128,16 +5160,59 @@ function createTriadNode(
     foldedLeaves: string[] = []
 ): TriadNode {
     const methodName = nodeId.split('.').pop() ?? 'execute';
+    const governedContracts = applyGhostDemandGovernance(nodeId, sourcePath, demand, answer);
     return {
         nodeId,
         category,
         sourcePath,
         fission: {
             problem: deriveCapabilityProblem(nodeId, sourcePath, demand, answer, problem ?? `execute ${methodName} flow`),
-            demand: demand.length > 0 ? demand : ['None'],
-            answer: answer.length > 0 ? answer : ['void']
+            demand: governedContracts.demand.length > 0 ? governedContracts.demand : ['None'],
+            answer: answer.length > 0 ? answer : ['void'],
+            evidence:
+                governedContracts.ghostReads.length > 0
+                    ? {
+                          ghostReads: governedContracts.ghostReads
+                      }
+                    : undefined
         },
         topology: foldedLeaves.length > 0 ? { foldedLeaves } : undefined
+    };
+}
+
+export function applyGhostDemandGovernance(nodeId: string, sourcePath: string, demand: string[], answer: string[]) {
+    const normalizedDemand = demand.length > 0 ? demand.map((entry) => String(entry ?? '').trim()).filter(Boolean) : [];
+    const nonGhostDemand = normalizedDemand.filter((entry) => !isGhostDemandEntry(entry) && !/^none$/i.test(entry));
+    const ghostRecords = normalizedDemand
+        .filter((entry) => isGhostDemandEntry(entry))
+        .map((entry) => {
+            const parsed = parseGhostDemandEntry(entry);
+            const score = scoreGhostDemand(parsed, nodeId, sourcePath);
+            return {
+                ...parsed,
+                raw: entry,
+                score
+            };
+        })
+        .sort((left, right) => right.score - left.score);
+
+    const keepGhostInDemand = shouldKeepGhostInDemand(nodeId, sourcePath, nonGhostDemand, answer);
+    const keptGhostRecords = keepGhostInDemand
+        ? ghostRecords.filter((entry) => entry.score >= GHOST_DEMAND_KEEP_SCORE).slice(0, GHOST_DEMAND_TOP_K)
+        : [];
+    const keptGhostSet = new Set(keptGhostRecords.map((entry) => entry.raw));
+    const governedDemand = dedupeStringEntries([...nonGhostDemand, ...keptGhostRecords.map((entry) => entry.raw)]);
+
+    return {
+        demand: governedDemand.length > 0 ? governedDemand : ['None'],
+        ghostReads: ghostRecords.map((entry) => ({
+            raw: entry.raw,
+            mode: entry.mode,
+            target: entry.target,
+            valueType: entry.valueType,
+            retainedInDemand: keptGhostSet.has(entry.raw),
+            score: entry.score
+        }))
     };
 }
 
@@ -5160,6 +5235,88 @@ function deriveCapabilityProblem(
     const subject = buildCapabilityProblemSubject(ownerName, methodName, sourcePath, demand, answer);
     const prefix = isLowSemanticSubject(subject, methodName, sourcePath) ? '[low_semantic_name] ' : '';
     return `${prefix}${capabilityType} Capability: ${verb} ${subject}`;
+}
+
+function shouldKeepGhostInDemand(nodeId: string, sourcePath: string, demand: string[], answer: string[]) {
+    const signalText = `${nodeId} ${sourcePath}`;
+    const hasRuntimeSemanticSignal =
+        /(workflow|pipeline|stage|step|node|service|task|worker|queue|scheduler|handler|controller|api|route|event|consumer)/i.test(
+            signalText
+        ) && !/(types?|schema|dto|entity|model)(\/|$)/i.test(sourcePath);
+
+    const hasMeaningfulContracts = [...demand, ...answer]
+        .map((entry) => extractContractTypeText(entry))
+        .filter((entry): entry is string => Boolean(entry))
+        .some((entry) => !isGenericContractType(entry));
+
+    return hasRuntimeSemanticSignal && hasMeaningfulContracts;
+}
+
+function isGhostDemandEntry(entry: string) {
+    return /^\[Ghost:[^\]]+\]/i.test(String(entry ?? '').trim());
+}
+
+function parseGhostDemandEntry(entry: string) {
+    const raw = String(entry ?? '').trim();
+    const match = raw.match(/^\[Ghost:(ReadWrite|Read)\]\s*(.*?)\s*\(([^()]+)\)\s*$/i);
+    if (!match) {
+        return {
+            mode: 'read' as const,
+            valueType: 'unknown',
+            target: raw.replace(/^\[Ghost:[^\]]+\]\s*/i, '') || 'unknown'
+        };
+    }
+
+    return {
+        mode: match[1].toLowerCase() === 'readwrite' ? ('read_write' as const) : ('read' as const),
+        valueType: normalizeTypeText(match[2] || 'unknown'),
+        target: String(match[3] ?? '').trim() || 'unknown'
+    };
+}
+
+function scoreGhostDemand(
+    ghost: {
+        mode: 'read' | 'read_write';
+        valueType: string;
+        target: string;
+    },
+    nodeId: string,
+    sourcePath: string
+) {
+    let score = 0;
+    if (ghost.mode === 'read_write') score += 2;
+    if (!isGenericContractType(ghost.valueType) && !isUnknownLikeType(ghost.valueType)) score += 3;
+    if (isRuntimeResourceTarget(ghost.target)) score += 2;
+    if (/(service|workflow|worker|task|queue|api|route|handler|controller)/i.test(`${nodeId} ${sourcePath}`)) score += 1;
+    if (/^(self|this|ctx|context|state|data)$/i.test(ghost.target)) score -= 2;
+    if (isUnknownLikeType(ghost.valueType)) score -= 1;
+    return score;
+}
+
+function isRuntimeResourceTarget(value: string) {
+    return /(redis|cache|db|database|session|postgres|mysql|mongo|minio|s3|queue|worker|task|workflow|pipeline|event|topic|client|http|api|tool|model|provider)/i.test(
+        String(value ?? '')
+    );
+}
+
+function isUnknownLikeType(value: string) {
+    return /^(unknown|any|none|null|undefined|module|object|dict|map|list|array|json)$/i.test(
+        String(value ?? '').trim()
+    );
+}
+
+function dedupeStringEntries(entries: string[]) {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const entry of entries) {
+        const normalized = String(entry ?? '').trim();
+        if (!normalized || seen.has(normalized)) {
+            continue;
+        }
+        seen.add(normalized);
+        result.push(normalized);
+    }
+    return result;
 }
 
 function isLowSemanticProblem(value: string) {

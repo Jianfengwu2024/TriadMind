@@ -482,6 +482,10 @@ Reviewer controls:
 - `triadmind runtime --visualize --layout dagre --trace-depth 2` enables v2 interactive runtime graph defaults
 - `triadmind runtime --visualize --layout leaf-force --hide-isolated` focuses on dense main paths in large graphs
 - `triadmind runtime --visualize --theme leaf-like` aligns runtime visual style with leaf visualizer defaults
+- `triadmind runtime --visualize --max-render-edges 500` optionally enables explicit runtime edge cap (default no cap)
+- `triadmind verify --json` emits machine-readable governance metrics for CI
+- `triadmind verify --strict` enforces default gates (`diagnostics_no_code`, `execute_like_ratio`, `ghost_ratio`, `rendered_edges_consistency`)
+- `triadmind verify --strict --baseline .triadmind/verify-baseline.json` enforces `runtime_unmatched_route_count <= baseline * 1.1`
 - capability visualizer now defaults to fast fallback unless strict fingerprint is explicitly requested
 - the generated `visualizer.html` now includes `Architecture` / `Leaf` view toggle buttons in the UI
 

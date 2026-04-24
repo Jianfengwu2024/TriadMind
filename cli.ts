@@ -28,6 +28,7 @@ import { extractRuntimeTopology } from './runtime/extractRuntimeTopology';
 import { normalizeRuntimeView } from './runtime/filterRuntimeMapByView';
 import { writeRuntimeMapArtifacts } from './runtime/runtimeMapWriter';
 import { generateRuntimeDashboard } from './runtime/runtimeVisualizer';
+import { formatVerifyReport, runTopologyVerify } from './verify';
 
 const program = new Command();
 const BLAST_RADIUS_WARNING_THRESHOLD = 5;
@@ -273,6 +274,60 @@ program
             console.log(chalk.green(`✅ Runtime visualizer written: ${paths.runtimeVisualizerFile}`));
         }
     });
+
+program
+    .command('verify')
+    .description(
+        'Verify topology quality gates (diagnostics, execute-like ratio, ghost ratio, runtime rendering consistency)'
+    )
+    .option('--json', 'Emit machine-readable JSON report')
+    .option('--strict', 'Exit with code 1 when any configured check fails')
+    .option(
+        '--baseline <path>',
+        'Baseline file for runtime unmatched route threshold (default: .triadmind/verify-baseline.json)'
+    )
+    .option('--update-baseline', 'Write current runtime_unmatched_route_count into baseline file')
+    .option('--max-execute-like-ratio <n>', 'Threshold for execute-like capability ratio (default: 0.10)')
+    .option('--max-ghost-ratio <n>', 'Threshold for ghost demand node ratio (default: 0.40)')
+    .option('--max-unmatched-routes <n>', 'Threshold for runtime unmatched frontend routes (default: baseline + 10%)')
+    .option('--max-render-edges <n>', 'Optional edge cap used only for rendered edge consistency check')
+    .action(
+        (options: {
+            json?: boolean;
+            strict?: boolean;
+            baseline?: string;
+            updateBaseline?: boolean;
+            maxExecuteLikeRatio?: string;
+            maxGhostRatio?: string;
+            maxUnmatchedRoutes?: string;
+            maxRenderEdges?: string;
+        }) => {
+            const paths = getWorkspacePaths(process.cwd());
+            ensureTriadSpec(paths);
+            const report = runTopologyVerify(paths, {
+                strict: Boolean(options.strict),
+                baselinePath: options.baseline,
+                updateBaseline: Boolean(options.updateBaseline),
+                maxExecuteLikeRatio: parseOptionalRatioCliNumber(options.maxExecuteLikeRatio),
+                maxGhostRatio: parseOptionalRatioCliNumber(options.maxGhostRatio),
+                maxUnmatchedRouteCount: parseOptionalNonNegativeCliInteger(options.maxUnmatchedRoutes),
+                maxRenderEdges: parseOptionalPositiveCliInteger(options.maxRenderEdges)
+            });
+
+            if (options.json) {
+                console.log(JSON.stringify(report, null, 2));
+            } else {
+                console.log(formatVerifyReport(report));
+                if (report.baseline) {
+                    console.log(chalk.gray(`[TriadMind] verify baseline: ${report.baseline.path}`));
+                }
+            }
+
+            if (options.strict && !report.passed) {
+                process.exitCode = 1;
+            }
+        }
+    );
 
 program
     .command('renormalize')
@@ -837,6 +892,22 @@ function normalizePositiveCliInteger(value: string | undefined, fallback: number
 function parseOptionalPositiveCliInteger(value: string | undefined) {
     const parsed = Number.parseInt(String(value ?? ''), 10);
     if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+    }
+    return undefined;
+}
+
+function parseOptionalNonNegativeCliInteger(value: string | undefined) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+        return parsed;
+    }
+    return undefined;
+}
+
+function parseOptionalRatioCliNumber(value: string | undefined) {
+    const parsed = Number.parseFloat(String(value ?? ''));
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
         return parsed;
     }
     return undefined;
