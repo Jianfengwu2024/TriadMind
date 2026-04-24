@@ -326,7 +326,7 @@ function writeVerifyBaseline(baselinePath: string, unmatchedCount: number, gener
 function resolveBaselinePath(paths: WorkspacePaths, overridePath?: string) {
     const raw = String(overridePath ?? '').trim();
     if (!raw) {
-        return path.join(paths.triadDir, 'verify-baseline.json');
+        return paths.verifyBaselineFile;
     }
     return path.isAbsolute(raw) ? raw : path.resolve(paths.projectRoot, raw);
 }

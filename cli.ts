@@ -29,6 +29,7 @@ import { normalizeRuntimeView } from './runtime/filterRuntimeMapByView';
 import { writeRuntimeMapArtifacts } from './runtime/runtimeMapWriter';
 import { generateRuntimeDashboard } from './runtime/runtimeVisualizer';
 import { formatVerifyReport, runTopologyVerify } from './verify';
+import { generateTrendArtifacts } from './trend';
 
 const program = new Command();
 const BLAST_RADIUS_WARNING_THRESHOLD = 5;
@@ -328,6 +329,40 @@ program
             }
         }
     );
+
+program
+    .command('trend')
+    .description('Generate architecture drift trend artifacts (trend.json + trend-report.md)')
+    .option('--window <n>', 'Maximum snapshots kept in trend history', '26')
+    .option('--max-edge-diff <n>', 'Max added/removed edge rows kept in report', '50')
+    .option('--json', 'Emit machine-readable trend report JSON')
+    .action((options: { window?: string; maxEdgeDiff?: string; json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+        const result = generateTrendArtifacts(paths, {
+            historyWindow: normalizePositiveCliInteger(options.window, 26),
+            maxEdgeDiff: normalizePositiveCliInteger(options.maxEdgeDiff, 50)
+        });
+
+        if (options.json) {
+            console.log(
+                JSON.stringify(
+                    {
+                        trendFile: paths.trendFile,
+                        trendReportFile: paths.trendReportFile,
+                        report: result.report
+                    },
+                    null,
+                    2
+                )
+            );
+            return;
+        }
+
+        console.log(chalk.green(`✅ Trend history written: ${paths.trendFile}`));
+        console.log(chalk.green(`✅ Trend report written: ${paths.trendReportFile}`));
+        result.report.summary.forEach((entry) => console.log(chalk.gray(`   - ${entry}`)));
+    });
 
 program
     .command('renormalize')

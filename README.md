@@ -486,6 +486,8 @@ Reviewer controls:
 - `triadmind verify --json` emits machine-readable governance metrics for CI
 - `triadmind verify --strict` enforces default gates (`diagnostics_no_code`, `execute_like_ratio`, `ghost_ratio`, `rendered_edges_consistency`)
 - `triadmind verify --strict --baseline .triadmind/verify-baseline.json` enforces `runtime_unmatched_route_count <= baseline * 1.1`
+- `triadmind trend` generates `.triadmind/trend.json` + `.triadmind/trend-report.md` for drift weekly reporting
+- CI sample is included at `.github/workflows/triadmind-verify.yml`
 - capability visualizer now defaults to fast fallback unless strict fingerprint is explicitly requested
 - the generated `visualizer.html` now includes `Architecture` / `Leaf` view toggle buttons in the UI
 
