@@ -16,6 +16,19 @@ type KnownRoute = {
     variants: string[];
 };
 
+type FrontendApiCall = {
+    method: string;
+    rawPath: string;
+    path: string;
+    text: string;
+    index: number;
+};
+
+type ResolvedApiPath = {
+    rawPath: string;
+    normalizedPath: string;
+};
+
 export const frontendApiCallExtractor: RuntimeTopologyExtractor = {
     name: 'FrontendApiCallExtractor',
     detect(context) {
@@ -81,7 +94,7 @@ export const frontendApiCallExtractor: RuntimeTopologyExtractor = {
                         level: 'warning',
                         code: 'RUNTIME_FRONTEND_API_ROUTE_UNMATCHED',
                         extractor: 'FrontendApiCallExtractor',
-                        message: `Could not match frontend API call ${call.path} to a known ApiRoute`,
+                        message: `Could not match frontend API call raw=${call.rawPath} normalized=${call.path} to a known ApiRoute`,
                         sourcePath: file.relativePath
                     });
                 }
@@ -93,7 +106,8 @@ export const frontendApiCallExtractor: RuntimeTopologyExtractor = {
                     confidence: targetRoute ? 0.78 : 0.45,
                     metadata: {
                         method: call.method,
-                        path: call.path
+                        path: call.path,
+                        rawPath: call.rawPath
                     },
                     evidence: [lineEvidence(file, 'call', call.text, call.index, targetRoute ? 0.78 : 0.45)]
                 });
@@ -105,7 +119,7 @@ export const frontendApiCallExtractor: RuntimeTopologyExtractor = {
 };
 
 function collectFrontendCalls(file: Parameters<RuntimeTopologyExtractor['extract']>[0]['files'][number]) {
-    const calls: Array<{ method: string; path: string; text: string; index: number }> = [];
+    const calls: FrontendApiCall[] = [];
 
     const fetchRegex =
         /fetch\(\s*([`"'][\s\S]*?[`"']|[^,\n)]+(?:\s*\+\s*[^,\n)]+)*)\s*(?:,\s*([\s\S]*?))?\)/g;
@@ -118,7 +132,8 @@ function collectFrontendCalls(file: Parameters<RuntimeTopologyExtractor['extract
         }
         calls.push({
             method: (methodMatch?.[1] ?? 'GET').toUpperCase(),
-            path: parsedPath,
+            rawPath: parsedPath.rawPath,
+            path: parsedPath.normalizedPath,
             text: match[0],
             index: match.index ?? 0
         });
@@ -133,7 +148,29 @@ function collectFrontendCalls(file: Parameters<RuntimeTopologyExtractor['extract
         }
         calls.push({
             method: match[1].toUpperCase(),
-            path: parsedPath,
+            rawPath: parsedPath.rawPath,
+            path: parsedPath.normalizedPath,
+            text: match[0],
+            index: match.index ?? 0
+        });
+    }
+
+    const objectClientRegex = /\b(?:axios|apiClient)\(\s*\{([\s\S]*?)\}\s*\)/gi;
+    for (const match of file.content.matchAll(objectClientRegex)) {
+        const body = match[1] ?? '';
+        const methodMatch = body.match(/\bmethod\s*:\s*["'`](GET|POST|PUT|DELETE|PATCH)["'`]/i);
+        const urlMatch = body.match(/\b(?:url|path)\s*:\s*([`"'][\s\S]*?[`"']|[^,\n}]+)/i);
+        if (!urlMatch) {
+            continue;
+        }
+        const parsedPath = resolveApiPathExpression(urlMatch[1]);
+        if (!parsedPath) {
+            continue;
+        }
+        calls.push({
+            method: (methodMatch?.[1] ?? 'GET').toUpperCase(),
+            rawPath: parsedPath.rawPath,
+            path: parsedPath.normalizedPath,
             text: match[0],
             index: match.index ?? 0
         });
@@ -150,7 +187,10 @@ function resolveApiPathExpression(expression: string) {
 
     const literal = readLiteralPath(trimmed);
     if (literal) {
-        return normalizeApiPath(literal);
+        return {
+            rawPath: literal,
+            normalizedPath: normalizeFrontendApiCallPath(literal)
+        } as ResolvedApiPath;
     }
 
     if (!trimmed.includes('+')) {
@@ -182,7 +222,11 @@ function resolveApiPathExpression(expression: string) {
         return undefined;
     }
 
-    return normalizeApiPath(parts.join(''));
+    const rawPath = parts.join('');
+    return {
+        rawPath,
+        normalizedPath: normalizeFrontendApiCallPath(rawPath)
+    } as ResolvedApiPath;
 }
 
 function readLiteralPath(value: string) {
@@ -194,7 +238,17 @@ function readLiteralPath(value: string) {
     if (!template) {
         return undefined;
     }
-    return template[1].replace(/\$\{[^}]+\}/g, ':param');
+    return template[1];
+}
+
+function normalizeFrontendApiCallPath(value: string) {
+    const normalizedRaw = String(value ?? '').replace(/\$\{[^}]+\}/g, ':param');
+    let normalized = normalizeApiPath(normalizedRaw);
+    const apiAnchorIndex = normalized.search(/\/api(?:\/v\d+)?(?:\/|$)/i);
+    if (apiAnchorIndex > 0) {
+        normalized = normalized.slice(apiAnchorIndex);
+    }
+    return normalizeApiPath(normalized);
 }
 
 function collectKnownRoutes(files: Parameters<RuntimeTopologyExtractor['extract']>[0]['files']) {
@@ -275,7 +329,7 @@ function combineRoutePath(prefix: string, routePath: string) {
 }
 
 function matchRoute(method: string, callPath: string, knownRoutes: KnownRoute[]) {
-    const callVariants = buildApiPathVariants(callPath);
+    const callVariants = buildFrontendCallPathVariants(callPath);
     const candidates = knownRoutes.filter((route) => route.method === method.toUpperCase());
 
     for (const candidate of candidates) {
@@ -291,6 +345,42 @@ function matchRoute(method: string, callPath: string, knownRoutes: KnownRoute[])
     }
 
     return undefined;
+}
+
+function buildFrontendCallPathVariants(pathValue: string) {
+    const variants = new Set<string>(buildApiPathVariants(pathValue));
+
+    for (const variant of Array.from(variants)) {
+        const dynamicTrimmed = trimDynamicPrefix(variant);
+        if (dynamicTrimmed) {
+            buildApiPathVariants(dynamicTrimmed).forEach((item) => variants.add(item));
+        }
+
+        const apiAnchorIndex = variant.search(/\/api(?:\/v\d+)?(?:\/|$)/i);
+        if (apiAnchorIndex > 0) {
+            buildApiPathVariants(variant.slice(apiAnchorIndex)).forEach((item) => variants.add(item));
+        }
+    }
+
+    return Array.from(variants);
+}
+
+function trimDynamicPrefix(pathValue: string) {
+    const segments = normalizeApiPath(pathValue).split('/').filter(Boolean);
+    if (segments.length < 3) {
+        return undefined;
+    }
+
+    let index = 0;
+    while (index < segments.length - 1 && isDynamicSegment(segments[index])) {
+        index += 1;
+    }
+
+    if (index === 0 || index >= segments.length - 1) {
+        return undefined;
+    }
+
+    return normalizeApiPath(`/${segments.slice(index).join('/')}`);
 }
 
 function hasExactVariantMatch(callVariants: string[], routeVariants: string[]) {

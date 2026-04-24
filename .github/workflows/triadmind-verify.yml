@@ -27,5 +27,8 @@ jobs:
       - name: Sync topology artifacts
         run: node --import tsx cli.ts sync --force
 
+      - name: Build runtime visualizer artifacts
+        run: node --import tsx cli.ts runtime --visualize --view full
+
       - name: Verify topology quality gates
-        run: node --import tsx cli.ts verify --strict --json
+        run: node --import tsx cli.ts verify --strict --json --max-unmatched-routes 0

@@ -53,6 +53,23 @@ export async function runItem() {
     assert.ok(runtimeMap.edges.some((edge) => edge.type === 'calls' && /ApiRoute\.(POST|UNKNOWN)\./.test(edge.to)));
 });
 
+test('unmatched frontend api diagnostic includes raw and normalized path', async () => {
+    const root = writeFixture({
+        'frontend/src/pages/items.tsx': `
+const id = "123";
+fetch(\`\${window.location.origin}/api/unknown/\${id}?x=1\`, { method: "POST" });
+`
+    });
+
+    const runtimeMap = await extractRuntimeTopology(root, { includeFrontend: true });
+    const diagnostic = (runtimeMap.diagnostics ?? []).find(
+        (item) => item.code === 'RUNTIME_FRONTEND_API_ROUTE_UNMATCHED'
+    );
+    assert.ok(diagnostic);
+    assert.match(diagnostic?.message ?? '', /raw=/);
+    assert.match(diagnostic?.message ?? '', /normalized=/);
+});
+
 test('frontend api call matcher resolves template/query/prefix variants without warning', async () => {
     const root = writeFixture({
         'backend/api/items.py': `
@@ -66,6 +83,31 @@ async def run_item(id: str):
         'frontend/src/pages/items.tsx': `
 const id = "123";
 fetch(\`/api/v1/items/\${id}/run?x=1\`, { method: "POST" });
+`
+    });
+
+    const runtimeMap = await extractRuntimeTopology(root, { includeFrontend: true, frameworkHint: 'fastapi' });
+    assert.ok(runtimeMap.edges.some((edge) => edge.type === 'calls' && edge.to === 'ApiRoute.POST./api/v1/items/{id}/run'));
+    assert.equal(
+        runtimeMap.diagnostics?.some((diagnostic) => diagnostic.code === 'RUNTIME_FRONTEND_API_ROUTE_UNMATCHED'),
+        false
+    );
+});
+
+test('frontend api call matcher resolves baseUrl template prefixes before route matching', async () => {
+    const root = writeFixture({
+        'backend/api/items.py': `
+from fastapi import APIRouter
+router = APIRouter(prefix="/api/v1")
+
+@router.post("/items/{id}/run")
+async def run_item(id: str):
+    return {"ok": True}
+`,
+        'frontend/src/pages/items.tsx': `
+const id = "123";
+const baseUrl = process.env.API_BASE_URL || "http://localhost:3000";
+axios.post(\`\${baseUrl}/api/v1/items/\${id}/run?x=1\`);
 `
     });
 
