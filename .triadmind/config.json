@@ -227,6 +227,20 @@
     "minHoursBetweenRuns": 24,
     "minConfidence": 0.55,
     "maxProposals": 5,
+    "autoTriggerEnabled": true,
+    "autoTriggerCommands": [
+      "init",
+      "sync",
+      "runtime",
+      "plan",
+      "apply",
+      "verify",
+      "govern",
+      "trend"
+    ],
+    "minEventsBetweenRuns": 5,
+    "scanThrottleMinutes": 10,
+    "lockTimeoutMinutes": 30,
     "failOnDreamError": false
   },
   "runtimeHealing": {

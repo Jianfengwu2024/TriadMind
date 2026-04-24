@@ -158,3 +158,15 @@ test('dream review --json returns latest report', () => {
     assert.equal(report.schemaVersion, '1.0');
     assert.equal(Array.isArray(report.summary), true);
 });
+
+test('dream auto --json emits auto tick result payload', () => {
+    const root = createDreamFixture();
+    const result = runCli(root, ['dream', 'auto', '--trigger', 'sync', '--force', '--json']);
+    assert.equal(result.status, 0, `dream auto failed: ${result.stderr || result.stdout}`);
+
+    const jsonStart = result.stdout.indexOf('{');
+    assert.ok(jsonStart >= 0, 'dream auto --json did not emit JSON payload');
+    const payload = JSON.parse(result.stdout.slice(jsonStart));
+    assert.equal(typeof payload.status, 'string');
+    assert.equal(typeof payload.pendingEvents, 'number');
+});

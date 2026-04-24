@@ -37,6 +37,7 @@ import { formatGovernReport, runGovern } from './govern';
 import { formatVerifyReport, runTopologyVerify } from './verify';
 import { generateTrendArtifacts } from './trend';
 import { formatDreamReport, loadLatestDreamReport, runDreamAnalysis } from './dream';
+import { tickDreamAutoRun } from './dreamScheduler';
 import { writeViewMapArtifacts } from './viewMap';
 
 const program = new Command();
@@ -87,6 +88,7 @@ program
         writeMasterPrompt(paths);
         reportRuntimeArtifactStatus(paths, runtimeResult);
         reportViewMapStatus(paths, viewMapResult);
+        runAutoDreamAfterCommand(paths, 'init');
 
         console.log(chalk.green(`✅ triad-map 已同步到 ${paths.mapFile}`));
         console.log(chalk.green(`✅ triad.md 已写入 ${paths.triadSpecFile}`));
@@ -260,6 +262,7 @@ program
         const viewMapResult = writeViewMapArtifactsBestEffort(paths);
         reportRuntimeArtifactStatus(paths, runtimeResult);
         reportViewMapStatus(paths, viewMapResult);
+        runAutoDreamAfterCommand(paths, 'sync');
         console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
         console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
     });
@@ -321,6 +324,7 @@ program
         console.log(chalk.green(`✅ Runtime map written: ${paths.runtimeMapFile}`));
         console.log(chalk.green(`✅ Runtime diagnostics written: ${paths.runtimeDiagnosticsFile}`));
         reportViewMapStatus(paths, viewMapResult);
+        runAutoDreamAfterCommand(paths, 'runtime');
 
         if (options.visualize) {
             generateRuntimeDashboard(paths.runtimeMapFile, paths.runtimeVisualizerFile, {
@@ -382,6 +386,7 @@ program
                     console.log(chalk.gray(`[TriadMind] verify baseline: ${report.baseline.path}`));
                 }
             }
+            runAutoDreamAfterCommand(paths, 'verify');
 
             if (options.strict && !report.passed) {
                 process.exitCode = 1;
@@ -411,6 +416,7 @@ governCommand
         } else {
             console.log(formatGovernReport(result.report));
         }
+        runAutoDreamAfterCommand(paths, 'govern');
 
         if (result.exitCode !== 0) {
             process.exitCode = result.exitCode;
@@ -435,6 +441,7 @@ governCommand
         } else {
             console.log(formatGovernReport(result.report));
         }
+        runAutoDreamAfterCommand(paths, 'govern');
 
         if (result.exitCode !== 0) {
             process.exitCode = result.exitCode;
@@ -466,6 +473,7 @@ governCommand
             } else {
                 console.log(formatGovernReport(result.report));
             }
+            runAutoDreamAfterCommand(paths, 'govern');
 
             if (result.exitCode !== 0) {
                 process.exitCode = result.exitCode;
@@ -486,6 +494,7 @@ program
             historyWindow: normalizePositiveCliInteger(options.window, 26),
             maxEdgeDiff: normalizePositiveCliInteger(options.maxEdgeDiff, 50)
         });
+        runAutoDreamAfterCommand(paths, 'trend');
 
         if (options.json) {
             console.log(
@@ -545,6 +554,38 @@ dreamCommand
         console.log(chalk.green(`✅ Dream report written: ${result.artifacts.reportFile}`));
         console.log(chalk.green(`✅ Dream diagnostics written: ${result.artifacts.diagnosticsFile}`));
         console.log(chalk.green(`✅ Dream proposals written: ${result.artifacts.proposalsFile}`));
+    });
+
+dreamCommand
+    .command('auto')
+    .description('Record one activity tick and execute auto-dream when gates pass')
+    .option('--trigger <name>', 'Auto trigger source label', 'manual')
+    .option('--force', 'Bypass gate checks and force auto-dream execution')
+    .option('--json', 'Emit machine-readable auto tick result JSON')
+    .action((options: { trigger?: string; force?: boolean; json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const result = tickDreamAutoRun(paths, {
+            trigger: String(options.trigger ?? 'manual'),
+            force: Boolean(options.force)
+        });
+
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+            return;
+        }
+
+        const color =
+            result.status === 'run' ? chalk.green : result.status === 'error' ? chalk.red : chalk.gray;
+        console.log(
+            color(
+                `[TriadMind] dream auto ${result.status}: trigger=${result.trigger}, reason=${result.reason}, pending=${result.pendingEvents}, lock=${result.lock}`
+            )
+        );
+        if (result.error) {
+            console.log(chalk.yellow(`[TriadMind] dream auto error: ${result.error}`));
+        }
     });
 
 dreamCommand
@@ -676,6 +717,7 @@ program
 
         generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile, toDashboardOptions(options));
         console.log(chalk.green(`✅ 演化视图已生成：${paths.visualizerFile}`));
+        runAutoDreamAfterCommand(paths, 'plan');
 
         if (options.open !== false) {
             try {
@@ -1031,6 +1073,7 @@ function executeApply(projectRoot: string) {
         syncProjectTopology(paths, true);
         assertNoTopologicalDegradation(paths, previousMap, 'apply');
         writeHandoffPrompt(projectRoot, result.changedFiles, approvedProtocolJson);
+        runAutoDreamAfterCommand(paths, 'apply');
 
         if (fs.existsSync(paths.draftFile)) {
             fs.unlinkSync(paths.draftFile);
@@ -1201,6 +1244,33 @@ function reportBootstrapInitResult(paths: ReturnType<typeof getWorkspacePaths>, 
         console.log(chalk.gray(`   ${marker} ${item.key}: ${item.path}`));
     });
     console.log(chalk.green(`[TriadMind] session verify output target: ${paths.bootstrapVerifyFile}`));
+}
+
+function runAutoDreamAfterCommand(paths: ReturnType<typeof getWorkspacePaths>, trigger: string) {
+    try {
+        const result = tickDreamAutoRun(paths, { trigger });
+        if (result.status === 'run') {
+            console.log(
+                chalk.gray(
+                    `[TriadMind] dream auto run complete: trigger=${trigger}, pending=${result.pendingEvents}, lock=${result.lock}`
+                )
+            );
+            return;
+        }
+        if (result.status === 'error') {
+            console.log(
+                chalk.yellow(
+                    `[TriadMind] dream auto run failed: trigger=${trigger}, reason=${result.reason}, error=${result.error ?? 'unknown'}`
+                )
+            );
+        }
+    } catch (error: any) {
+        console.log(
+            chalk.yellow(
+                `[TriadMind] dream auto trigger crashed: trigger=${trigger}, error=${error?.message ? String(error.message) : String(error)}`
+            )
+        );
+    }
 }
 
 function formatBootstrapDoctorReport(report: BootstrapDoctorReport) {

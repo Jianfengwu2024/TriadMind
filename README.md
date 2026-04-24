@@ -134,6 +134,8 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - `.triadmind/dream-proposals.json`：建议清单（含可审阅 protocol draft）
 - `.triadmind/dream-diagnostics.json`：Dream 执行诊断
 - `.triadmind/dream-state.json`：Dream 运行状态（idle gate 使用）
+- `.triadmind/dream-auto-state.json`：自动触发计数与门禁状态
+- `.triadmind/dream.lock`：自动触发互斥锁（防并发）
 
 ---
 
@@ -168,8 +170,16 @@ triadmind verify --strict --json
 triadmind dream run
 triadmind dream run --json
 triadmind dream run --mode idle
+triadmind dream auto --trigger sync
+triadmind dream auto --trigger manual --force
 triadmind dream review --json
 ```
+
+默认行为（v2）：
+
+- `init/sync/runtime/plan/apply/verify/govern/trend` 会自动记一次 Dream 活动
+- 达到 `minEventsBetweenRuns` 且满足时间门禁后，会自动触发一次 idle Dream
+- 使用 `dream.lock` 做互斥，旧锁超时会自动回收（stale lock recovery）
 
 ### 4.5 治理门禁
 

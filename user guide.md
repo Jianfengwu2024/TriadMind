@@ -362,8 +362,17 @@ triadmind dream run
 triadmind dream run --json
 triadmind dream run --mode idle
 triadmind dream run --mode idle --force
+triadmind dream auto --trigger sync
+triadmind dream auto --trigger manual --force
 triadmind dream review --json
 ```
+
+V2 automatic idle trigger:
+
+- `init/sync/runtime/plan/apply/verify/govern/trend` will automatically record dream activity ticks.
+- When `minEventsBetweenRuns` + `minHoursBetweenRuns` gates pass, TriadMind auto-runs one idle dream cycle.
+- `.triadmind/dream.lock` prevents concurrent dream runs.
+- stale lock recovery is enabled by `dream.lockTimeoutMinutes`.
 
 Recommended usage:
 

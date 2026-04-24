@@ -77,6 +77,11 @@ export interface TriadConfig {
         minHoursBetweenRuns: number;
         minConfidence: number;
         maxProposals: number;
+        autoTriggerEnabled: boolean;
+        autoTriggerCommands: string[];
+        minEventsBetweenRuns: number;
+        scanThrottleMinutes: number;
+        lockTimeoutMinutes: number;
         failOnDreamError: boolean;
     };
     runtimeHealing: {
@@ -283,6 +288,11 @@ const DEFAULT_CONFIG: TriadConfig = {
         minHoursBetweenRuns: 24,
         minConfidence: 0.55,
         maxProposals: 5,
+        autoTriggerEnabled: true,
+        autoTriggerCommands: ['init', 'sync', 'runtime', 'plan', 'apply', 'verify', 'govern', 'trend'],
+        minEventsBetweenRuns: 5,
+        scanThrottleMinutes: 10,
+        lockTimeoutMinutes: 30,
         failOnDreamError: false
     },
     runtimeHealing: {
@@ -583,6 +593,23 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             ),
             minConfidence: normalizeConfidence(value.dream?.minConfidence, DEFAULT_CONFIG.dream.minConfidence),
             maxProposals: normalizePositiveInteger(value.dream?.maxProposals, DEFAULT_CONFIG.dream.maxProposals),
+            autoTriggerEnabled: value.dream?.autoTriggerEnabled ?? DEFAULT_CONFIG.dream.autoTriggerEnabled,
+            autoTriggerCommands: mergeStringList(
+                value.dream?.autoTriggerCommands,
+                DEFAULT_CONFIG.dream.autoTriggerCommands
+            ),
+            minEventsBetweenRuns: normalizePositiveInteger(
+                value.dream?.minEventsBetweenRuns,
+                DEFAULT_CONFIG.dream.minEventsBetweenRuns
+            ),
+            scanThrottleMinutes: normalizePositiveInteger(
+                value.dream?.scanThrottleMinutes,
+                DEFAULT_CONFIG.dream.scanThrottleMinutes
+            ),
+            lockTimeoutMinutes: normalizePositiveInteger(
+                value.dream?.lockTimeoutMinutes,
+                DEFAULT_CONFIG.dream.lockTimeoutMinutes
+            ),
             failOnDreamError: value.dream?.failOnDreamError ?? DEFAULT_CONFIG.dream.failOnDreamError
         },
         runtimeHealing: {

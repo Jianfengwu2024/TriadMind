@@ -37,6 +37,8 @@ export interface WorkspacePaths {
     dreamDiagnosticsFile: string;
     dreamProposalsFile: string;
     dreamStateFile: string;
+    dreamAutoStateFile: string;
+    dreamLockFile: string;
     draftFile: string;
     macroSplitFile: string;
     mesoSplitFile: string;
@@ -116,6 +118,8 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         dreamDiagnosticsFile: path.join(triadDir, 'dream-diagnostics.json'),
         dreamProposalsFile: path.join(triadDir, 'dream-proposals.json'),
         dreamStateFile: path.join(triadDir, 'dream-state.json'),
+        dreamAutoStateFile: path.join(triadDir, 'dream-auto-state.json'),
+        dreamLockFile: path.join(triadDir, 'dream.lock'),
         draftFile: path.join(triadDir, 'draft-protocol.json'),
         macroSplitFile: path.join(triadDir, 'macro-split.json'),
         mesoSplitFile: path.join(triadDir, 'meso-split.json'),
