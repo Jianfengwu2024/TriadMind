@@ -38,6 +38,8 @@ import { formatVerifyReport, runTopologyVerify } from './verify';
 import { generateTrendArtifacts } from './trend';
 import { formatDreamReport, loadLatestDreamReport, runDreamAnalysis } from './dream';
 import { tickDreamAutoRun } from './dreamScheduler';
+import { generateDreamDashboard } from './dreamVisualizer';
+import { getDreamDaemonStatus, runDreamDaemonLoop, startDreamDaemon, stopDreamDaemon } from './dreamDaemon';
 import { writeViewMapArtifacts } from './viewMap';
 
 const program = new Command();
@@ -527,12 +529,16 @@ dreamCommand
     .option('--force', 'Ignore idle gate or dream.enabled=false and run immediately')
     .option('--max-proposals <n>', 'Maximum number of dream proposals to keep')
     .option('--min-confidence <n>', 'Minimum confidence threshold for retained proposals (0-1)')
+    .option('--visualize', 'Generate dream-visualizer.html after dream run')
+    .option('--theme <leaf-like|runtime-dark>', 'Dream visualizer theme', 'leaf-like')
     .option('--json', 'Emit machine-readable dream report JSON')
     .action((options: {
         mode?: string;
         force?: boolean;
         maxProposals?: string;
         minConfidence?: string;
+        visualize?: boolean;
+        theme?: string;
         json?: boolean;
     }) => {
         const paths = getWorkspacePaths(process.cwd());
@@ -544,6 +550,11 @@ dreamCommand
             maxProposals: parseOptionalPositiveCliInteger(options.maxProposals),
             minConfidence: parseOptionalRatioCliNumber(options.minConfidence)
         });
+        if (options.visualize) {
+            generateDreamDashboard(result.report, paths.dreamVisualizerFile, {
+                theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
+            });
+        }
 
         if (options.json) {
             console.log(JSON.stringify(result.report, null, 2));
@@ -554,6 +565,9 @@ dreamCommand
         console.log(chalk.green(`✅ Dream report written: ${result.artifacts.reportFile}`));
         console.log(chalk.green(`✅ Dream diagnostics written: ${result.artifacts.diagnosticsFile}`));
         console.log(chalk.green(`✅ Dream proposals written: ${result.artifacts.proposalsFile}`));
+        if (options.visualize) {
+            console.log(chalk.green(`✅ Dream visualizer written: ${paths.dreamVisualizerFile}`));
+        }
     });
 
 dreamCommand
@@ -609,6 +623,155 @@ dreamCommand
         }
 
         console.log(formatDreamReport(report));
+    });
+
+dreamCommand
+    .command('visualize')
+    .description('Generate dream governance dashboard html from latest dream report')
+    .option('--theme <leaf-like|runtime-dark>', 'Dream visualizer theme', 'leaf-like')
+    .option('--open', 'Open generated html in browser')
+    .option('--json', 'Emit machine-readable result')
+    .action(async (options: { theme?: string; open?: boolean; json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const report = loadLatestDreamReport(paths);
+        if (!report) {
+            console.log(chalk.red(`❌ No dream report found: ${paths.dreamReportFile}`));
+            process.exitCode = 1;
+            return;
+        }
+
+        generateDreamDashboard(report, paths.dreamVisualizerFile, {
+            theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
+        });
+
+        if (options.open) {
+            try {
+                await openFile(paths.dreamVisualizerFile);
+            } catch (error: any) {
+                console.log(chalk.yellow(`ℹ️ Failed to open dream visualizer: ${error?.message ?? String(error)}`));
+            }
+        }
+
+        if (options.json) {
+            console.log(
+                JSON.stringify(
+                    {
+                        dreamReportFile: paths.dreamReportFile,
+                        dreamVisualizerFile: paths.dreamVisualizerFile
+                    },
+                    null,
+                    2
+                )
+            );
+            return;
+        }
+
+        console.log(chalk.green(`✅ Dream visualizer written: ${paths.dreamVisualizerFile}`));
+    });
+
+const dreamDaemonCommand = dreamCommand
+    .command('daemon')
+    .description('Dream daemon lifecycle: background idle run loop');
+
+dreamDaemonCommand
+    .command('start')
+    .description('Start dream daemon in background')
+    .option('--interval-seconds <n>', 'Daemon loop interval in seconds')
+    .option('--max-ticks <n>', 'Max daemon ticks before auto-exit (0 = infinite)')
+    .option('--json', 'Emit machine-readable daemon start result')
+    .action((options: { intervalSeconds?: string; maxTicks?: string; json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const result = startDreamDaemon(paths, {
+            intervalSeconds: parseOptionalPositiveCliInteger(options.intervalSeconds),
+            maxTicks: parseOptionalNonNegativeCliInteger(options.maxTicks)
+        });
+
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+            return;
+        }
+
+        const color =
+            result.status === 'started'
+                ? chalk.green
+                : result.status === 'already_running'
+                  ? chalk.yellow
+                  : chalk.red;
+        console.log(color(`[TriadMind] ${result.message}`));
+    });
+
+dreamDaemonCommand
+    .command('stop')
+    .description('Stop dream daemon')
+    .option('--json', 'Emit machine-readable daemon stop result')
+    .action((options: { json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const result = stopDreamDaemon(paths);
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+            return;
+        }
+
+        const color =
+            result.status === 'stopped'
+                ? chalk.green
+                : result.status === 'not_running'
+                  ? chalk.gray
+                  : chalk.red;
+        console.log(color(`[TriadMind] ${result.message}`));
+    });
+
+dreamDaemonCommand
+    .command('status')
+    .description('Show dream daemon status')
+    .option('--json', 'Emit machine-readable daemon status')
+    .action((options: { json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        const status = getDreamDaemonStatus(paths);
+        if (options.json) {
+            console.log(
+                JSON.stringify(
+                    {
+                        running: status.running,
+                        pid: status.pid,
+                        state: status.state
+                    },
+                    null,
+                    2
+                )
+            );
+            return;
+        }
+
+        const color = status.running ? chalk.green : chalk.gray;
+        console.log(
+            color(
+                `[TriadMind] dream daemon running=${status.running} pid=${status.pid ?? '-'} ticks=${status.state.ticks} last=${status.state.lastStatus ?? '-'}`
+            )
+        );
+    });
+
+dreamCommand
+    .command('daemon-loop')
+    .description('Internal dream daemon loop command (do not invoke directly)')
+    .option('--interval-seconds <n>', 'Daemon loop interval in seconds', '180')
+    .option('--max-ticks <n>', 'Max daemon ticks before auto-exit (0=infinite)', '0')
+    .action(async (options: { intervalSeconds?: string; maxTicks?: string }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        await runDreamDaemonLoop(paths, {
+            intervalSeconds: normalizePositiveCliInteger(options.intervalSeconds, 180),
+            maxTicks: parseOptionalNonNegativeCliInteger(options.maxTicks) ?? 0
+        });
     });
 
 program

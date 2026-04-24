@@ -362,9 +362,14 @@ triadmind dream run
 triadmind dream run --json
 triadmind dream run --mode idle
 triadmind dream run --mode idle --force
+triadmind dream run --visualize
 triadmind dream auto --trigger sync
 triadmind dream auto --trigger manual --force
 triadmind dream review --json
+triadmind dream visualize --open
+triadmind dream daemon start
+triadmind dream daemon status
+triadmind dream daemon stop
 ```
 
 V2 automatic idle trigger:
@@ -373,6 +378,15 @@ V2 automatic idle trigger:
 - When `minEventsBetweenRuns` + `minHoursBetweenRuns` gates pass, TriadMind auto-runs one idle dream cycle.
 - `.triadmind/dream.lock` prevents concurrent dream runs.
 - stale lock recovery is enabled by `dream.lockTimeoutMinutes`.
+
+V3 daemon and dashboard:
+
+- `dream daemon` provides background idle loop (`start/status/stop`).
+- daemon artifacts:
+  - `.triadmind/dream-daemon.pid.json`
+  - `.triadmind/dream-daemon-state.json`
+  - `.triadmind/dream-daemon.log`
+- `dream visualize` generates `.triadmind/dream-visualizer.html` for proposal triage.
 
 Recommended usage:
 

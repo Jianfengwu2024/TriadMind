@@ -82,6 +82,9 @@ export interface TriadConfig {
         minEventsBetweenRuns: number;
         scanThrottleMinutes: number;
         lockTimeoutMinutes: number;
+        daemonEnabled: boolean;
+        daemonIntervalSeconds: number;
+        daemonMaxTicksPerRun: number;
         failOnDreamError: boolean;
     };
     runtimeHealing: {
@@ -293,6 +296,9 @@ const DEFAULT_CONFIG: TriadConfig = {
         minEventsBetweenRuns: 5,
         scanThrottleMinutes: 10,
         lockTimeoutMinutes: 30,
+        daemonEnabled: true,
+        daemonIntervalSeconds: 180,
+        daemonMaxTicksPerRun: 0,
         failOnDreamError: false
     },
     runtimeHealing: {
@@ -609,6 +615,15 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             lockTimeoutMinutes: normalizePositiveInteger(
                 value.dream?.lockTimeoutMinutes,
                 DEFAULT_CONFIG.dream.lockTimeoutMinutes
+            ),
+            daemonEnabled: value.dream?.daemonEnabled ?? DEFAULT_CONFIG.dream.daemonEnabled,
+            daemonIntervalSeconds: normalizePositiveInteger(
+                value.dream?.daemonIntervalSeconds,
+                DEFAULT_CONFIG.dream.daemonIntervalSeconds
+            ),
+            daemonMaxTicksPerRun: normalizeNonNegativeInteger(
+                value.dream?.daemonMaxTicksPerRun,
+                DEFAULT_CONFIG.dream.daemonMaxTicksPerRun
             ),
             failOnDreamError: value.dream?.failOnDreamError ?? DEFAULT_CONFIG.dream.failOnDreamError
         },

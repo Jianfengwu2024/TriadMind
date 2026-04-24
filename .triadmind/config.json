@@ -241,6 +241,9 @@
     "minEventsBetweenRuns": 5,
     "scanThrottleMinutes": 10,
     "lockTimeoutMinutes": 30,
+    "daemonEnabled": true,
+    "daemonIntervalSeconds": 180,
+    "daemonMaxTicksPerRun": 0,
     "failOnDreamError": false
   },
   "runtimeHealing": {

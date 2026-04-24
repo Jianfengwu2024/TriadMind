@@ -136,6 +136,10 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - `.triadmind/dream-state.json`：Dream 运行状态（idle gate 使用）
 - `.triadmind/dream-auto-state.json`：自动触发计数与门禁状态
 - `.triadmind/dream.lock`：自动触发互斥锁（防并发）
+- `.triadmind/dream-daemon.pid.json`：daemon 进程元数据
+- `.triadmind/dream-daemon-state.json`：daemon 心跳/状态
+- `.triadmind/dream-daemon.log`：daemon 日志
+- `.triadmind/dream-visualizer.html`：Dream 治理面板
 
 ---
 
@@ -170,9 +174,14 @@ triadmind verify --strict --json
 triadmind dream run
 triadmind dream run --json
 triadmind dream run --mode idle
+triadmind dream run --visualize
 triadmind dream auto --trigger sync
 triadmind dream auto --trigger manual --force
 triadmind dream review --json
+triadmind dream visualize --open
+triadmind dream daemon start
+triadmind dream daemon status
+triadmind dream daemon stop
 ```
 
 默认行为（v2）：
