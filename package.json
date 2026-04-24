@@ -9,6 +9,7 @@
   "types": "dist/cli.d.ts",
   "files": [
     "dist",
+    "templates",
     "README.md",
     "user guide.md"
   ],

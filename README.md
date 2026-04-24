@@ -2,6 +2,7 @@
 
 TriadMind Core 是一个把“拓扑先行”落地到工程实践的 CLI。
 它的目标不是替代编码，而是把需求 -> 设计 -> 变更 -> 验证这条链路变成可审计、可回归、可门禁的流程。
+它是通用多语言工具，支持 Python / TypeScript / JavaScript / Rust / Go / Java / C++ 工程。
 
 ---
 
@@ -40,6 +41,24 @@ triadmind init
 - `.triadmind/runtime-diagnostics.json`
 - `.triadmind/govern-policy.json`
 - `.triadmind/verify-baseline.json`
+- `AGENTS.md`（TriadMind managed rules 区块）
+- `skills.md`（会话 SOP）
+- `.triadmind/session-bootstrap.sh`
+- `.triadmind/session-bootstrap.ps1`
+- `.triadmind/session-bootstrap.cmd`
+
+如果你只想初始化 triad 工作区而跳过会话脚手架：
+
+```bash
+triadmind init --skip-bootstrap
+```
+
+也可以单独执行：
+
+```bash
+triadmind bootstrap init
+triadmind bootstrap doctor --json
+```
 
 ### 2.2 每次需求开发（推荐 6 步）
 
@@ -143,6 +162,27 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 triadmind govern fix --policy .triadmind/govern-policy.json --llm <provider:model> --max-iterations 3 --dry-run
 ```
 
+### 4.5 会话脚手架（Bootstrap）
+
+```bash
+triadmind bootstrap init
+triadmind bootstrap init --force
+triadmind bootstrap doctor --json
+```
+
+跨平台启动当前会话（建议每个新终端窗口执行一次）：
+
+```bash
+# Linux / macOS
+bash .triadmind/session-bootstrap.sh
+
+# Windows PowerShell
+.\.triadmind\session-bootstrap.ps1
+
+# Windows CMD
+.triadmind\session-bootstrap.cmd
+```
+
 `govern` 退出码：
 
 - `0`: pass
@@ -191,6 +231,7 @@ triadmind runtime --visualize --max-render-edges 500
 CI 最小门禁建议：
 
 ```bash
+triadmind bootstrap doctor --json
 triadmind sync --force
 triadmind runtime --visualize --view full
 triadmind govern ci --policy .triadmind/govern-policy.json --json

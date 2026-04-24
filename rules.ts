@@ -11,7 +11,7 @@ export function installAlwaysOnRules(paths: WorkspacePaths) {
 
     const agentRules = buildAgentRules(paths);
     fs.writeFileSync(paths.agentRulesFile, agentRules, 'utf-8');
-    upsertAgentsMd(path.join(paths.projectRoot, 'AGENTS.md'), agentRules);
+    upsertAgentsMd(paths.agentsFile, agentRules);
     fs.writeFileSync(paths.cursorRuleFile, buildCursorRule(paths), 'utf-8');
 }
 

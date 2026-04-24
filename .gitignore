@@ -4,6 +4,7 @@ dist/
 .triadmind/cache/
 .triadmind/snapshots/
 .triadmind/runtime-error.log
+.triadmind/bootstrap-verify.json
 .triadmind/govern-report.json
 .triadmind/govern-audit.log
 .triadmind/govern-fixes.patch

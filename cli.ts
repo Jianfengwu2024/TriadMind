@@ -14,6 +14,11 @@ import { installAlwaysOnRules } from './rules';
 import { collectProtocolSnapshotFiles, createSnapshot, listSnapshots, restoreSnapshot } from './snapshot';
 import { syncTriadMap, syncTriadMapWithOptions, watchTriadMap } from './sync';
 import { writeSelfBootstrapProtocol, writeSelfBootstrapReport } from './bootstrap';
+import {
+    BootstrapDoctorReport,
+    BootstrapScaffoldInitResult,
+    BootstrapScaffoldService
+} from './bootstrapScaffoldService';
 import { calculateBlastRadius, detectCycles, detectTopologicalDrift, generateRenormalizeProtocol } from './analyzer';
 import { LanguageAdapter } from './languageAdapter';
 import {
@@ -35,6 +40,7 @@ import { writeViewMapArtifacts } from './viewMap';
 
 const program = new Command();
 const BLAST_RADIUS_WARNING_THRESHOLD = 5;
+const bootstrapScaffoldService = new BootstrapScaffoldService();
 
 interface ILanguageAdapter {
     applyProtocol(protocol: any, projectRoot: string): void;
@@ -59,12 +65,19 @@ program.name('triadmind').description('TriadMind：顶点三元法驱动的项�
 program
     .command('init')
     .description('初始化目标项目的 `.triadmind` 工作区，并重新生成 `triad-map.json`')
-    .action(async () => {
+    .option('--skip-bootstrap', 'Skip session bootstrap scaffold generation')
+    .action(async (options: { skipBootstrap?: boolean }) => {
         const paths = getWorkspacePaths(process.cwd());
         const previousMap = readCurrentTriadMap(paths);
 
         console.log(chalk.cyan('🧭 [TriadMind] 正在初始化工作区...'));
         ensureTriadSpec(paths);
+        if (!options.skipBootstrap) {
+            const bootstrapResult = bootstrapScaffoldService.init(paths, {
+                nonInteractive: true
+            });
+            reportBootstrapInitResult(paths, bootstrapResult);
+        }
         syncProjectTopology(paths, true);
         const runtimeResult = await writeRuntimeTopologyArtifacts(paths, {}, true);
         const viewMapResult = writeViewMapArtifactsBestEffort(paths);
@@ -77,6 +90,43 @@ program
         console.log(chalk.green(`✅ triad-map 已同步到 ${paths.mapFile}`));
         console.log(chalk.green(`✅ triad.md 已写入 ${paths.triadSpecFile}`));
         console.log(chalk.green(`✅ master-prompt 已写入 ${paths.masterPromptFile}`));
+    });
+
+const bootstrapCommand = program
+    .command('bootstrap')
+    .description('Session bootstrap scaffolding for AGENTS/skills/bootstrap scripts');
+
+bootstrapCommand
+    .command('init')
+    .description('Create or update TriadMind session bootstrap files')
+    .option('--force', 'Overwrite scaffold files that already exist')
+    .option('--non-interactive', 'Run without interactive prompts')
+    .action((options: { force?: boolean; nonInteractive?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+        const result = bootstrapScaffoldService.init(paths, {
+            force: Boolean(options.force),
+            nonInteractive: Boolean(options.nonInteractive)
+        });
+        reportBootstrapInitResult(paths, result);
+    });
+
+bootstrapCommand
+    .command('doctor')
+    .description('Check bootstrap scaffold health and template freshness')
+    .option('--json', 'Emit machine-readable JSON report')
+    .action((options: { json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+        const report = bootstrapScaffoldService.doctor(paths);
+        if (options.json) {
+            console.log(JSON.stringify(report, null, 2));
+        } else {
+            console.log(formatBootstrapDoctorReport(report));
+        }
+        if (!report.passed) {
+            process.exitCode = 1;
+        }
     });
 
 program
@@ -1066,6 +1116,44 @@ function reportViewMapStatus(
         )
     );
     console.log(chalk.green(`✅ View map diagnostics written: ${paths.viewMapDiagnosticsFile}`));
+}
+
+function reportBootstrapInitResult(paths: ReturnType<typeof getWorkspacePaths>, result: BootstrapScaffoldInitResult) {
+    const created = result.files.filter((item) => item.action === 'created').length;
+    const updated = result.files.filter((item) => item.action === 'updated').length;
+    const skipped = result.files.filter((item) => item.action === 'skipped').length;
+    console.log(
+        chalk.green(
+            `[TriadMind] bootstrap init complete: created=${created}, updated=${updated}, skipped=${skipped}`
+        )
+    );
+    result.files.forEach((item) => {
+        const marker =
+            item.action === 'created'
+                ? chalk.green('+')
+                : item.action === 'updated'
+                  ? chalk.yellow('~')
+                  : chalk.gray('=');
+        console.log(chalk.gray(`   ${marker} ${item.key}: ${item.path}`));
+    });
+    console.log(chalk.green(`[TriadMind] session verify output target: ${paths.bootstrapVerifyFile}`));
+}
+
+function formatBootstrapDoctorReport(report: BootstrapDoctorReport) {
+    const summary = report.passed ? 'PASS' : 'FAIL';
+    const lines = [
+        `TriadMind Bootstrap Doctor (${summary})`,
+        `generatedAt=${report.generatedAt}`,
+        `pass=${report.summary.passCount}, fail=${report.summary.failCount}`
+    ];
+    for (const file of report.files) {
+        const icon = file.status === 'pass' ? 'PASS' : 'FAIL';
+        lines.push(`[${icon}] ${file.key} | ${file.message}`);
+        if (file.recommendedAction) {
+            lines.push(`   action: ${file.recommendedAction}`);
+        }
+    }
+    return lines.join('\n');
 }
 
 function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {

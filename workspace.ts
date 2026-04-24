@@ -3,6 +3,8 @@ import * as path from 'path';
 export interface WorkspacePaths {
     projectRoot: string;
     triadDir: string;
+    agentsFile: string;
+    skillsFile: string;
     cacheDir: string;
     syncCacheFile: string;
     snapshotDir: string;
@@ -18,6 +20,10 @@ export interface WorkspacePaths {
     runtimeMapFile: string;
     runtimeVisualizerFile: string;
     runtimeDiagnosticsFile: string;
+    sessionBootstrapShellFile: string;
+    sessionBootstrapPs1File: string;
+    sessionBootstrapCmdFile: string;
+    bootstrapVerifyFile: string;
     governPolicyFile: string;
     governReportFile: string;
     governAuditFile: string;
@@ -72,6 +78,8 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
     return {
         projectRoot,
         triadDir,
+        agentsFile: path.join(projectRoot, 'AGENTS.md'),
+        skillsFile: path.join(projectRoot, 'skills.md'),
         cacheDir: path.join(triadDir, 'cache'),
         syncCacheFile: path.join(triadDir, 'cache', 'sync-manifest.json'),
         snapshotDir: path.join(triadDir, 'snapshots'),
@@ -87,6 +95,10 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         runtimeMapFile: path.join(triadDir, 'runtime-map.json'),
         runtimeVisualizerFile: path.join(triadDir, 'runtime-visualizer.html'),
         runtimeDiagnosticsFile: path.join(triadDir, 'runtime-diagnostics.json'),
+        sessionBootstrapShellFile: path.join(triadDir, 'session-bootstrap.sh'),
+        sessionBootstrapPs1File: path.join(triadDir, 'session-bootstrap.ps1'),
+        sessionBootstrapCmdFile: path.join(triadDir, 'session-bootstrap.cmd'),
+        bootstrapVerifyFile: path.join(triadDir, 'bootstrap-verify.json'),
         governPolicyFile: path.join(triadDir, 'govern-policy.json'),
         governReportFile: path.join(triadDir, 'govern-report.json'),
         governAuditFile: path.join(triadDir, 'govern-audit.log'),

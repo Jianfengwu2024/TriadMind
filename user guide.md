@@ -294,3 +294,45 @@ TriadMind 鐜板湪榛樿閬靛惊杩欎釜鍒ゆ柇鍘熷垯锛?
 - 榛樿闄嶅櫔锛歚str`銆乣int`銆乣dict`銆乣Any`銆乣Request`銆乣Response`銆乣Path` 绛変綆璇箟濂戠害杈?- 榛樿淇濈暀锛歚execute`銆乣run`銆乣handle`銆乣process`銆乣dispatch`銆乣apply`銆乣invoke`銆乣plan`銆乣schedule`銆乣orchestrate`
 - 榛樿鎶樺彔锛氭寕鍦?capability 涓嬬殑 helper / leaf 瀹炵幇涓嶄細鍦?architecture 涓诲浘鍗曠嫭鍑虹偣锛屼絾浠嶄繚鐣欑粰 drill-down / leaf 瑙嗗浘
 - 濡傞渶鏈€缁嗗嚱鏁板浘锛岃鏄惧紡璁?AI 鍔╂墜浣跨敤 `leaf` 瑙嗗浘
+
+---
+
+## 11. Session Bootstrap (Cross-platform)
+
+From this version, `triadmind init` runs bootstrap scaffolding by default (disable with `--skip-bootstrap`).
+
+Generated files:
+
+- `AGENTS.md` (managed block between `TRIADMIND_RULES_START/END`)
+- `skills.md` (session SOP)
+- `.triadmind/session-bootstrap.sh`
+- `.triadmind/session-bootstrap.ps1`
+- `.triadmind/session-bootstrap.cmd`
+
+Commands:
+
+```bash
+triadmind bootstrap init
+triadmind bootstrap init --force
+triadmind bootstrap doctor --json
+```
+
+Cross-platform startup (run once per new terminal session):
+
+```bash
+# Linux/macOS
+bash .triadmind/session-bootstrap.sh
+
+# Windows PowerShell
+.\.triadmind\session-bootstrap.ps1
+
+# Windows CMD
+.triadmind\session-bootstrap.cmd
+```
+
+Recommended CI order:
+
+```bash
+triadmind bootstrap doctor --json
+triadmind govern ci --policy .triadmind/govern-policy.json --json
+```
