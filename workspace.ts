@@ -18,6 +18,10 @@ export interface WorkspacePaths {
     runtimeMapFile: string;
     runtimeVisualizerFile: string;
     runtimeDiagnosticsFile: string;
+    governPolicyFile: string;
+    governReportFile: string;
+    governAuditFile: string;
+    governFixesFile: string;
     viewMapFile: string;
     viewMapDiagnosticsFile: string;
     verifyBaselineFile: string;
@@ -83,6 +87,10 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         runtimeMapFile: path.join(triadDir, 'runtime-map.json'),
         runtimeVisualizerFile: path.join(triadDir, 'runtime-visualizer.html'),
         runtimeDiagnosticsFile: path.join(triadDir, 'runtime-diagnostics.json'),
+        governPolicyFile: path.join(triadDir, 'govern-policy.json'),
+        governReportFile: path.join(triadDir, 'govern-report.json'),
+        governAuditFile: path.join(triadDir, 'govern-audit.log'),
+        governFixesFile: path.join(triadDir, 'govern-fixes.patch'),
         viewMapFile: path.join(triadDir, 'view-map.json'),
         viewMapDiagnosticsFile: path.join(triadDir, 'view-map-diagnostics.json'),
         verifyBaselineFile: path.join(triadDir, 'verify-baseline.json'),

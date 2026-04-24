@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "mode": "hard",
+  "must_pass": {
+    "diagnostics_no_code": { "op": "eq", "value": 0 },
+    "execute_like_ratio": { "op": "lt", "value": 0.1 },
+    "ghost_ratio": { "op": "lt", "value": 0.4 },
+    "rendered_edges_consistency": { "op": "eq", "value": true },
+    "runtime_unmatched_route_count": { "op": "lte_baseline_factor", "value": 1.1 }
+  },
+  "language_ghost_policy": {
+    "python": { "include_in_demand": false, "top_k": 0, "min_confidence": "high" },
+    "javascript": { "include_in_demand": false, "top_k": 0, "min_confidence": "high" },
+    "typescript": { "include_in_demand": true, "top_k": 5, "min_confidence": "high" },
+    "java": { "include_in_demand": true, "top_k": 5, "min_confidence": "high" },
+    "go": { "include_in_demand": true, "top_k": 5, "min_confidence": "high" },
+    "rust": { "include_in_demand": true, "top_k": 8, "min_confidence": "high" }
+  },
+  "forbidden_in_run": ["modify_policy", "modify_baseline"]
+}

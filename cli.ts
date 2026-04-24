@@ -28,6 +28,7 @@ import { extractRuntimeTopology } from './runtime/extractRuntimeTopology';
 import { normalizeRuntimeView } from './runtime/filterRuntimeMapByView';
 import { writeRuntimeMapArtifacts } from './runtime/runtimeMapWriter';
 import { generateRuntimeDashboard } from './runtime/runtimeVisualizer';
+import { formatGovernReport, runGovern } from './govern';
 import { formatVerifyReport, runTopologyVerify } from './verify';
 import { generateTrendArtifacts } from './trend';
 import { writeViewMapArtifacts } from './viewMap';
@@ -333,6 +334,90 @@ program
 
             if (options.strict && !report.passed) {
                 process.exitCode = 1;
+            }
+        }
+    );
+
+const governCommand = program
+    .command('govern')
+    .description('Hard-gate governance workflow (fail-closed checks, CI gates, fix planning)');
+
+governCommand
+    .command('check')
+    .description('Run hard governance checks using policy rules and emit govern artifacts')
+    .option('--policy <path>', 'Govern policy file path (default: .triadmind/govern-policy.json)')
+    .option('--json', 'Emit machine-readable govern report JSON')
+    .action((options: { policy?: string; json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+        const result = runGovern(paths, {
+            mode: 'check',
+            policyPath: options.policy
+        });
+
+        if (options.json) {
+            console.log(JSON.stringify(result.report, null, 2));
+        } else {
+            console.log(formatGovernReport(result.report));
+        }
+
+        if (result.exitCode !== 0) {
+            process.exitCode = result.exitCode;
+        }
+    });
+
+governCommand
+    .command('ci')
+    .description('CI fail-fast gate: run hard governance checks without interactive flow')
+    .option('--policy <path>', 'Govern policy file path (default: .triadmind/govern-policy.json)')
+    .option('--json', 'Emit machine-readable govern report JSON')
+    .action((options: { policy?: string; json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+        const result = runGovern(paths, {
+            mode: 'ci',
+            policyPath: options.policy
+        });
+
+        if (options.json) {
+            console.log(JSON.stringify(result.report, null, 2));
+        } else {
+            console.log(formatGovernReport(result.report));
+        }
+
+        if (result.exitCode !== 0) {
+            process.exitCode = result.exitCode;
+        }
+    });
+
+governCommand
+    .command('fix')
+    .description('Generate govern fix patch plan under hard policy constraints')
+    .option('--policy <path>', 'Govern policy file path (default: .triadmind/govern-policy.json)')
+    .option('--llm <provider:model>', 'LLM backend descriptor for fix planning')
+    .option('--max-iterations <n>', 'Max fix iterations for future auto-fix backends', '3')
+    .option('--dry-run', 'Only emit govern-fixes.patch without applying any fix')
+    .option('--json', 'Emit machine-readable govern report JSON')
+    .action(
+        (options: { policy?: string; llm?: string; maxIterations?: string; dryRun?: boolean; json?: boolean }) => {
+            const paths = getWorkspacePaths(process.cwd());
+            ensureTriadSpec(paths);
+            const result = runGovern(paths, {
+                mode: 'fix',
+                policyPath: options.policy,
+                llm: options.llm,
+                maxIterations: normalizePositiveCliInteger(options.maxIterations, 3),
+                dryRun: Boolean(options.dryRun)
+            });
+
+            if (options.json) {
+                console.log(JSON.stringify(result.report, null, 2));
+            } else {
+                console.log(formatGovernReport(result.report));
+            }
+
+            if (result.exitCode !== 0) {
+                process.exitCode = result.exitCode;
             }
         }
     );

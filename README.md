@@ -487,6 +487,9 @@ Reviewer controls:
 - `triadmind verify --json` emits machine-readable governance metrics for CI
 - `triadmind verify --strict` enforces default gates (`diagnostics_no_code`, `execute_like_ratio`, `ghost_ratio`, `rendered_edges_consistency`)
 - `triadmind verify --strict --baseline .triadmind/verify-baseline.json` enforces `runtime_unmatched_route_count <= baseline * 1.1`
+- `triadmind govern check --policy .triadmind/govern-policy.json --json` runs fail-closed hard gate checks and writes `govern-report.json` / `govern-audit.log`
+- `triadmind govern ci --policy .triadmind/govern-policy.json --json` is CI fail-fast entrypoint with explicit exit codes (2/3/4/5/6/7)
+- `triadmind govern fix --policy .triadmind/govern-policy.json --llm <provider:model> --max-iterations 3 --dry-run` emits `govern-fixes.patch` without changing policy/baseline
 - `triadmind trend` generates `.triadmind/trend.json` + `.triadmind/trend-report.md` for drift weekly reporting
 - CI sample is included at `.github/workflows/triadmind-verify.yml`
 - capability visualizer now defaults to fast fallback unless strict fingerprint is explicitly requested

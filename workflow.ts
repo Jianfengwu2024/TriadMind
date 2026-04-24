@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ensureTriadConfig } from './config';
+import { ensureGovernPolicyFile } from './governPolicy';
 import { analyzeWorkspaceStage } from './stage';
 import { getWorkspacePaths, ImplementationHandoffInput, normalizePath, WorkspacePaths } from './workspace';
 import {
@@ -29,6 +30,7 @@ export { getWorkspacePaths, type WorkspacePaths, type ImplementationHandoffInput
 export function ensureTriadSpec(paths: WorkspacePaths, force = false) {
     fs.mkdirSync(paths.triadDir, { recursive: true });
     ensureTriadConfig(paths);
+    ensureGovernPolicyFile(paths);
 
     if (force || !fs.existsSync(paths.triadSpecFile)) {
         fs.writeFileSync(paths.triadSpecFile, buildTriadSpec(paths.projectRoot), 'utf-8');
