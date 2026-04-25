@@ -365,7 +365,13 @@ function collectTypeScriptLeafNodes(
     const topLevelRecords = collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config);
     for (const record of topLevelRecords) {
         triadGraph.push(
-            createTriadNode(`${moduleName}.${record.name}`, category, sourcePath, record.demand, record.answer)
+            createTriadNode(
+                `${toPascalCase(record.ownerName || moduleName)}.${record.name}`,
+                category,
+                sourcePath,
+                record.demand,
+                record.answer
+            )
         );
     }
 
@@ -911,33 +917,22 @@ function collectJavaScriptLeafNodes(
         }
     }
 
-    const topLevelNodes = config.parser.includeUntaggedExports ? rootNode.namedChildren : rootNode.namedChildren.filter((node) => node.type === 'export_statement');
-    for (const topLevelNode of topLevelNodes) {
-        if (topLevelNode.type === 'export_statement') {
-            triadGraph.push(...collectJavaScriptExportNode(topLevelNode, moduleName, category, sourcePath, ghostContext));
-            continue;
-        }
-
-        if (topLevelNode.type === 'function_declaration') {
-            const functionName = getNameText(topLevelNode.childForFieldName('name'));
-            if (functionName) {
-                const ghostDemand = collectTypeScriptGhostDemand(topLevelNode, ghostContext);
-                triadGraph.push(
-                    createTriadNode(
-                        `${moduleName}.${functionName}`,
-                        category,
-                        sourcePath,
-                        mergeDemandEntries(parseJsParameters(topLevelNode.childForFieldName('parameters')), ghostDemand),
-                        ['unknown']
-                    )
-                );
-            }
-            continue;
-        }
-
-        if (topLevelNode.type === 'lexical_declaration' || topLevelNode.type === 'variable_declaration') {
-            triadGraph.push(...collectJavaScriptVariableFunctions(topLevelNode, moduleName, category, sourcePath, ghostContext));
-        }
+    const topLevelNodes = config.parser.includeUntaggedExports
+        ? rootNode.namedChildren
+        : rootNode.namedChildren.filter((node) => node.type === 'export_statement');
+    const topLevelRecords = topLevelNodes.flatMap((node) =>
+        collectJavaScriptTopLevelCapabilityRecords(node, rootNode, moduleName, ghostContext)
+    );
+    for (const record of topLevelRecords) {
+        triadGraph.push(
+            createTriadNode(
+                `${toPascalCase(record.ownerName || moduleName)}.${record.name}`,
+                category,
+                sourcePath,
+                record.demand,
+                record.answer
+            )
+        );
     }
 
     return triadGraph;
@@ -1081,79 +1076,6 @@ function collectJavaScriptClassPropertyTypes(
     }
 
     return propertyTypes;
-}
-
-function collectJavaScriptExportNode(
-    exportNode: Parser.SyntaxNode,
-    moduleName: string,
-    category: string,
-    sourcePath: string,
-    ghostContext: GhostBindingContext
-) {
-    const triadGraph: TriadNode[] = [];
-    const functionNode = exportNode.namedChildren.find((node) => node.type === 'function_declaration');
-    if (functionNode) {
-        const functionName = getNameText(functionNode.childForFieldName('name'));
-        if (functionName) {
-            const ghostDemand = collectTypeScriptGhostDemand(functionNode, ghostContext);
-            triadGraph.push(
-                createTriadNode(
-                    `${moduleName}.${functionName}`,
-                    category,
-                    sourcePath,
-                    mergeDemandEntries(parseJsParameters(functionNode.childForFieldName('parameters')), ghostDemand),
-                    ['unknown']
-                )
-            );
-        }
-        return triadGraph;
-    }
-
-    const declarationNode = exportNode.namedChildren.find(
-        (node) => node.type === 'lexical_declaration' || node.type === 'variable_declaration'
-    );
-    if (declarationNode) {
-        triadGraph.push(...collectJavaScriptVariableFunctions(declarationNode, moduleName, category, sourcePath, ghostContext));
-    }
-
-    return triadGraph;
-}
-
-function collectJavaScriptVariableFunctions(
-    declarationNode: Parser.SyntaxNode,
-    moduleName: string,
-    category: string,
-    sourcePath: string,
-    ghostContext: GhostBindingContext
-) {
-    const triadGraph: TriadNode[] = [];
-
-    for (const declarator of declarationNode.namedChildren.filter((node) => node.type === 'variable_declarator')) {
-        const nameNode = declarator.childForFieldName('name');
-        const valueNode = declarator.childForFieldName('value');
-        const functionName = getNameText(nameNode);
-
-        if (!functionName || !valueNode) {
-            continue;
-        }
-
-        if (valueNode.type !== 'arrow_function' && valueNode.type !== 'function') {
-            continue;
-        }
-
-        const ghostDemand = collectTypeScriptGhostDemand(valueNode, ghostContext);
-        triadGraph.push(
-            createTriadNode(
-                `${moduleName}.${functionName}`,
-                category,
-                sourcePath,
-                mergeDemandEntries(parseJsParameters(valueNode.childForFieldName('parameters')), ghostDemand),
-                ['unknown']
-            )
-        );
-    }
-
-    return triadGraph;
 }
 
 function resolveJavaScriptImportedBindingInfo(
@@ -1328,18 +1250,18 @@ function collectTypeScriptCapabilityNodes(
     const topLevelRecords = collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config);
     const promotableTopLevel = topLevelRecords.filter((record) => !isTypeScriptNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
-        shouldPromoteTypeScriptCapability(record.name, sourcePath, undefined, record.isExported, config, record)
+        shouldPromoteTypeScriptCapability(record.name, sourcePath, record.ownerName, record.isExported, config, record)
     );
 
     for (const record of promotedTopLevel) {
         triadGraph.push(
             createTriadNode(
-                `${moduleName}.${record.name}`,
+                `${toPascalCase(record.ownerName || moduleName)}.${record.name}`,
                 category,
                 sourcePath,
                 record.demand,
                 record.answer,
-                `execute ${moduleName}.${record.name} capability`
+                `execute ${toPascalCase(record.ownerName || moduleName)}.${record.name} capability`
             )
         );
     }
@@ -1365,6 +1287,7 @@ type TypeScriptExecutableRecord = {
     demand: string[];
     answer: string[];
     isExported: boolean;
+    ownerName: string;
     decorators?: string[];
 };
 
@@ -1407,22 +1330,34 @@ function collectTypeScriptTopLevelExecutableRecordsFromDeclaration(
     }
 
     if (declarationNode.type === 'function_declaration') {
-        return [buildTypeScriptExecutableRecord(declarationNode, ghostContext, undefined, isExported)];
+        return [buildTypeScriptExecutableRecord(declarationNode, ghostContext, moduleName, undefined, isExported)];
     }
 
     if (declarationNode.type === 'lexical_declaration' || declarationNode.type === 'variable_declaration') {
         return declarationNode.namedChildren
             .filter((child) => child.type === 'variable_declarator')
-            .map((declarator) => {
+            .flatMap((declarator) => {
                 const name = getNameText(declarator.childForFieldName('name'));
-                const valueNode = declarator.childForFieldName('value');
-                if (!name || !valueNode || (valueNode.type !== 'arrow_function' && valueNode.type !== 'function')) {
-                    return null;
+                const valueNode = unwrapTypeScriptExecutableValueNode(declarator.childForFieldName('value'));
+                if (!name || !valueNode) {
+                    return [];
                 }
 
-                return buildTypeScriptExecutableRecord(valueNode, ghostContext, undefined, isExported, name);
+                if (valueNode.type === 'arrow_function' || valueNode.type === 'function') {
+                    return [buildTypeScriptExecutableRecord(valueNode, ghostContext, moduleName, undefined, isExported, name)];
+                }
+
+                if (valueNode.type === 'object') {
+                    return collectTypeScriptObjectExecutableRecords(valueNode, ghostContext, name, isExported);
+                }
+
+                return [];
             })
             .filter((record): record is TypeScriptExecutableRecord => Boolean(record));
+    }
+
+    if (declarationNode.type === 'object') {
+        return collectTypeScriptObjectExecutableRecords(declarationNode, ghostContext, moduleName, isExported);
     }
 
     if (declarationNode.type === 'identifier' || declarationNode.type === 'type_identifier') {
@@ -1483,7 +1418,7 @@ function resolveTypeScriptTopLevelExecutableRecordByName(
         if (declarationNode.type === 'function_declaration') {
             const functionName = getNameText(declarationNode.childForFieldName('name'));
             if (functionName === bindingName) {
-                return [buildTypeScriptExecutableRecord(declarationNode, ghostContext, undefined, true)];
+                return [buildTypeScriptExecutableRecord(declarationNode, ghostContext, moduleName, undefined, true)];
             }
             continue;
         }
@@ -1494,13 +1429,15 @@ function resolveTypeScriptTopLevelExecutableRecordByName(
 
         for (const declarator of declarationNode.namedChildren.filter((entry) => entry.type === 'variable_declarator')) {
             const functionName = getNameText(declarator.childForFieldName('name'));
-            const valueNode = declarator.childForFieldName('value');
-            if (
-                functionName === bindingName &&
-                valueNode &&
-                (valueNode.type === 'arrow_function' || valueNode.type === 'function')
-            ) {
-                return [buildTypeScriptExecutableRecord(valueNode, ghostContext, undefined, true, functionName)];
+            const valueNode = unwrapTypeScriptExecutableValueNode(declarator.childForFieldName('value'));
+            if (functionName !== bindingName || !valueNode) {
+                continue;
+            }
+            if (valueNode.type === 'arrow_function' || valueNode.type === 'function') {
+                return [buildTypeScriptExecutableRecord(valueNode, ghostContext, moduleName, undefined, true, functionName)];
+            }
+            if (valueNode.type === 'object') {
+                return collectTypeScriptObjectExecutableRecords(valueNode, ghostContext, functionName, true);
             }
         }
     }
@@ -1537,7 +1474,7 @@ function collectTypeScriptClassCapabilityNodes(
                 classHasTriadTag ||
                 hasNearbyTriadTag(source, entry.node.startIndex, config)
         )
-        .map((entry) => buildTypeScriptExecutableRecord(entry.node, ghostContext, classPropertyTypes));
+        .map((entry) => buildTypeScriptExecutableRecord(entry.node, ghostContext, className, classPropertyTypes));
 
     const promotable = records.filter((record) => !isTypeScriptNoiseCapability(record.name, config, sourcePath, record));
     if (promotable.length === 0) {
@@ -1598,33 +1535,10 @@ function collectTypeScriptClassCapabilityNodes(
     return [];
 }
 
-function buildTypeScriptExportCapabilityRecord(
-    exportNode: Parser.SyntaxNode,
-    moduleName: string,
-    ghostContext: GhostBindingContext,
-    source: string,
-    config: TriadConfig
-) {
-    const fnNode = exportNode.namedChildren.find((node) => node.type === 'function_declaration');
-    if (!fnNode) {
-        return null;
-    }
-
-    const functionName = getNameText(fnNode.childForFieldName('name'));
-    if (!functionName) {
-        return null;
-    }
-
-    if (!config.parser.includeUntaggedExports && !hasNearbyTriadTag(source, exportNode.startIndex, config)) {
-        return null;
-    }
-
-    return buildTypeScriptExecutableRecord(fnNode, ghostContext, undefined, true);
-}
-
 function buildTypeScriptExecutableRecord(
     executableNode: Parser.SyntaxNode,
     ghostContext: GhostBindingContext,
+    ownerName: string,
     classPropertyTypes?: Map<string, string>,
     isExported = false,
     fallbackName?: string
@@ -1636,8 +1550,58 @@ function buildTypeScriptExecutableRecord(
         demand: mergeDemandEntries(parseTsParameters(executableNode.childForFieldName('parameters')), ghostDemand),
         answer: [normalizeGenericContractType(executableNode.childForFieldName('return_type')?.text.replace(/^:\s*/, '') ?? 'void')],
         isExported,
+        ownerName,
         decorators: getTypeScriptDecorators(executableNode)
     };
+}
+
+function collectTypeScriptObjectExecutableRecords(
+    objectNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext,
+    ownerName: string,
+    isExported = false
+) {
+    const records: TypeScriptExecutableRecord[] = [];
+    for (const child of objectNode.namedChildren) {
+        if (child.type === 'method_definition') {
+            records.push(buildTypeScriptExecutableRecord(child, ghostContext, ownerName, undefined, isExported));
+            continue;
+        }
+
+        if (child.type !== 'pair') {
+            continue;
+        }
+
+        const propertyName = getNameText(child.namedChildren[0] ?? null);
+        const valueNode = unwrapTypeScriptExecutableValueNode(child.namedChildren[1] ?? null);
+        if (!propertyName || !valueNode) {
+            continue;
+        }
+
+        if (valueNode.type === 'arrow_function' || valueNode.type === 'function') {
+            records.push(
+                buildTypeScriptExecutableRecord(valueNode, ghostContext, ownerName, undefined, isExported, propertyName)
+            );
+        }
+    }
+    return records;
+}
+
+function unwrapTypeScriptExecutableValueNode(node: Parser.SyntaxNode | null) {
+    let current = node;
+    while (current) {
+        if (
+            current.type === 'satisfies_expression' ||
+            current.type === 'as_expression' ||
+            current.type === 'parenthesized_expression' ||
+            current.type === 'type_assertion'
+        ) {
+            current = current.namedChildren[0] ?? null;
+            continue;
+        }
+        break;
+    }
+    return current;
 }
 
 function getTypeScriptDecorators(executableNode: Parser.SyntaxNode) {
@@ -1671,7 +1635,7 @@ function collectJavaScriptCapabilityNodes(
     );
     const promotableTopLevel = topLevelRecords.filter((record) => !isJavaScriptNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
-        shouldPromoteJavaScriptCapability(record.name, sourcePath, undefined, record.isExported, config, record)
+        shouldPromoteJavaScriptCapability(record.name, sourcePath, record.ownerName, record.isExported, config, record)
     );
 
     for (const record of promotedTopLevel) {
@@ -1818,16 +1782,28 @@ function collectJavaScriptTopLevelCapabilityRecordsFromDeclaration(
     if (declarationNode.type === 'lexical_declaration' || declarationNode.type === 'variable_declaration') {
         return declarationNode.namedChildren
             .filter((node) => node.type === 'variable_declarator')
-            .map((declarator) => {
+            .flatMap((declarator) => {
                 const name = getNameText(declarator.childForFieldName('name'));
-                const valueNode = declarator.childForFieldName('value');
-                if (!name || !valueNode || (valueNode.type !== 'arrow_function' && valueNode.type !== 'function')) {
-                    return null;
+                const valueNode = unwrapJavaScriptExecutableValueNode(declarator.childForFieldName('value'));
+                if (!name || !valueNode) {
+                    return [];
                 }
 
-                return buildJavaScriptExecutableRecord(valueNode, ghostContext, moduleName, undefined, isExported, name);
+                if (valueNode.type === 'arrow_function' || valueNode.type === 'function') {
+                    return [buildJavaScriptExecutableRecord(valueNode, ghostContext, moduleName, undefined, isExported, name)];
+                }
+
+                if (valueNode.type === 'object') {
+                    return collectJavaScriptObjectExecutableRecords(valueNode, ghostContext, name, isExported);
+                }
+
+                return [];
             })
             .filter((record): record is JavaScriptExecutableRecord => Boolean(record));
+    }
+
+    if (declarationNode.type === 'object') {
+        return collectJavaScriptObjectExecutableRecords(declarationNode, ghostContext, moduleName, isExported);
     }
 
     if (declarationNode.type === 'identifier') {
@@ -1875,13 +1851,15 @@ function resolveJavaScriptTopLevelExecutableRecordByName(
 
         for (const declarator of declarationNode.namedChildren.filter((entry) => entry.type === 'variable_declarator')) {
             const functionName = getNameText(declarator.childForFieldName('name'));
-            const valueNode = declarator.childForFieldName('value');
-            if (
-                functionName === bindingName &&
-                valueNode &&
-                (valueNode.type === 'arrow_function' || valueNode.type === 'function')
-            ) {
+            const valueNode = unwrapJavaScriptExecutableValueNode(declarator.childForFieldName('value'));
+            if (functionName !== bindingName || !valueNode) {
+                continue;
+            }
+            if (valueNode.type === 'arrow_function' || valueNode.type === 'function') {
                 return [buildJavaScriptExecutableRecord(valueNode, ghostContext, moduleName, undefined, true, functionName)];
+            }
+            if (valueNode.type === 'object') {
+                return collectJavaScriptObjectExecutableRecords(valueNode, ghostContext, functionName, true);
             }
         }
     }
@@ -1914,6 +1892,47 @@ function buildJavaScriptExecutableRecord(
         ownerName,
         isExported
     };
+}
+
+function collectJavaScriptObjectExecutableRecords(
+    objectNode: Parser.SyntaxNode,
+    ghostContext: GhostBindingContext,
+    ownerName: string,
+    isExported = false
+) {
+    const records: JavaScriptExecutableRecord[] = [];
+    for (const child of objectNode.namedChildren) {
+        if (child.type === 'method_definition') {
+            records.push(buildJavaScriptExecutableRecord(child, ghostContext, ownerName, undefined, isExported));
+            continue;
+        }
+
+        if (child.type !== 'pair') {
+            continue;
+        }
+
+        const propertyName = getNameText(child.namedChildren[0] ?? null);
+        const valueNode = unwrapJavaScriptExecutableValueNode(child.namedChildren[1] ?? null);
+        if (!propertyName || !valueNode) {
+            continue;
+        }
+
+        if (valueNode.type === 'arrow_function' || valueNode.type === 'function') {
+            records.push(
+                buildJavaScriptExecutableRecord(valueNode, ghostContext, ownerName, undefined, isExported, propertyName)
+            );
+        }
+    }
+
+    return records;
+}
+
+function unwrapJavaScriptExecutableValueNode(node: Parser.SyntaxNode | null) {
+    let current = node;
+    while (current && current.type === 'parenthesized_expression') {
+        current = current.namedChildren[0] ?? null;
+    }
+    return current;
 }
 
 function inferJavaScriptExecutableReturnType(executableNode: Parser.SyntaxNode) {

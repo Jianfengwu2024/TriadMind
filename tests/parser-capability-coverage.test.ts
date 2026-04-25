@@ -200,6 +200,29 @@ export { createDeployCommand };
     assert.deepEqual((idsByPath.get('rheo_cli/main.ts') ?? []).sort(), ['Main.createDeployCommand', 'Main.main']);
 });
 
+test('typescript cli command descriptor objects with satisfies/export default become executable nodes', () => {
+    const { triadMap, leafMap } = parseFixture('typescript', {
+        'rheo_cli/commands/agents/index.ts': `
+type Command = { load(): Promise<unknown> };
+
+const agents = {
+    type: 'local-jsx',
+    name: 'agents',
+    description: 'Manage agent configurations',
+    load: () => import('./agents.js')
+} satisfies Command;
+
+export default agents;
+`
+    });
+
+    const triadIds = triadMap.filter((node) => node.sourcePath === 'rheo_cli/commands/agents/index.ts').map((node) => node.nodeId);
+    const leafIds = leafMap.filter((node) => node.sourcePath === 'rheo_cli/commands/agents/index.ts').map((node) => node.nodeId);
+
+    assert.deepEqual(triadIds, ['Agents.load']);
+    assert.deepEqual(leafIds, ['Agents.load']);
+});
+
 test('javascript frontend default-export identifier resolves back to executable capability', () => {
     const { triadMap } = parseFixture('javascript', {
         'frontend/src/app/settings/page.jsx': `
@@ -210,4 +233,17 @@ export default SettingsPage;
 
     const ids = triadMap.filter((node) => node.sourcePath === 'frontend/src/app/settings/page.jsx').map((node) => node.nodeId);
     assert.deepEqual(ids, ['Page.SettingsPage']);
+});
+
+test('javascript direct default-export object exposes executable members for cli-like modules', () => {
+    const { triadMap } = parseFixture('javascript', {
+        'rheo_cli/commands/deploy/index.js': `
+export default {
+    load: () => import('./deploy.js')
+};
+`
+    });
+
+    const ids = triadMap.filter((node) => node.sourcePath === 'rheo_cli/commands/deploy/index.js').map((node) => node.nodeId);
+    assert.deepEqual(ids, ['Index.load']);
 });
