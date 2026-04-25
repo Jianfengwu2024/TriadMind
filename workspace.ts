@@ -28,6 +28,7 @@ export interface WorkspacePaths {
     governReportFile: string;
     governAuditFile: string;
     governFixesFile: string;
+    coverageReportFile: string;
     viewMapFile: string;
     viewMapDiagnosticsFile: string;
     verifyBaselineFile: string;
@@ -113,6 +114,7 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         governReportFile: path.join(triadDir, 'govern-report.json'),
         governAuditFile: path.join(triadDir, 'govern-audit.log'),
         governFixesFile: path.join(triadDir, 'govern-fixes.patch'),
+        coverageReportFile: path.join(triadDir, 'coverage-report.json'),
         viewMapFile: path.join(triadDir, 'view-map.json'),
         viewMapDiagnosticsFile: path.join(triadDir, 'view-map-diagnostics.json'),
         verifyBaselineFile: path.join(triadDir, 'verify-baseline.json'),

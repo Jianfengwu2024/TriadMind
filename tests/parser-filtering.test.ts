@@ -30,6 +30,8 @@ function createTestConfig(): TriadConfig {
         categories: {
             frontend: ['src/frontend', 'frontend'],
             backend: ['src/backend', 'backend', 'src/api', 'api'],
+            agent: ['src/agent', 'agent'],
+            rheo_cli: ['src/rheo_cli', 'rheo_cli', 'src/cli', 'cli'],
             core: ['src/core', 'core', 'src/shared', 'shared', 'src/lib', 'lib']
         },
         parser: {

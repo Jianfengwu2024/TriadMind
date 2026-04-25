@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadTriadConfig, resolveCategoryBySourcePath, TriadLanguage } from './config';
-import { TriadOp, UpgradeProtocol } from './protocol';
+import { TriadCategory, TriadOp, UpgradeProtocol } from './protocol';
 import { VerifyMetrics, runTopologyVerify } from './verify';
 import { WorkspacePaths } from './workspace';
 
@@ -70,7 +70,7 @@ export interface DreamProposal {
     title: string;
     priority: 'low' | 'medium' | 'high';
     confidence: number;
-    category?: 'frontend' | 'backend' | 'core' | 'unknown';
+    category?: TriadCategory | 'unknown';
     sourcePath?: string;
     objective: string;
     expectedOutcome: string;
@@ -662,7 +662,7 @@ function rankAndFilterProposals(proposals: DreamProposal[], minConfidence: numbe
 
 function validateProposalConsistency(
     proposals: DreamProposal[],
-    categories: { frontend: string[]; backend: string[]; core: string[] },
+    categories: Record<TriadCategory, string[]>,
     diagnostics: DreamDiagnostic[]
 ) {
     return proposals.map((proposal) => {
@@ -728,7 +728,7 @@ function extractProposalSourcePathFromProtocolDraft(protocolDraft: UpgradeProtoc
 
 function canonicalizeProtocolDraft(
     proposal: DreamProposal,
-    categories: { frontend: string[]; backend: string[]; core: string[] },
+    categories: Record<TriadCategory, string[]>,
     diagnostics: DreamDiagnostic[]
 ) {
     if (!proposal.protocolDraft || !Array.isArray(proposal.protocolDraft.actions)) {
@@ -801,8 +801,8 @@ function emitCategoryConsistencyDiagnostics(input: {
     diagnostics: DreamDiagnostic[];
     proposalId: string;
     scope: string;
-    previousCategory: 'frontend' | 'backend' | 'core' | 'unknown';
-    resolvedCategory: 'frontend' | 'backend' | 'core' | 'unknown';
+    previousCategory: TriadCategory | 'unknown';
+    resolvedCategory: TriadCategory | 'unknown';
     sourcePath: string;
     nodeId?: string;
     actionIndex?: number;

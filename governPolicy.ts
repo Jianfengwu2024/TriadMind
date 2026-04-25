@@ -10,6 +10,7 @@ export type GovernMetricKey =
     | 'runtime_unmatched_route_count';
 
 export type GovernRuleOperator = 'eq' | 'lt' | 'lte' | 'lte_baseline_factor';
+export type GovernCoverageRuleOperator = 'gt' | 'gte';
 
 export type ForbiddenRunMutation = 'modify_policy' | 'modify_baseline';
 
@@ -24,10 +25,18 @@ export interface GovernLanguageGhostPolicy {
     min_confidence: number | 'low' | 'medium' | 'high';
 }
 
+export interface GovernCoverageRule {
+    metric?: 'triad' | 'runtime' | 'combined';
+    op: GovernCoverageRuleOperator;
+    value: number;
+    must_pass?: boolean;
+}
+
 export interface GovernPolicy {
     version: string;
     mode: 'hard';
     must_pass: Record<string, GovernMetricRule>;
+    coverage_by_root?: Record<string, GovernCoverageRule>;
     language_ghost_policy?: Record<string, GovernLanguageGhostPolicy>;
     forbidden_in_run?: ForbiddenRunMutation[];
     baseline_path?: string;
@@ -74,4 +83,3 @@ export function ensureGovernPolicyFile(paths: WorkspacePaths) {
     fs.mkdirSync(path.dirname(paths.governPolicyFile), { recursive: true });
     fs.writeFileSync(paths.governPolicyFile, JSON.stringify(buildDefaultGovernPolicy(), null, 2), 'utf-8');
 }
-

@@ -143,3 +143,100 @@ test('writeViewMapArtifacts emits diagnostics for missing runtime map', () => {
         true
     );
 });
+
+test('view-map uses runtime evidence sourcePath and category alignment for runtime-capability links', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-view-map-evidence-'));
+    const paths = getWorkspacePaths(root);
+
+    writeFixture(root, '.triadmind/config.json', {
+        schemaVersion: '1.1',
+        architecture: {
+            language: 'typescript',
+            parserEngine: 'tree-sitter',
+            adapter: '@triadmind/plugin-ts'
+        },
+        categories: {
+            frontend: ['frontend'],
+            backend: ['backend'],
+            agent: ['agent'],
+            rheo_cli: ['rheo_cli'],
+            core: ['core']
+        },
+        parser: {
+            scanCategories: ['frontend', 'backend', 'agent', 'rheo_cli'],
+            scanMode: 'capability'
+        }
+    });
+
+    writeFixture(root, '.triadmind/triad-map.json', [
+        {
+            nodeId: 'DashboardPage.render',
+            category: 'frontend',
+            sourcePath: 'frontend/dashboard/page.tsx',
+            fission: {
+                problem: 'Render dashboard',
+                demand: ['None'],
+                answer: ['JSX.Element']
+            }
+        },
+        {
+            nodeId: 'DashboardService.render',
+            category: 'backend',
+            sourcePath: 'backend/dashboard/page.py',
+            fission: {
+                problem: 'Render backend dashboard',
+                demand: ['None'],
+                answer: ['dict']
+            }
+        }
+    ]);
+
+    writeFixture(root, '.triadmind/leaf-map.json', [
+        {
+            nodeId: 'DashboardPage.render',
+            category: 'frontend',
+            sourcePath: 'frontend/dashboard/page.tsx',
+            fission: {
+                problem: 'Render dashboard',
+                demand: ['None'],
+                answer: ['JSX.Element']
+            }
+        }
+    ]);
+
+    writeFixture(root, '.triadmind/runtime-map.json', {
+        schemaVersion: '1.0',
+        project: 'view-map-evidence-test',
+        generatedAt: new Date().toISOString(),
+        nodes: [
+            {
+                id: 'FrontendEntry.page',
+                type: 'FrontendEntry',
+                label: 'page entry',
+                category: 'frontend',
+                evidence: [
+                    {
+                        sourcePath: 'frontend/dashboard/page.tsx',
+                        kind: 'call',
+                        text: 'render dashboard'
+                    }
+                ]
+            }
+        ],
+        edges: []
+    });
+
+    const viewMap = generateViewMap(paths);
+    assert.equal(viewMap.stats.runtimeMatchedNodes, 1);
+    assert.equal(viewMap.stats.runtimeMatchRate, 1);
+    assert.equal(
+        viewMap.links.some(
+            (link) =>
+                link.fromView === 'runtime' &&
+                link.fromId === 'FrontendEntry.page' &&
+                link.toView === 'capability' &&
+                link.toId === 'DashboardPage.render'
+        ),
+        true
+    );
+});

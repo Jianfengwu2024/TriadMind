@@ -3,7 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { resolveAdapter } from './adapter';
-import { createSourcePathFilter, isIgnorableFsError, loadTriadConfig, shouldSkipWalkPath, TriadScanMode } from './config';
+import { createSourcePathFilter, isIgnorableFsError, loadTriadConfig, shouldSkipWalkPath, TriadLanguage, TriadScanMode } from './config';
+import { collectTreeSitterParseResult, TreeSitterTriadNode } from './treeSitterParser';
 import { normalizePath, WorkspacePaths } from './workspace';
 
 interface SourceFileDigest {
@@ -51,7 +52,11 @@ export function syncTriadMapWithOptions(
     }
 
     console.log(chalk.gray('   - [Sync] source changes detected; rebuilding triad-map...'));
-    resolveAdapter(paths).parseTopology(paths.projectRoot, paths.mapFile, effectiveConfig);
+    if (effectiveConfig.architecture.parserEngine === 'tree-sitter') {
+        syncPolyglotTreeSitterTopology(paths, effectiveConfig);
+    } else {
+        resolveAdapter(paths).parseTopology(paths.projectRoot, paths.mapFile, effectiveConfig);
+    }
     const nextManifest: SyncManifest = {
         ...currentManifest,
         parserEngine: effectiveConfig.architecture.parserEngine,
@@ -234,3 +239,169 @@ function hashContent(content: string) {
 function isSourceFile(filePath: string) {
     return /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py|go|rs|cpp|cc|cxx|hpp|hh|h|java)$/i.test(filePath) && !filePath.endsWith('.d.ts');
 }
+
+function syncPolyglotTreeSitterTopology(paths: WorkspacePaths, config: ReturnType<typeof loadTriadConfig>) {
+    const languages = detectProjectLanguages(paths, config);
+    const results = languages.map((language) => collectTreeSitterParseResult(language, paths.projectRoot, config));
+    const rewritePlan = buildCollisionRewritePlan(
+        results.flatMap((result) => [...result.leafNodes, ...result.projectedNodes])
+    );
+    const mergedLeafNodes = mergeMultiLanguageNodes(results.flatMap((result) => result.leafNodes), rewritePlan);
+    const mergedCapabilityNodes = mergeMultiLanguageNodes(results.flatMap((result) => result.projectedNodes), rewritePlan);
+
+    fs.mkdirSync(path.dirname(paths.leafMapFile), { recursive: true });
+    fs.mkdirSync(path.dirname(paths.mapFile), { recursive: true });
+    fs.writeFileSync(paths.leafMapFile, JSON.stringify(mergedLeafNodes, null, 2), 'utf-8');
+    fs.writeFileSync(paths.mapFile, JSON.stringify(mergedCapabilityNodes, null, 2), 'utf-8');
+
+    console.log(
+        chalk.gray(
+            `   - [Sync] polyglot tree-sitter merge complete: languages=${languages.join(', ')}, capability=${mergedCapabilityNodes.length}, leaf=${mergedLeafNodes.length}`
+        )
+    );
+}
+
+function detectProjectLanguages(paths: WorkspacePaths, config: ReturnType<typeof loadTriadConfig>) {
+    const includeSourcePath = createSourcePathFilter(paths.projectRoot, config);
+    const detected = new Set<TriadLanguage>();
+    for (const relativePath of collectSourceFiles(paths)) {
+        if (!includeSourcePath(relativePath)) {
+            continue;
+        }
+        const language = inferLanguageFromPath(relativePath);
+        if (language) {
+            detected.add(language);
+        }
+    }
+
+    if (detected.size === 0) {
+        detected.add(config.architecture.language);
+    }
+
+    return LANGUAGE_PRIORITY.filter((language) => detected.has(language));
+}
+
+function inferLanguageFromPath(filePath: string): TriadLanguage | undefined {
+    const normalized = normalizePath(filePath).toLowerCase();
+    if (/\.(ts|tsx|mts|cts)$/.test(normalized)) return 'typescript';
+    if (/\.(js|jsx|mjs|cjs)$/.test(normalized)) return 'javascript';
+    if (/\.py$/.test(normalized)) return 'python';
+    if (/\.go$/.test(normalized)) return 'go';
+    if (/\.rs$/.test(normalized)) return 'rust';
+    if (/\.(cc|cpp|cxx|hpp|hh|h)$/.test(normalized)) return 'cpp';
+    if (/\.java$/.test(normalized)) return 'java';
+    return undefined;
+}
+
+function mergeMultiLanguageNodes(nodes: TreeSitterTriadNode[], rewritePlan: Map<string, string>) {
+    return nodes
+        .map((node) => applyCollisionRewrite(node, rewritePlan))
+        .sort((left, right) => left.nodeId.localeCompare(right.nodeId) || left.sourcePath.localeCompare(right.sourcePath));
+}
+
+function buildCollisionRewritePlan(nodes: TreeSitterTriadNode[]) {
+    const grouped = new Map<string, TreeSitterTriadNode[]>();
+    for (const node of nodes) {
+        const list = grouped.get(node.nodeId) ?? [];
+        list.push(node);
+        grouped.set(node.nodeId, list);
+    }
+
+    const rewritePlan = new Map<string, string>();
+    for (const [nodeId, group] of grouped.entries()) {
+        const uniqueSourceKeys = new Set(group.map((node) => normalizePath(node.sourcePath).toLowerCase()));
+        if (uniqueSourceKeys.size <= 1) {
+            continue;
+        }
+
+        const sourceNamespaces = chooseUniqueSourceNamespaces(group);
+        for (const node of group) {
+            const identity = buildNodeIdentity(node);
+            const namespace = sourceNamespaces.get(identity) ?? sanitizeNamespace(node.category);
+            rewritePlan.set(identity, `${sanitizeNamespace(node.category)}.${namespace}.${nodeId}`);
+        }
+    }
+
+    return rewritePlan;
+}
+
+function chooseUniqueSourceNamespaces(group: TreeSitterTriadNode[]) {
+    const keyedSegments = group.map((node) => ({
+        identity: buildNodeIdentity(node),
+        segments: extractSourceNamespaceSegments(node.sourcePath)
+    }));
+
+    for (let width = 1; width <= Math.max(...keyedSegments.map((item) => item.segments.length), 1); width += 1) {
+        const candidateMap = new Map<string, string>();
+        let hasCollision = false;
+        for (const item of keyedSegments) {
+            const namespace = buildNamespaceFromSegments(item.segments, width);
+            if (Array.from(candidateMap.values()).includes(namespace)) {
+                hasCollision = true;
+                break;
+            }
+            candidateMap.set(item.identity, namespace);
+        }
+        if (!hasCollision) {
+            return candidateMap;
+        }
+    }
+
+    return new Map(
+        keyedSegments.map((item, index) => [item.identity, `${buildNamespaceFromSegments(item.segments, item.segments.length)}.${index + 1}`])
+    );
+}
+
+function applyCollisionRewrite(node: TreeSitterTriadNode, rewritePlan: Map<string, string>): TreeSitterTriadNode {
+    const identity = buildNodeIdentity(node);
+    const rewrittenNodeId = rewritePlan.get(identity) ?? node.nodeId;
+    const rewrittenFoldedLeaves = Array.isArray(node.topology?.foldedLeaves)
+        ? node.topology?.foldedLeaves.map((leafId) => {
+              const leafIdentity = buildNodeIdentity({
+                  ...node,
+                  nodeId: leafId
+              } as TreeSitterTriadNode);
+              return rewritePlan.get(leafIdentity) ?? leafId;
+          })
+        : undefined;
+
+    return {
+        ...node,
+        nodeId: rewrittenNodeId,
+        topology: rewrittenFoldedLeaves && rewrittenFoldedLeaves.length > 0 ? { foldedLeaves: rewrittenFoldedLeaves } : node.topology
+    };
+}
+
+function buildNodeIdentity(node: Pick<TreeSitterTriadNode, 'nodeId' | 'sourcePath' | 'category'>) {
+    return [node.nodeId, normalizePath(node.sourcePath).toLowerCase(), sanitizeNamespace(node.category)].join('::');
+}
+
+function extractSourceNamespaceSegments(sourcePath: string) {
+    return normalizePath(sourcePath)
+        .replace(/\.[^.\/]+$/, '')
+        .split('/')
+        .filter(Boolean)
+        .map((segment) => sanitizeNamespace(segment))
+        .filter((segment) => segment && !GENERIC_NAMESPACE_SEGMENTS.has(segment));
+}
+
+function buildNamespaceFromSegments(segments: string[], width: number) {
+    const chosen = segments.slice(-Math.max(1, width));
+    if (chosen.length === 0) {
+        return 'source';
+    }
+    return chosen.join('.');
+}
+
+function sanitizeNamespace(value: string) {
+    return String(value ?? '')
+        .trim()
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^A-Za-z0-9_]+/g, '.')
+        .replace(/^\.+|\.+$/g, '')
+        .replace(/\.{2,}/g, '.')
+        .toLowerCase() || 'source';
+}
+
+const LANGUAGE_PRIORITY: TriadLanguage[] = ['typescript', 'javascript', 'python', 'go', 'rust', 'cpp', 'java'];
+const GENERIC_NAMESPACE_SEGMENTS = new Set(['src', 'app', 'apps', 'packages', 'package', 'lib', 'core', 'main', 'index']);

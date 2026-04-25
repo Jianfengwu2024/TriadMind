@@ -105,6 +105,8 @@ const DEFAULT_CONFIG: TriadConfig = {
     categories: {
         frontend: ['src/frontend', 'frontend', 'src/client', 'client', 'src/web', 'web', 'src/app', 'app', 'apps/frontend', 'packages/frontend'],
         backend: ['src/backend', 'backend', 'src/server', 'server', 'src/api', 'api', 'apps/backend', 'packages/backend'],
+        agent: ['src/agent', 'agent', 'apps/agent', 'packages/agent'],
+        rheo_cli: ['src/rheo_cli', 'rheo_cli', 'src/cli', 'cli', 'apps/cli', 'packages/cli'],
         core: ['src/core', 'core', 'src/shared', 'shared', 'src/lib', 'lib']
     },
     parser: {
@@ -132,7 +134,7 @@ const DEFAULT_CONFIG: TriadConfig = {
             'dist',
             'build'
         ],
-        scanCategories: ['frontend', 'backend'],
+        scanCategories: ['frontend', 'backend', 'agent', 'rheo_cli'],
         scanMode: 'capability',
         leafOutputFile: '.triadmind/leaf-map.json',
         capabilityOutputFile: '.triadmind/triad-map.json',
@@ -394,17 +396,8 @@ export function loadTriadConfig(paths: WorkspacePaths): TriadConfig {
 }
 
 export function resolveCategoryFromConfig(sourcePath: string, config: TriadConfig): TriadCategory {
-    const normalizedPath = normalizePath(sourcePath).toLowerCase();
-
-    const categories: TriadCategory[] = ['frontend', 'backend', 'core'];
-    for (const category of categories) {
-        const patterns = config.categories[category] ?? [];
-        if (patterns.some((pattern) => normalizedPath.includes(normalizePath(pattern).toLowerCase()))) {
-            return category;
-        }
-    }
-
-    return 'core';
+    const resolved = resolveCategoryBySourcePath(sourcePath, config.categories);
+    return resolved === 'unknown' ? 'core' : resolved;
 }
 
 export function resolveCategoryBySourcePath(
@@ -416,7 +409,7 @@ export function resolveCategoryBySourcePath(
         return 'unknown';
     }
 
-    const categoryOrder: TriadCategory[] = ['frontend', 'backend', 'core'];
+    const categoryOrder = (Object.keys(categories) as TriadCategory[]).filter(Boolean);
     let bestMatch: { category: TriadCategory; score: number } | undefined;
 
     for (const category of categoryOrder) {
@@ -517,6 +510,8 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
         categories: {
             frontend: mergeCategoryPatterns(value.categories?.frontend, DEFAULT_CONFIG.categories.frontend),
             backend: mergeCategoryPatterns(value.categories?.backend, DEFAULT_CONFIG.categories.backend),
+            agent: mergeCategoryPatterns(value.categories?.agent, DEFAULT_CONFIG.categories.agent),
+            rheo_cli: mergeCategoryPatterns(value.categories?.rheo_cli, DEFAULT_CONFIG.categories.rheo_cli),
             core: mergeCategoryPatterns(value.categories?.core, DEFAULT_CONFIG.categories.core)
         },
         parser: {
@@ -692,7 +687,7 @@ function normalizeScanCategories(value: TriadCategory[] | undefined) {
         return [...DEFAULT_CONFIG.parser.scanCategories];
     }
 
-    const allowed = new Set<TriadCategory>(['frontend', 'backend', 'core']);
+    const allowed = new Set<TriadCategory>(['frontend', 'backend', 'agent', 'rheo_cli', 'core']);
     const normalized = value.filter((entry): entry is TriadCategory => allowed.has(entry));
     return normalized.length > 0 ? Array.from(new Set(normalized)) : [...DEFAULT_CONFIG.parser.scanCategories];
 }

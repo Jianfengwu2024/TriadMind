@@ -1,7 +1,9 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { CoverageReport, runCoverage } from './coverage';
 import {
+    GovernCoverageRule,
     ForbiddenRunMutation,
     GovernLanguageGhostPolicy,
     GovernMetricRule,
@@ -77,6 +79,7 @@ export interface GovernReport {
         triadMapFile: string;
         runtimeMapFile: string;
         runtimeDiagnosticsFile: string;
+        coverageReportFile: string;
         governReportFile: string;
         governAuditFile: string;
         governFixesFile?: string;
@@ -101,11 +104,19 @@ interface GovernLanguagePolicyNormalized {
     minConfidence: number;
 }
 
+interface GovernCoverageRuleNormalized {
+    metric: 'triad' | 'runtime' | 'combined';
+    op: 'gt' | 'gte';
+    value: number;
+    mustPass: boolean;
+}
+
 interface GovernPolicyNormalized {
     version: string;
     mode: 'hard';
     mustPass: Record<string, GovernMetricRule>;
     languageGhostPolicy: Record<string, GovernLanguagePolicyNormalized>;
+    coverageByRoot: Record<string, GovernCoverageRuleNormalized>;
     forbiddenInRun: Set<ForbiddenRunMutation>;
     baselinePath?: string;
 }
@@ -201,8 +212,16 @@ export function runGovern(paths: WorkspacePaths, options: GovernRunOptions): Gov
         strict: true,
         baselinePath
     });
+    const coverageReport = runCoverage(paths);
 
     const metrics = { ...(verifyReport.metrics as VerifyMetrics) } as Record<string, unknown>;
+    metrics.coverage_summary = {
+        triad: coverageReport.summary.triadCoverage,
+        runtime: coverageReport.summary.runtimeCoverage,
+        combined: coverageReport.summary.combinedCoverage,
+        total_source_files: coverageReport.summary.totalSourceFiles
+    };
+    metrics.coverage_by_root = buildCoverageMetricSnapshot(coverageReport);
     const diagnosticsShapeErrors = validateRuntimeDiagnosticsShape(paths.runtimeDiagnosticsFile);
     if (diagnosticsShapeErrors.length > 0) {
         report.checks.push({
@@ -229,6 +248,7 @@ export function runGovern(paths: WorkspacePaths, options: GovernRunOptions): Gov
     report.checks.push(...mustPassEvaluation.checks);
     report.baseline = mustPassEvaluation.baseline;
     mustPassEvaluation.errors.forEach((item) => report.failures.push(item));
+    report.checks.push(...evaluateCoverageRules(loadedPolicy.policy.coverageByRoot, coverageReport));
 
     const triadNodes = readTriadNodes(paths.mapFile);
     const languagePolicy = evaluateLanguageGhostPolicy(triadNodes, loadedPolicy.policy.languageGhostPolicy);
@@ -386,6 +406,7 @@ function createBaseReport(paths: WorkspacePaths, mode: GovernMode, policyPath: s
             triadMapFile: paths.mapFile,
             runtimeMapFile: paths.runtimeMapFile,
             runtimeDiagnosticsFile: paths.runtimeDiagnosticsFile,
+            coverageReportFile: paths.coverageReportFile,
             governReportFile: paths.governReportFile,
             governAuditFile: paths.governAuditFile,
             governFixesFile: mode === 'fix' ? paths.governFixesFile : undefined
@@ -740,6 +761,13 @@ function loadGovernPolicy(policyPath: string): { policy?: GovernPolicyNormalized
         };
     }
 
+    const coverageByRoot = normalizeCoverageByRoot(policy.coverage_by_root);
+    if (policy.coverage_by_root && !coverageByRoot) {
+        return {
+            error: 'Policy coverage_by_root contains invalid rule definitions'
+        };
+    }
+
     const forbiddenInRun = normalizeForbiddenMutations(policy.forbidden_in_run);
     if (!forbiddenInRun) {
         return {
@@ -754,6 +782,7 @@ function loadGovernPolicy(policyPath: string): { policy?: GovernPolicyNormalized
             mode: 'hard',
             mustPass,
             languageGhostPolicy: normalizedLanguagePolicy,
+            coverageByRoot: coverageByRoot ?? {},
             forbiddenInRun,
             baselinePath
         }
@@ -827,6 +856,43 @@ function normalizeLanguageGhostPolicy(raw: unknown) {
     }
 
     return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizeCoverageByRoot(raw: unknown) {
+    if (raw === undefined) {
+        return {} as Record<string, GovernCoverageRuleNormalized>;
+    }
+    if (!raw || typeof raw !== 'object') {
+        return undefined;
+    }
+
+    const normalized: Record<string, GovernCoverageRuleNormalized> = {};
+    for (const [rawKey, rawValue] of Object.entries(raw as Record<string, unknown>)) {
+        const key = String(rawKey ?? '').trim();
+        if (!key || !rawValue || typeof rawValue !== 'object') {
+            return undefined;
+        }
+
+        const rule = rawValue as GovernCoverageRule;
+        const op = String(rule.op ?? '').trim() as 'gt' | 'gte';
+        const value = toFiniteNumber(rule.value);
+        const metric = String(rule.metric ?? 'combined').trim().toLowerCase();
+        if ((op !== 'gt' && op !== 'gte') || typeof value !== 'number' || value < 0 || value > 1) {
+            return undefined;
+        }
+        if (metric !== 'triad' && metric !== 'runtime' && metric !== 'combined') {
+            return undefined;
+        }
+
+        normalized[key] = {
+            metric,
+            op,
+            value,
+            mustPass: rule.must_pass === true
+        };
+    }
+
+    return normalized;
 }
 
 function normalizeForbiddenMutations(raw: unknown) {
@@ -1003,4 +1069,72 @@ function stringifyExpected(value: unknown) {
 
 function isNonEmptyText(value: unknown) {
     return typeof value === 'string' && value.trim().length > 0;
+}
+
+function buildCoverageMetricSnapshot(report: CoverageReport) {
+    return {
+        by_category: Object.fromEntries(
+            Object.entries(report.byCategory).map(([key, bucket]) => [
+                key,
+                {
+                    triad: bucket.triadCoverage,
+                    runtime: bucket.runtimeCoverage,
+                    combined: bucket.combinedCoverage,
+                    total_source_files: bucket.totalSourceFiles
+                }
+            ])
+        ),
+        by_root: Object.fromEntries(
+            Object.entries(report.byRoot).map(([key, bucket]) => [
+                key,
+                {
+                    triad: bucket.triadCoverage,
+                    runtime: bucket.runtimeCoverage,
+                    combined: bucket.combinedCoverage,
+                    total_source_files: bucket.totalSourceFiles,
+                    exists: bucket.exists ?? false
+                }
+            ])
+        )
+    };
+}
+
+function evaluateCoverageRules(
+    coverageRules: Record<string, GovernCoverageRuleNormalized>,
+    coverageReport: CoverageReport
+) {
+    return Object.entries(coverageRules).map(([key, rule]) => {
+        const bucket = coverageReport.byCategory[key] ?? coverageReport.byRoot[key];
+        const actual = bucket ? selectCoverageMetric(bucket, rule.metric) : null;
+        const totalFiles = bucket?.totalSourceFiles ?? 0;
+        const passed =
+            typeof actual === 'number' &&
+            totalFiles > 0 &&
+            (rule.op === 'gt' ? actual > rule.value : actual >= rule.value);
+
+        return {
+            key: `coverage_by_root.${key}`,
+            status: passed ? 'pass' : 'fail',
+            expected: `${rule.op === 'gt' ? '>' : '>='} ${rule.value} (${rule.metric})`,
+            actual,
+            detail:
+                bucket && totalFiles > 0
+                    ? `${bucket.key} ${rule.metric} coverage across ${totalFiles} source files`
+                    : `${key} has no discoverable source files in coverage report`,
+            mustPass: rule.mustPass
+        } satisfies GovernCheckResult;
+    });
+}
+
+function selectCoverageMetric(
+    bucket: { triadCoverage: number; runtimeCoverage: number; combinedCoverage: number },
+    metric: 'triad' | 'runtime' | 'combined'
+) {
+    if (metric === 'triad') {
+        return bucket.triadCoverage;
+    }
+    if (metric === 'runtime') {
+        return bucket.runtimeCoverage;
+    }
+    return bucket.combinedCoverage;
 }

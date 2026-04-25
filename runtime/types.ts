@@ -65,7 +65,7 @@ export interface RuntimeNode {
     type: RuntimeNodeType;
     label: string;
     sourcePath?: string;
-    category?: 'frontend' | 'backend' | 'core' | 'infra' | 'external';
+    category?: 'frontend' | 'backend' | 'agent' | 'rheo_cli' | 'core' | 'infra' | 'external';
     framework?: string;
     metadata?: Record<string, unknown>;
     evidence?: RuntimeEvidence[];

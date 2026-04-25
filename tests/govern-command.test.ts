@@ -10,6 +10,7 @@ interface FixtureOptions {
     triadNodes?: unknown[];
     runtimeDiagnostics?: unknown[];
     policyOverride?: Record<string, unknown>;
+    sourceFiles?: Record<string, string>;
 }
 
 function createGovernFixture(options: FixtureOptions = {}) {
@@ -116,6 +117,13 @@ function createGovernFixture(options: FixtureOptions = {}) {
         'utf-8'
     );
     fs.writeFileSync(path.join(triadDir, 'govern-policy.json'), JSON.stringify(governPolicy, null, 2), 'utf-8');
+
+    for (const [relativePath, content] of Object.entries(options.sourceFiles ?? {})) {
+        const targetPath = path.join(root, relativePath);
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+        fs.writeFileSync(targetPath, content, 'utf-8');
+    }
+
     return root;
 }
 
@@ -227,3 +235,76 @@ test('govern fix dry-run emits patch and returns fix_failed exit code', () => {
     assert.equal(fs.existsSync(path.join(root, '.triadmind', 'govern-fixes.patch')), true);
 });
 
+test('govern ci reports coverage_by_root warning without blocking when must_pass=false', () => {
+    const root = createGovernFixture({
+        sourceFiles: {
+            'backend/executor.ts': 'export function execute() { return 1; }\n',
+            'backend/helper.ts': 'export function helper() { return 2; }\n'
+        },
+        triadNodes: [
+            {
+                nodeId: 'Executor.dispatch',
+                category: 'backend',
+                sourcePath: 'backend/executor.ts',
+                fission: {
+                    problem: 'dispatch path',
+                    demand: ['Payload (payload)'],
+                    answer: ['Result']
+                }
+            }
+        ],
+        policyOverride: {
+            coverage_by_root: {
+                backend: { metric: 'combined', op: 'gte', value: 0.8, must_pass: false }
+            }
+        }
+    });
+
+    const result = runCli(root, ['govern', 'ci', '--json']);
+    assert.equal(result.status, 0, `warning-only coverage gate should not block: ${result.stderr || result.stdout}`);
+    const report = parseJsonStdout(result.stdout);
+    assert.equal(
+        report.checks.some(
+            (check: { key?: string; status?: string; mustPass?: boolean }) =>
+                check.key === 'coverage_by_root.backend' && check.status === 'fail' && check.mustPass === false
+        ),
+        true
+    );
+});
+
+test('govern ci blocks when coverage_by_root must_pass rule fails', () => {
+    const root = createGovernFixture({
+        sourceFiles: {
+            'backend/executor.ts': 'export function execute() { return 1; }\n',
+            'backend/helper.ts': 'export function helper() { return 2; }\n'
+        },
+        triadNodes: [
+            {
+                nodeId: 'Executor.dispatch',
+                category: 'backend',
+                sourcePath: 'backend/executor.ts',
+                fission: {
+                    problem: 'dispatch path',
+                    demand: ['Payload (payload)'],
+                    answer: ['Result']
+                }
+            }
+        ],
+        policyOverride: {
+            coverage_by_root: {
+                backend: { metric: 'combined', op: 'gte', value: 0.8, must_pass: true }
+            }
+        }
+    });
+
+    const result = runCli(root, ['govern', 'ci', '--json']);
+    assert.equal(result.status, 2, `must-pass coverage gate should block: ${result.stderr || result.stdout}`);
+    const report = parseJsonStdout(result.stdout);
+    assert.equal(
+        report.checks.some(
+            (check: { key?: string; status?: string; mustPass?: boolean }) =>
+                check.key === 'coverage_by_root.backend' && check.status === 'fail' && check.mustPass === true
+        ),
+        true
+    );
+});

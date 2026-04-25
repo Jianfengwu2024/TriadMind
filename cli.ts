@@ -34,6 +34,7 @@ import { normalizeRuntimeView } from './runtime/filterRuntimeMapByView';
 import { writeRuntimeMapArtifacts } from './runtime/runtimeMapWriter';
 import { generateRuntimeDashboard } from './runtime/runtimeVisualizer';
 import { formatGovernReport, runGovern } from './govern';
+import { formatCoverageReport, runCoverage } from './coverage';
 import { formatVerifyReport, runTopologyVerify } from './verify';
 import { generateTrendArtifacts } from './trend';
 import { formatDreamReport, loadLatestDreamReport, runDreamAnalysis } from './dream';
@@ -348,6 +349,23 @@ program
                 theme: options.theme === 'runtime-dark' ? 'runtime-dark' : 'leaf-like'
             });
             console.log(chalk.green(`✅ Runtime visualizer written: ${paths.runtimeVisualizerFile}`));
+        }
+    });
+
+program
+    .command('coverage')
+    .description('Measure triad/runtime/combined topology coverage by category root')
+    .option('--json', 'Emit machine-readable coverage JSON report')
+    .action((options: { json?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+        const report = runCoverage(paths);
+
+        if (options.json) {
+            console.log(JSON.stringify(report, null, 2));
+        } else {
+            console.log(formatCoverageReport(report));
+            console.log(chalk.gray(`[TriadMind] coverage report written: ${paths.coverageReportFile}`));
         }
     });
 

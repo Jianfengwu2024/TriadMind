@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { loadTriadConfig, resolveCategoryBySourcePath } from './config';
 import { RuntimeMap } from './runtime/types';
 import { WorkspacePaths } from './workspace';
 
@@ -15,6 +16,7 @@ type ViewRelation =
 
 type TriadNode = {
     nodeId?: string;
+    category?: string;
     sourcePath?: string;
     topology?: {
         foldedLeaves?: string[];
@@ -51,6 +53,9 @@ export interface ViewMap {
         capabilityNodes: number;
         leafNodes: number;
         linkCount: number;
+        runtimeMatchedNodes: number;
+        runtimeUnmatchedNodes: number;
+        runtimeMatchRate: number;
     };
     links: ViewMapLink[];
     diagnostics: ViewMapDiagnostic[];
@@ -68,6 +73,7 @@ type RuntimeCapabilityCandidate = {
 };
 
 export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions = {}): ViewMap {
+    const config = loadTriadConfig(paths);
     const diagnostics: ViewMapDiagnostic[] = [];
     const capabilityNodes = readTriadNodes(paths.mapFile, diagnostics, 'VIEW_MAP_MISSING_TRIAD_MAP');
     const leafNodes = readTriadNodes(paths.leafMapFile, diagnostics, 'VIEW_MAP_MISSING_LEAF_MAP');
@@ -184,7 +190,7 @@ export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions =
             continue;
         }
 
-        const candidates = collectRuntimeCapabilityCandidates(runtimeNode, capabilityById);
+        const candidates = collectRuntimeCapabilityCandidates(runtimeNode, capabilityById, config.categories);
         if (candidates.length === 0) {
             runtimeUnmatchedCount += 1;
             if (unmatchedSamples.length < 10) {
@@ -236,6 +242,14 @@ export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions =
             }`
         });
     }
+    diagnostics.push({
+        level: 'info',
+        code: 'VIEW_MAP_RUNTIME_MATCH_SUMMARY',
+        message: `Runtime match rate: ${runtimeNodes.length - runtimeUnmatchedCount}/${runtimeNodes.length} (${safeRatio(
+            runtimeNodes.length - runtimeUnmatchedCount,
+            runtimeNodes.length
+        ).toFixed(3)})`
+    });
 
     const links = Array.from(linksByKey.values()).sort((left, right) => left.id.localeCompare(right.id));
     return {
@@ -246,7 +260,10 @@ export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions =
             runtimeNodes: runtimeNodes.length,
             capabilityNodes: capabilityById.size,
             leafNodes: leafById.size,
-            linkCount: links.length
+            linkCount: links.length,
+            runtimeMatchedNodes: runtimeNodes.length - runtimeUnmatchedCount,
+            runtimeUnmatchedNodes: runtimeUnmatchedCount,
+            runtimeMatchRate: safeRatio(runtimeNodes.length - runtimeUnmatchedCount, runtimeNodes.length)
         },
         links,
         diagnostics
@@ -261,31 +278,38 @@ export function writeViewMapArtifacts(paths: WorkspacePaths, options: ViewMapOpt
     return viewMap;
 }
 
-function collectRuntimeCapabilityCandidates(runtimeNode: RuntimeNode, capabilityById: Map<string, TriadNode>) {
-    const runtimeSourcePath = normalizeSourcePath(runtimeNode.sourcePath);
-    const runtimeTokens = tokenize(`${runtimeNode.id} ${runtimeNode.label} ${runtimeNode.sourcePath ?? ''}`);
+function collectRuntimeCapabilityCandidates(
+    runtimeNode: RuntimeNode,
+    capabilityById: Map<string, TriadNode>,
+    categories: Record<string, string[]>
+) {
+    const runtimeSourcePaths = collectRuntimeSourcePathCandidates(runtimeNode);
+    const runtimeTokens = tokenize(`${runtimeNode.id} ${runtimeNode.label} ${runtimeSourcePaths.join(' ')}`);
     const handlerToken = normalizeText(
         typeof runtimeNode.metadata?.handler === 'string' ? String(runtimeNode.metadata?.handler) : ''
     );
     const serviceMethod = parseServiceRuntimeId(runtimeNode.id);
+    const runtimeCategory = resolveRuntimeCategory(runtimeNode, runtimeSourcePaths, categories);
     const candidates: RuntimeCapabilityCandidate[] = [];
 
     for (const [capabilityId, capabilityNode] of capabilityById.entries()) {
         let score = 0;
         const reasons: string[] = [];
         const capabilitySourcePath = normalizeSourcePath(capabilityNode.sourcePath);
+        const capabilityCategory = normalizeTriadCategory(capabilityNode.category);
         const capabilityTokens = tokenize(`${capabilityId} ${capabilitySourcePath}`);
 
-        if (runtimeSourcePath && capabilitySourcePath && runtimeSourcePath === capabilitySourcePath) {
-            score += 65;
-            reasons.push('source_path_exact');
-        } else if (
-            runtimeSourcePath &&
-            capabilitySourcePath &&
-            (runtimeSourcePath.endsWith(capabilitySourcePath) || capabilitySourcePath.endsWith(runtimeSourcePath))
-        ) {
-            score += 28;
-            reasons.push('source_path_partial');
+        const sourcePathScore = scoreRuntimeSourcePathMatch(runtimeSourcePaths, capabilitySourcePath);
+        if (sourcePathScore > 0) {
+            score += sourcePathScore >= 60 ? 65 : sourcePathScore;
+            reasons.push(sourcePathScore >= 60 ? 'source_path_exact' : 'source_path_partial');
+        }
+
+        if (runtimeCategory && capabilityCategory && runtimeCategory === capabilityCategory) {
+            score += 18;
+            reasons.push('category_match');
+        } else if (runtimeCategory && capabilityCategory && runtimeCategory !== capabilityCategory) {
+            score -= 8;
         }
 
         if (handlerToken) {
@@ -328,6 +352,80 @@ function collectRuntimeCapabilityCandidates(runtimeNode: RuntimeNode, capability
     return candidates
         .sort((left, right) => right.score - left.score || left.capabilityId.localeCompare(right.capabilityId))
         .slice(0, 6);
+}
+
+function collectRuntimeSourcePathCandidates(runtimeNode: RuntimeNode) {
+    const sourcePaths = new Set<string>();
+    const direct = normalizeSourcePath(runtimeNode.sourcePath);
+    if (direct) {
+        sourcePaths.add(direct);
+    }
+    for (const evidence of Array.isArray(runtimeNode.evidence) ? runtimeNode.evidence : []) {
+        const evidencePath = normalizeSourcePath(evidence?.sourcePath);
+        if (evidencePath) {
+            sourcePaths.add(evidencePath);
+        }
+    }
+    return Array.from(sourcePaths);
+}
+
+function resolveRuntimeCategory(
+    runtimeNode: RuntimeNode,
+    runtimeSourcePaths: string[],
+    categories: Record<string, string[]>
+) {
+    for (const sourcePath of runtimeSourcePaths) {
+        const resolved = resolveCategoryBySourcePath(sourcePath, categories as any);
+        if (resolved !== 'unknown') {
+            return resolved;
+        }
+    }
+    return normalizeTriadCategory(runtimeNode.category);
+}
+
+function normalizeTriadCategory(value: string | undefined) {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (
+        normalized === 'frontend' ||
+        normalized === 'backend' ||
+        normalized === 'agent' ||
+        normalized === 'rheo_cli' ||
+        normalized === 'core'
+    ) {
+        return normalized;
+    }
+    return '';
+}
+
+function scoreRuntimeSourcePathMatch(runtimeSourcePaths: string[], capabilitySourcePath: string) {
+    if (!capabilitySourcePath) {
+        return 0;
+    }
+    for (const runtimeSourcePath of runtimeSourcePaths) {
+        if (!runtimeSourcePath) {
+            continue;
+        }
+        if (runtimeSourcePath === capabilitySourcePath) {
+            return 65;
+        }
+        if (
+            runtimeSourcePath.endsWith(capabilitySourcePath) ||
+            capabilitySourcePath.endsWith(runtimeSourcePath) ||
+            shareSourcePathTail(runtimeSourcePath, capabilitySourcePath)
+        ) {
+            return 32;
+        }
+    }
+    return 0;
+}
+
+function shareSourcePathTail(left: string, right: string) {
+    const leftParts = left.split('/').filter(Boolean);
+    const rightParts = right.split('/').filter(Boolean);
+    if (leftParts.length < 2 || rightParts.length < 2) {
+        return false;
+    }
+    return leftParts.slice(-2).join('/') === rightParts.slice(-2).join('/');
 }
 
 function parseServiceRuntimeId(runtimeId: string) {
@@ -498,6 +596,13 @@ function normalizeConfidence(value: number) {
 
 function normalizePositiveInteger(value: number | undefined, fallback: number) {
     return Number.isFinite(value) && (value as number) > 0 ? Math.floor(value as number) : fallback;
+}
+
+function safeRatio(part: number, total: number) {
+    if (!total) {
+        return 0;
+    }
+    return Number((part / total).toFixed(6));
 }
 
 const GENERIC_TOKENS = new Set([
