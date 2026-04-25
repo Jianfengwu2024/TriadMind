@@ -666,39 +666,25 @@ function validateProposalConsistency(
     diagnostics: DreamDiagnostic[]
 ) {
     return proposals.map((proposal) => {
+        const protocolDraft = canonicalizeProtocolDraft(proposal, categories, diagnostics);
         const sourcePath = normalizeProposalSourcePath(
-            proposal.sourcePath ?? extractProposalSourcePathFromProtocol(proposal) ?? extractProposalSourcePathFromEvidence(proposal)
+            proposal.sourcePath ??
+                extractProposalSourcePathFromProtocolDraft(protocolDraft) ??
+                extractProposalSourcePathFromEvidence(proposal)
         );
         const previousCategory = normalizeProposalCategory(proposal.category);
         const resolvedCategory = sourcePath ? resolveCategoryBySourcePath(sourcePath, categories) : 'unknown';
-
-        if (sourcePath && previousCategory !== resolvedCategory) {
-            diagnostics.push({
-                level: 'warning',
-                code: 'DREAM_PROPOSAL_CATEGORY_MISMATCH_AUTO_FIXED',
-                component: 'DreamProposalValidator',
-                message: `Proposal ${proposal.id} category auto-fixed: ${previousCategory} -> ${resolvedCategory}`,
-                sourcePath
-            });
-        } else if (!sourcePath && previousCategory !== 'unknown') {
-            diagnostics.push({
-                level: 'warning',
-                code: 'DREAM_PROPOSAL_CATEGORY_UNKNOWN_FALLBACK',
-                component: 'DreamProposalValidator',
-                message: `Proposal ${proposal.id} has no resolvable sourcePath; category downgraded to unknown`
-            });
-        } else if (sourcePath && resolvedCategory === 'unknown') {
-            diagnostics.push({
-                level: 'warning',
-                code: 'DREAM_PROPOSAL_CATEGORY_UNKNOWN_FALLBACK',
-                component: 'DreamProposalValidator',
-                message: `Proposal ${proposal.id} sourcePath cannot map to configured categories; using unknown`,
-                sourcePath
-            });
-        }
-
+        emitCategoryConsistencyDiagnostics({
+            diagnostics,
+            proposalId: proposal.id,
+            scope: 'proposal',
+            previousCategory,
+            resolvedCategory,
+            sourcePath
+        });
         return {
             ...proposal,
+            protocolDraft,
             category: resolvedCategory,
             sourcePath: sourcePath || undefined
         };
@@ -721,8 +707,8 @@ function normalizeProposalSourcePath(value: string | undefined) {
     return normalized || '';
 }
 
-function extractProposalSourcePathFromProtocol(proposal: DreamProposal) {
-    const actions = Array.isArray(proposal.protocolDraft?.actions) ? proposal.protocolDraft.actions : [];
+function extractProposalSourcePathFromProtocolDraft(protocolDraft: UpgradeProtocol | undefined) {
+    const actions = Array.isArray(protocolDraft?.actions) ? protocolDraft.actions : [];
     for (const action of actions) {
         if (action?.op === 'create_child' && typeof action?.node?.sourcePath === 'string') {
             const normalized = normalizeProposalSourcePath(action.node.sourcePath);
@@ -738,6 +724,130 @@ function extractProposalSourcePathFromProtocol(proposal: DreamProposal) {
         }
     }
     return '';
+}
+
+function canonicalizeProtocolDraft(
+    proposal: DreamProposal,
+    categories: { frontend: string[]; backend: string[]; core: string[] },
+    diagnostics: DreamDiagnostic[]
+) {
+    if (!proposal.protocolDraft || !Array.isArray(proposal.protocolDraft.actions)) {
+        return proposal.protocolDraft;
+    }
+
+    const protocolDraft = {
+        ...proposal.protocolDraft,
+        actions: proposal.protocolDraft.actions.map((action, actionIndex) => {
+            if (action?.op === 'create_child' && action?.node) {
+                const nodeSourcePath = normalizeProposalSourcePath(action.node.sourcePath);
+                const previousNodeCategory = normalizeProposalCategory(action.node.category as any);
+                const resolvedNodeCategory = nodeSourcePath
+                    ? resolveCategoryBySourcePath(nodeSourcePath, categories)
+                    : 'unknown';
+
+                emitCategoryConsistencyDiagnostics({
+                    diagnostics,
+                    proposalId: proposal.id,
+                    scope: 'protocolDraft.actions.node',
+                    previousCategory: previousNodeCategory,
+                    resolvedCategory: resolvedNodeCategory,
+                    sourcePath: nodeSourcePath,
+                    nodeId: action.node.nodeId,
+                    actionIndex
+                });
+
+                return {
+                    ...action,
+                    node: {
+                        ...action.node,
+                        category: resolvedNodeCategory as any,
+                        sourcePath: nodeSourcePath || undefined
+                    }
+                };
+            }
+
+            if (action?.op === 'modify') {
+                const actionSourcePath = normalizeProposalSourcePath((action as any).sourcePath);
+                const previousActionCategory = normalizeProposalCategory((action as any).category);
+                const resolvedActionCategory = actionSourcePath
+                    ? resolveCategoryBySourcePath(actionSourcePath, categories)
+                    : 'unknown';
+
+                emitCategoryConsistencyDiagnostics({
+                    diagnostics,
+                    proposalId: proposal.id,
+                    scope: 'protocolDraft.actions',
+                    previousCategory: previousActionCategory,
+                    resolvedCategory: resolvedActionCategory,
+                    sourcePath: actionSourcePath,
+                    nodeId: (action as any).nodeId,
+                    actionIndex
+                });
+
+                return {
+                    ...action,
+                    category: resolvedActionCategory as any,
+                    sourcePath: actionSourcePath || undefined
+                };
+            }
+
+            return action;
+        })
+    };
+    return protocolDraft;
+}
+
+function emitCategoryConsistencyDiagnostics(input: {
+    diagnostics: DreamDiagnostic[];
+    proposalId: string;
+    scope: string;
+    previousCategory: 'frontend' | 'backend' | 'core' | 'unknown';
+    resolvedCategory: 'frontend' | 'backend' | 'core' | 'unknown';
+    sourcePath: string;
+    nodeId?: string;
+    actionIndex?: number;
+}) {
+    const {
+        diagnostics,
+        proposalId,
+        scope,
+        previousCategory,
+        resolvedCategory,
+        sourcePath,
+        nodeId,
+        actionIndex
+    } = input;
+
+    const targetLabelParts = [`Proposal ${proposalId}`, scope];
+    if (typeof actionIndex === 'number') {
+        targetLabelParts.push(`action#${actionIndex}`);
+    }
+    if (nodeId) {
+        targetLabelParts.push(`node=${nodeId}`);
+    }
+    const targetLabel = targetLabelParts.join(' | ');
+
+    if (sourcePath && previousCategory !== resolvedCategory) {
+        diagnostics.push({
+            level: 'warning',
+            code: 'DREAM_PROPOSAL_CATEGORY_MISMATCH_AUTO_FIXED',
+            component: 'DreamProposalValidator',
+            message: `${targetLabel} category auto-fixed: ${previousCategory} -> ${resolvedCategory}`,
+            sourcePath
+        });
+    }
+
+    if (resolvedCategory === 'unknown') {
+        diagnostics.push({
+            level: 'warning',
+            code: 'DREAM_PROPOSAL_CATEGORY_UNRESOLVED',
+            component: 'DreamProposalValidator',
+            message: sourcePath
+                ? `${targetLabel} sourcePath cannot map to configured categories; category=unknown`
+                : `${targetLabel} has no resolvable sourcePath; category=unknown`,
+            sourcePath: sourcePath || undefined
+        });
+    }
 }
 
 function extractProposalSourcePathFromEvidence(proposal: DreamProposal) {

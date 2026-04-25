@@ -6,9 +6,16 @@ import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-function createDreamFixture(options?: { executeSourcePath?: string; paymentSourcePath?: string }) {
+function createDreamFixture(options?: {
+    executeSourcePath?: string;
+    paymentSourcePath?: string;
+    executeCategory?: string;
+    paymentCategory?: string;
+}) {
     const executeSourcePath = options?.executeSourcePath ?? 'src/backend/order_service.py';
     const paymentSourcePath = options?.paymentSourcePath ?? 'src/backend/payment_service.py';
+    const executeCategory = options?.executeCategory ?? 'backend';
+    const paymentCategory = options?.paymentCategory ?? 'backend';
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-dream-'));
     const triadDir = path.join(root, '.triadmind');
     fs.mkdirSync(triadDir, { recursive: true });
@@ -19,7 +26,7 @@ function createDreamFixture(options?: { executeSourcePath?: string; paymentSourc
             [
                 {
                     nodeId: 'OrderService.execute',
-                    category: 'backend',
+                    category: executeCategory,
                     sourcePath: executeSourcePath,
                     fission: {
                         problem: 'Execute order orchestration',
@@ -29,7 +36,7 @@ function createDreamFixture(options?: { executeSourcePath?: string; paymentSourc
                 },
                 {
                     nodeId: 'PaymentService.process',
-                    category: 'backend',
+                    category: paymentCategory,
                     sourcePath: paymentSourcePath,
                     fission: {
                         problem: 'Process payment',
@@ -100,6 +107,71 @@ function createDreamFixture(options?: { executeSourcePath?: string; paymentSourc
     );
 
     return root;
+}
+
+function resolveCategoryFromConfigRoot(root: string, sourcePath: string | undefined) {
+    const configPath = path.join(root, '.triadmind', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const categories = config?.categories ?? {};
+    const normalizedSourcePath = String(sourcePath ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
+    if (!normalizedSourcePath) {
+        return 'unknown';
+    }
+
+    let best: { category: string; length: number } | undefined;
+    for (const [category, patterns] of Object.entries(categories)) {
+        for (const rawPattern of Array.isArray(patterns) ? patterns : []) {
+            const normalizedPattern = String(rawPattern ?? '')
+                .replace(/\\/g, '/')
+                .replace(/^\.\//, '')
+                .replace(/\/+$/, '');
+            if (!normalizedPattern) {
+                continue;
+            }
+            if (normalizedSourcePath === normalizedPattern || normalizedSourcePath.startsWith(`${normalizedPattern}/`)) {
+                if (!best || normalizedPattern.length > best.length) {
+                    best = {
+                        category: String(category),
+                        length: normalizedPattern.length
+                    };
+                }
+            }
+        }
+    }
+    return best?.category ?? 'unknown';
+}
+
+function collectProtocolDraftNodeCategoryMismatches(
+    root: string,
+    report: { proposals?: Array<{ id?: string; protocolDraft?: { actions?: Array<{ node?: { nodeId?: string; sourcePath?: string; category?: string } }> } }> }
+) {
+    const mismatch: Array<{
+        proposalId: string;
+        nodeId: string;
+        category: string;
+        resolved: string;
+        sourcePath: string;
+    }> = [];
+    for (const proposal of Array.isArray(report.proposals) ? report.proposals : []) {
+        for (const action of Array.isArray(proposal.protocolDraft?.actions) ? proposal.protocolDraft?.actions : []) {
+            const node = action?.node;
+            if (!node?.sourcePath) {
+                continue;
+            }
+            const resolved = resolveCategoryFromConfigRoot(root, node.sourcePath);
+            const category = String(node.category ?? 'unknown');
+            if (category !== resolved) {
+                mismatch.push({
+                    proposalId: String(proposal.id ?? 'unknown'),
+                    nodeId: String(node.nodeId ?? 'unknown'),
+                    category,
+                    resolved,
+                    sourcePath: String(node.sourcePath)
+                });
+            }
+        }
+    }
+    return mismatch;
 }
 
 function runCli(cwd: string, args: string[]) {
@@ -191,10 +263,11 @@ test('dream review --json returns latest report', () => {
     assert.equal(Array.isArray(report.summary), true);
 });
 
-test('dream proposal category follows sourcePath mapping for backend paths', () => {
+test('dream proposal category and protocolDraft node.category are canonicalized by sourcePath', () => {
     const root = createDreamFixture({
         executeSourcePath: 'src/backend/orders/execution.py',
-        paymentSourcePath: 'src/backend/payments/processor.py'
+        paymentSourcePath: 'src/backend/payments/processor.py',
+        executeCategory: 'frontend'
     });
     const runResult = runCli(root, ['dream', '--json']);
     assert.equal(runResult.status, 0, `dream run failed: ${runResult.stderr || runResult.stdout}`);
@@ -206,7 +279,43 @@ test('dream proposal category follows sourcePath mapping for backend paths', () 
             typeof proposal?.sourcePath === 'string' && proposal.sourcePath.includes('src/backend/')
     );
     assert.ok(backendProposal, 'expected at least one proposal with backend sourcePath');
-    assert.equal(backendProposal.category, 'backend');
+    assert.equal(
+        backendProposal.category,
+        resolveCategoryFromConfigRoot(root, backendProposal.sourcePath),
+        'outer proposal category should align with sourcePath'
+    );
+
+    const actions = Array.isArray(backendProposal.protocolDraft?.actions) ? backendProposal.protocolDraft.actions : [];
+    const createChildAction = actions.find(
+        (action: { op?: string; node?: { sourcePath?: string; category?: string } }) => action?.op === 'create_child'
+    );
+    assert.ok(createChildAction, 'expected create_child action in protocol draft');
+    assert.equal(
+        createChildAction.node.category,
+        resolveCategoryFromConfigRoot(root, createChildAction.node.sourcePath),
+        'protocolDraft node.category should align with node.sourcePath'
+    );
+
+    const diagnostics = Array.isArray(report.diagnostics) ? report.diagnostics : [];
+    assert.equal(
+        diagnostics.some((item: { code?: string }) => item.code === 'DREAM_PROPOSAL_CATEGORY_MISMATCH_AUTO_FIXED'),
+        true
+    );
+});
+
+test('dream canonicalize removes all protocolDraft node category/sourcePath mismatches', () => {
+    const root = createDreamFixture({
+        executeSourcePath: 'src/backend/orders/execution.py',
+        paymentSourcePath: 'src/backend/payments/processor.py',
+        executeCategory: 'frontend',
+        paymentCategory: 'frontend'
+    });
+    const runResult = runCli(root, ['dream', '--json']);
+    assert.equal(runResult.status, 0, `dream run failed: ${runResult.stderr || runResult.stdout}`);
+
+    const report = JSON.parse(runResult.stdout.slice(runResult.stdout.indexOf('{')));
+    const mismatch = collectProtocolDraftNodeCategoryMismatches(root, report);
+    assert.equal(mismatch.length, 0, `expected protocolDraft mismatch=0, got ${JSON.stringify(mismatch, null, 2)}`);
 });
 
 test('dream proposal category falls back to unknown when sourcePath cannot map', () => {
@@ -227,13 +336,19 @@ test('dream proposal category falls back to unknown when sourcePath cannot map',
     );
     assert.ok(unknownCategoryProposal, 'expected unmapped proposal category to downgrade to unknown');
 
+    const actions = Array.isArray(unknownCategoryProposal.protocolDraft?.actions)
+        ? unknownCategoryProposal.protocolDraft.actions
+        : [];
+    const createChildAction = actions.find(
+        (action: { op?: string; node?: { sourcePath?: string; category?: string } }) =>
+            action?.op === 'create_child' && action?.node?.sourcePath?.includes('services/order_service.py')
+    );
+    assert.ok(createChildAction, 'expected create_child action using unmapped sourcePath');
+    assert.equal(createChildAction.node.category, 'unknown');
+
     const diagnostics = Array.isArray(report.diagnostics) ? report.diagnostics : [];
     assert.equal(
-        diagnostics.some(
-            (item: { code?: string }) =>
-                item.code === 'DREAM_PROPOSAL_CATEGORY_MISMATCH_AUTO_FIXED' ||
-                item.code === 'DREAM_PROPOSAL_CATEGORY_UNKNOWN_FALLBACK'
-        ),
+        diagnostics.some((item: { code?: string }) => item.code === 'DREAM_PROPOSAL_CATEGORY_UNRESOLVED'),
         true
     );
 });
