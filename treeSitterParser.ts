@@ -14,9 +14,12 @@ import {
     describeSourceScanScope,
     GhostLanguagePolicy,
     isIgnorableFsError,
+    resolveSourceScanScope,
+    TriadSourcePolicy,
     shouldSkipWalkPath,
     TriadConfig,
     TriadLanguage,
+    resolveCategoryBySourcePath,
     resolveCategoryFromConfig
 } from './config';
 import { scanTreeSitterGhostReferences, TreeSitterGhostAccessMode } from './treeSitterGhostScanner';
@@ -54,8 +57,19 @@ export interface TreeSitterParseResult {
     leafNodes: TreeSitterTriadNode[];
     capabilityNodes: TreeSitterTriadNode[];
     projectedNodes: TreeSitterTriadNode[];
+    diagnostics: TreeSitterParseDiagnostic[];
     fileCount: number;
     scanUnit: string;
+}
+
+export interface TreeSitterParseDiagnostic {
+    level: 'info' | 'warning';
+    code: string;
+    message: string;
+    sourcePath?: string;
+    nodeId?: string;
+    originalCategory?: string;
+    resolvedCategory?: string;
 }
 
 interface ParsedSourceFile {
@@ -129,10 +143,13 @@ export function runTreeSitterParser(
     const result = collectTreeSitterParseResult(language, targetDir, config);
     const leafOutputPath = resolveParserOutputPath(targetDir, config.parser.leafOutputFile);
     const capabilityOutputPath = resolveParserOutputPath(targetDir, config.parser.capabilityOutputFile);
+    const diagnosticsOutputPath = path.resolve(targetDir, '.triadmind', 'triad-diagnostics.json');
     fs.mkdirSync(path.dirname(leafOutputPath), { recursive: true });
     fs.mkdirSync(path.dirname(capabilityOutputPath), { recursive: true });
+    fs.mkdirSync(path.dirname(diagnosticsOutputPath), { recursive: true });
     fs.writeFileSync(leafOutputPath, JSON.stringify(result.leafNodes, null, 2), 'utf-8');
     fs.writeFileSync(capabilityOutputPath, JSON.stringify(result.projectedNodes, null, 2), 'utf-8');
+    fs.writeFileSync(diagnosticsOutputPath, JSON.stringify(result.diagnostics, null, 2), 'utf-8');
     if (normalizePath(path.resolve(outputPath)) !== normalizePath(path.resolve(capabilityOutputPath))) {
         fs.mkdirSync(path.dirname(outputPath), { recursive: true });
         fs.writeFileSync(outputPath, JSON.stringify(result.projectedNodes, null, 2), 'utf-8');
@@ -214,14 +231,24 @@ export function collectTreeSitterParseResult(
         );
     }
 
-    const leafNodes = dedupeNodes(leafGraph).sort((left, right) => left.nodeId.localeCompare(right.nodeId));
-    const capabilityNodes = dedupeNodes(capabilityGraph).sort((left, right) => left.nodeId.localeCompare(right.nodeId));
-    const projectedNodes =
-        config.parser.scanMode === 'leaf'
-            ? leafNodes
-            : aggregateNodesForScanMode(capabilityNodes, architectureConfig).sort((left, right) =>
-                  left.nodeId.localeCompare(right.nodeId)
-              );
+    const leafCanonical = canonicalizeTriadNodes(
+        dedupeNodes(leafGraph).sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
+        config
+    );
+    const capabilityCanonical = canonicalizeTriadNodes(
+        dedupeNodes(capabilityGraph).sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
+        config
+    );
+    const projectedCanonical = canonicalizeTriadNodes(
+        (
+            config.parser.scanMode === 'leaf'
+                ? leafCanonical.nodes
+                : aggregateNodesForScanMode(capabilityCanonical.nodes, architectureConfig).sort((left, right) =>
+                      left.nodeId.localeCompare(right.nodeId)
+                  )
+        ).map((node) => ({ ...node })),
+        config
+    );
 
     const scanUnit =
         config.parser.scanMode === 'leaf'
@@ -234,9 +261,14 @@ export function collectTreeSitterParseResult(
 
     return {
         language,
-        leafNodes,
-        capabilityNodes,
-        projectedNodes,
+        leafNodes: leafCanonical.nodes,
+        capabilityNodes: capabilityCanonical.nodes,
+        projectedNodes: projectedCanonical.nodes,
+        diagnostics: dedupeParserDiagnostics([
+            ...leafCanonical.diagnostics,
+            ...capabilityCanonical.diagnostics,
+            ...projectedCanonical.diagnostics
+        ]),
         fileCount: files.length,
         scanUnit
     };
@@ -362,7 +394,10 @@ function collectTypeScriptLeafNodes(
         }
     }
 
-    const topLevelRecords = collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config);
+    const topLevelRecords = [
+        ...collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config),
+        ...collectTypeScriptCliRegistrationRecords(rootNode, sourcePath, moduleName)
+    ];
     for (const record of topLevelRecords) {
         triadGraph.push(
             createTriadNode(
@@ -920,9 +955,10 @@ function collectJavaScriptLeafNodes(
     const topLevelNodes = config.parser.includeUntaggedExports
         ? rootNode.namedChildren
         : rootNode.namedChildren.filter((node) => node.type === 'export_statement');
-    const topLevelRecords = topLevelNodes.flatMap((node) =>
-        collectJavaScriptTopLevelCapabilityRecords(node, rootNode, moduleName, ghostContext)
-    );
+    const topLevelRecords = [
+        ...topLevelNodes.flatMap((node) => collectJavaScriptTopLevelCapabilityRecords(node, rootNode, moduleName, ghostContext)),
+        ...collectJavaScriptCliRegistrationRecords(rootNode, sourcePath, moduleName)
+    ];
     for (const record of topLevelRecords) {
         triadGraph.push(
             createTriadNode(
@@ -1227,6 +1263,18 @@ function collectPythonLeafNodes(
         }
     }
 
+    for (const record of collectPythonCliRegistrationRecords(rootNode, sourcePath, moduleName)) {
+        triadGraph.push(
+            createTriadNode(
+                `${toPascalCase(record.ownerName || moduleName)}.${record.name}`,
+                category,
+                sourcePath,
+                record.demand,
+                record.answer
+            )
+        );
+    }
+
     return triadGraph;
 }
 
@@ -1247,7 +1295,10 @@ function collectTypeScriptCapabilityNodes(
         triadGraph.push(...collectTypeScriptClassCapabilityNodes(classNode, source, sourcePath, category, config, ghostContext));
     }
 
-    const topLevelRecords = collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config);
+    const topLevelRecords = [
+        ...collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config),
+        ...collectTypeScriptCliRegistrationRecords(rootNode, sourcePath, moduleName)
+    ];
     const promotableTopLevel = topLevelRecords.filter((record) => !isTypeScriptNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
         shouldPromoteTypeScriptCapability(record.name, sourcePath, record.ownerName, record.isExported, config, record)
@@ -1443,6 +1494,41 @@ function resolveTypeScriptTopLevelExecutableRecordByName(
     }
 
     return [];
+}
+
+function collectTypeScriptCliRegistrationRecords(
+    rootNode: Parser.SyntaxNode,
+    sourcePath: string,
+    moduleName: string
+) {
+    if (inferSourceCapabilityPolicy(sourcePath) !== 'cli') {
+        return [] as TypeScriptExecutableRecord[];
+    }
+
+    return rootNode.namedChildren
+        .flatMap((child) => {
+            if (child.type !== 'expression_statement') {
+                return [];
+            }
+            const callNode = child.namedChildren[0] ?? null;
+            const descriptor = extractCliRegistrationDescriptor(callNode, moduleName);
+            if (!descriptor) {
+                return [];
+            }
+            return [
+                {
+                    name: descriptor.name,
+                    ownerName: descriptor.ownerName,
+                    demand: [],
+                    answer: deriveCliSyntheticAnswer(descriptor.name),
+                    isExported: true,
+                    decorators: []
+                } satisfies TypeScriptExecutableRecord
+            ];
+        })
+        .filter((record, index, records) =>
+            records.findIndex((candidate) => candidate.ownerName === record.ownerName && candidate.name === record.name) === index
+        );
 }
 
 function collectTypeScriptClassCapabilityNodes(
@@ -1641,12 +1727,12 @@ function collectJavaScriptCapabilityNodes(
     for (const record of promotedTopLevel) {
         triadGraph.push(
             createTriadNode(
-                `${moduleName}.${record.name}`,
+                `${toPascalCase(record.ownerName || moduleName)}.${record.name}`,
                 category,
                 sourcePath,
                 record.demand,
                 record.answer,
-                `execute ${moduleName}.${record.name} capability`
+                `execute ${toPascalCase(record.ownerName || moduleName)}.${record.name} capability`
             )
         );
     }
@@ -1867,6 +1953,48 @@ function resolveJavaScriptTopLevelExecutableRecordByName(
     return [];
 }
 
+function collectJavaScriptCliRegistrationRecords(
+    rootNode: Parser.SyntaxNode,
+    sourcePath: string,
+    moduleName: string
+) {
+    if (inferSourceCapabilityPolicy(sourcePath) !== 'cli') {
+        return [] as JavaScriptExecutableRecord[];
+    }
+
+    return rootNode.namedChildren
+        .flatMap((child) => {
+            if (child.type !== 'expression_statement') {
+                return [];
+            }
+            const callNode = child.namedChildren[0] ?? null;
+            const descriptor = extractCliRegistrationDescriptor(callNode, moduleName);
+            if (!descriptor) {
+                return [];
+            }
+            return [
+                {
+                    name: descriptor.name,
+                    ownerName: descriptor.ownerName,
+                    demand: [],
+                    answer: deriveCliSyntheticAnswer(descriptor.name),
+                    isExported: true
+                } satisfies JavaScriptExecutableRecord
+            ];
+        })
+        .filter((record, index, records) =>
+            records.findIndex((candidate) => candidate.ownerName === record.ownerName && candidate.name === record.name) === index
+        );
+}
+
+type PythonExecutableRecord = {
+    name: string;
+    decorators: string[];
+    demand: string[];
+    answer: string[];
+    ownerName: string;
+};
+
 type JavaScriptExecutableRecord = {
     name: string;
     demand: string[];
@@ -1935,6 +2063,148 @@ function unwrapJavaScriptExecutableValueNode(node: Parser.SyntaxNode | null) {
     return current;
 }
 
+const CLI_COMMAND_REGISTRATION_METHODS = new Set([
+    'command',
+    'commands',
+    'add_parser',
+    'addparser',
+    'addcommand',
+    'subcommand'
+]);
+
+const CLI_HANDLER_REGISTRATION_METHODS = new Set(['action', 'handler', 'callback', 'set_defaults', 'setdefaults']);
+
+function extractCliRegistrationDescriptor(callNode: Parser.SyntaxNode | null, moduleName: string) {
+    if (!callNode || (callNode.type !== 'call_expression' && callNode.type !== 'call')) {
+        return null;
+    }
+
+    const methods: string[] = [];
+    let commandName = '';
+    let actionName = '';
+
+    const visit = (node: Parser.SyntaxNode | null) => {
+        if (!node || (node.type !== 'call_expression' && node.type !== 'call')) {
+            return;
+        }
+
+        const calleeNode = node.namedChildren[0] ?? null;
+        const argsNode = node.namedChildren.find((child) => child.type === 'arguments' || child.type === 'argument_list') ?? null;
+
+        if (calleeNode?.type === 'member_expression' || calleeNode?.type === 'attribute') {
+            const objectNode = calleeNode.namedChildren[0] ?? null;
+            const propertyName = normalizeText(getNameText(calleeNode.namedChildren[1] ?? null));
+            if (propertyName) {
+                methods.push(propertyName);
+                if (!commandName && CLI_COMMAND_REGISTRATION_METHODS.has(propertyName)) {
+                    commandName = extractCliCommandName(argsNode);
+                    if (!actionName) {
+                        actionName = extractCliHandlerName(argsNode);
+                    }
+                }
+                if (!actionName && CLI_HANDLER_REGISTRATION_METHODS.has(propertyName)) {
+                    actionName = extractCliHandlerName(argsNode);
+                }
+            }
+            if (objectNode?.type === 'call_expression' || objectNode?.type === 'call') {
+                visit(objectNode);
+            }
+            return;
+        }
+
+        if (calleeNode?.type === 'identifier') {
+            const propertyName = normalizeText(calleeNode.text);
+            if (propertyName && CLI_COMMAND_REGISTRATION_METHODS.has(propertyName)) {
+                methods.push(propertyName);
+                if (!commandName) {
+                    commandName = extractCliCommandName(argsNode);
+                }
+                if (!actionName) {
+                    actionName = extractCliHandlerName(argsNode);
+                }
+            }
+        }
+    };
+
+    visit(callNode);
+
+    const methodSet = new Set(methods);
+    if (!commandName && !actionName) {
+        return null;
+    }
+    if (!methodSet.has('command') && !methodSet.has('commands') && !methodSet.has('add_parser') && !methodSet.has('addparser') && !methodSet.has('addcommand') && !methodSet.has('subcommand')) {
+        return null;
+    }
+
+    const ownerName = toPascalCase(commandName || moduleName || 'cli');
+    const name = normalizeCliRegistrationNodeName(actionName, commandName, methodSet);
+    return {
+        ownerName,
+        name,
+        commandName
+    };
+}
+
+function extractCliCommandName(argsNode: Parser.SyntaxNode | null) {
+    if (!argsNode) {
+        return '';
+    }
+
+    for (const child of argsNode.namedChildren) {
+        if (child.type === 'string') {
+            const stringFragment = child.namedChildren.find((node) => node.type === 'string_fragment' || node.type === 'string_content');
+            const value = normalizeText(stringFragment?.text ?? child.text.replace(/^['"]|['"]$/g, ''));
+            if (value && !value.startsWith('--')) {
+                return value;
+            }
+        }
+    }
+
+    return '';
+}
+
+function extractCliHandlerName(argsNode: Parser.SyntaxNode | null) {
+    if (!argsNode) {
+        return '';
+    }
+
+    const children = [...argsNode.namedChildren].reverse();
+    for (const child of children) {
+        if (child.type === 'identifier' || child.type === 'property_identifier') {
+            return normalizeText(child.text);
+        }
+        if (child.type === 'member_expression' || child.type === 'attribute') {
+            const valueName = normalizeText(getNameText(child));
+            if (valueName) {
+                return valueName;
+            }
+        }
+        if (child.type === 'keyword_argument') {
+            const valueNode = child.childForFieldName('value') ?? child.namedChildren[1] ?? null;
+            const valueName = normalizeText(getNameText(valueNode));
+            if (valueName) {
+                return valueName;
+            }
+        }
+    }
+
+    return '';
+}
+
+function normalizeCliRegistrationNodeName(actionName: string, commandName: string, methods: Set<string>) {
+    const normalizedAction = normalizeText(actionName);
+    if (normalizedAction && normalizedAction !== normalizeText(commandName)) {
+        return normalizedAction;
+    }
+    if (methods.has('set_defaults') || methods.has('setdefaults')) {
+        return 'handler';
+    }
+    if (methods.has('action') || methods.has('handler') || methods.has('callback')) {
+        return 'command';
+    }
+    return 'command';
+}
+
 function inferJavaScriptExecutableReturnType(executableNode: Parser.SyntaxNode) {
     const bodyNode = executableNode.childForFieldName('body') ?? executableNode.namedChildren[executableNode.namedChildren.length - 1];
     if (executableNode.type === 'arrow_function' && bodyNode && bodyNode.type !== 'statement_block') {
@@ -1992,7 +2262,7 @@ const JAVASCRIPT_PRIMARY_CAPABILITY_PREFIXES = [
     'schedule'
 ];
 
-const JAVASCRIPT_CAPABILITY_CLASS_SUFFIXES = [
+const GENERIC_CAPABILITY_CONTAINER_SUFFIXES = [
     'Service',
     'Node',
     'Workflow',
@@ -2002,8 +2272,17 @@ const JAVASCRIPT_CAPABILITY_CLASS_SUFFIXES = [
     'Controller',
     'Tool',
     'Agent',
-    'Manager'
+    'Manager',
+    'Orchestrator',
+    'Router',
+    'Planner',
+    'Coordinator',
+    'Dispatcher',
+    'Executor',
+    'Registry'
 ];
+
+const JAVASCRIPT_CAPABILITY_CLASS_SUFFIXES = GENERIC_CAPABILITY_CONTAINER_SUFFIXES;
 
 const TYPESCRIPT_MAGIC_METHODS = JAVASCRIPT_MAGIC_METHODS;
 const TYPESCRIPT_HELPER_PREFIXES = JAVASCRIPT_HELPER_PREFIXES;
@@ -2017,7 +2296,7 @@ const JAVA_HELPER_PREFIXES = [
     'guess', 'serialize', 'deserialize', 'dump'
 ];
 const JAVA_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
-const JAVA_CAPABILITY_CLASS_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
+const JAVA_CAPABILITY_CLASS_SUFFIXES = GENERIC_CAPABILITY_CONTAINER_SUFFIXES;
 
 const GO_HELPER_PREFIXES = [
     'get', 'set', 'build', 'parse', 'format', 'normalize', 'sanitize', 'validate', 'ensure', 'create', 'load', 'save',
@@ -2025,7 +2304,7 @@ const GO_HELPER_PREFIXES = [
     'guess', 'dump'
 ];
 const GO_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
-const GO_CAPABILITY_TYPE_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
+const GO_CAPABILITY_TYPE_SUFFIXES = GENERIC_CAPABILITY_CONTAINER_SUFFIXES;
 
 const RUST_HELPER_PREFIXES = [
     '_', 'get', 'set', 'build', 'parse', 'format', 'normalize', 'sanitize', 'validate', 'ensure', 'create', 'load',
@@ -2033,7 +2312,7 @@ const RUST_HELPER_PREFIXES = [
     'infer', 'guess', 'dump'
 ];
 const RUST_PRIMARY_CAPABILITY_PREFIXES = ['execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
-const RUST_CAPABILITY_TYPE_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
+const RUST_CAPABILITY_TYPE_SUFFIXES = GENERIC_CAPABILITY_CONTAINER_SUFFIXES;
 
 const CPP_MAGIC_METHODS = new Set(['ToString', 'toString']);
 const CPP_HELPER_PREFIXES = [
@@ -2044,7 +2323,7 @@ const CPP_HELPER_PREFIXES = [
     'infer', 'guess', 'get', 'set', 'dump'
 ];
 const CPP_PRIMARY_CAPABILITY_PREFIXES = ['Execute', 'Run', 'Handle', 'Process', 'Invoke', 'Dispatch', 'Orchestrate', 'Apply', 'Plan', 'Schedule', 'execute', 'run', 'handle', 'process', 'invoke', 'dispatch', 'orchestrate', 'apply', 'plan', 'schedule'];
-const CPP_CAPABILITY_TYPE_SUFFIXES = ['Service', 'Node', 'Workflow', 'Pipeline', 'Step', 'Handler', 'Controller', 'Tool', 'Agent', 'Manager'];
+const CPP_CAPABILITY_TYPE_SUFFIXES = GENERIC_CAPABILITY_CONTAINER_SUFFIXES;
 
 type CapabilityCandidateRecord = {
     name?: string;
@@ -2055,19 +2334,7 @@ type CapabilityCandidateRecord = {
     promotionReasons?: string[];
 };
 
-type SourceCapabilityPolicy =
-    | 'api'
-    | 'services'
-    | 'nodes'
-    | 'tasks'
-    | 'utils'
-    | 'ui'
-    | 'agent'
-    | 'cli'
-    | 'types'
-    | 'migrations'
-    | 'tests'
-    | 'other';
+type SourceCapabilityPolicy = TriadSourcePolicy;
 type HelperVerbClass = 'hard' | 'conditional' | 'none';
 
 const CAPABILITY_ACTION_PREFIXES = ['submit', 'export', 'import', 'reconcile'];
@@ -2116,6 +2383,11 @@ function isConfiguredPrimaryCapabilityMethod(name: string, config?: TriadConfig)
 }
 
 function inferSourceCapabilityPolicy(sourcePath = ''): SourceCapabilityPolicy {
+    const configuredScope = ACTIVE_PARSER_CONFIG ? resolveSourceScanScope(sourcePath, ACTIVE_PARSER_CONFIG) : undefined;
+    if (configuredScope?.kind) {
+        return configuredScope.kind;
+    }
+
     const normalizedPath = normalizePath(String(sourcePath ?? '')).toLowerCase();
     const segments = normalizedPath.split('/').filter(Boolean);
     if (segments.some((segment) => segment === 'test' || segment === 'tests' || segment === '__tests__')) {
@@ -2127,59 +2399,22 @@ function inferSourceCapabilityPolicy(sourcePath = ''): SourceCapabilityPolicy {
     if (segments.some((segment) => ['types', 'schemas', 'schema', 'models', 'model', 'entities', 'entity', 'dto', 'vo'].includes(segment))) {
         return 'types';
     }
-    if (segments.includes('api')) {
-        return 'api';
-    }
-    if (isLikelyAgentSourcePath(normalizedPath, segments)) {
-        return 'agent';
-    }
-    if (isLikelyCliSourcePath(normalizedPath, segments)) {
-        return 'cli';
-    }
-    if (isLikelyUiSourcePath(normalizedPath, segments)) {
-        return 'ui';
-    }
-    if (segments.includes('services') || segments.includes('service')) {
-        return 'services';
-    }
-    if (segments.includes('nodes') || segments.includes('node')) {
-        return 'nodes';
-    }
-    if (segments.includes('tasks') || segments.includes('task') || segments.includes('workflows') || segments.includes('workflow')) {
-        return 'tasks';
-    }
-    if (segments.includes('utils') || segments.includes('util')) {
-        return 'utils';
-    }
     return 'other';
 }
 
 function isLikelyUiSourcePath(normalizedPath: string, segments: string[]) {
-    const hasFrontendRoot = segments.some((segment) => ['frontend', 'client', 'web'].includes(segment));
-    const hasUiSegment = segments.some((segment) =>
-        ['app', 'pages', 'page', 'layouts', 'layout', 'components', 'hooks', 'screens', 'views', 'dashboard', 'ui'].includes(segment)
-    );
-    return /\.(tsx|jsx)$/.test(normalizedPath) || (hasFrontendRoot && hasUiSegment);
+    void segments;
+    return /\.(tsx|jsx)$/.test(normalizedPath) || inferSourceCapabilityPolicy(normalizedPath) === 'ui';
 }
 
 function isLikelyAgentSourcePath(normalizedPath: string, segments: string[]) {
-    return (
-        segments.includes('agent') ||
-        segments.includes('agents') ||
-        segments.some((segment) =>
-            ['orchestration', 'function_calling', 'memory', 'session', 'planner', 'reasoning', 'tools', 'tooling', 'chat'].includes(segment)
-        ) ||
-        /(^|\/)(agent|agents|function_calling|orchestration|memory|session|planner|reasoning|chat)(\/|$)/.test(normalizedPath)
-    );
+    void segments;
+    return inferSourceCapabilityPolicy(normalizedPath) === 'agent';
 }
 
 function isLikelyCliSourcePath(normalizedPath: string, segments: string[]) {
-    return (
-        segments.includes('rheo_cli') ||
-        segments.some((segment) => segment === 'cli') ||
-        (segments.includes('commands') && (segments.includes('rheo_cli') || segments.some((segment) => segment === 'cli'))) ||
-        /(^|\/)(rheo_cli|cli)(\/|$)/.test(normalizedPath)
-    );
+    void segments;
+    return inferSourceCapabilityPolicy(normalizedPath) === 'cli';
 }
 
 function classifyHelperVerb(name: string): HelperVerbClass {
@@ -2286,10 +2521,15 @@ function isSuppressedCapabilityCandidate(
     }
 
     const helperClass = classifyHelperVerb(trimmedName);
-    if (helperClass === 'hard') {
+    const relaxHardSuppression =
+        helperClass === 'hard' && shouldRelaxHardSuppression(trimmedName, sourcePath, record, sourcePolicy);
+    if (helperClass === 'hard' && !relaxHardSuppression) {
         return true;
     }
-    if (helperClass === 'conditional' && !isConditionalHelperCapabilityAllowed(trimmedName, sourcePath, record, isPrimary, config)) {
+    if (
+        (helperClass === 'conditional' || relaxHardSuppression) &&
+        !isConditionalHelperCapabilityAllowed(trimmedName, sourcePath, record, isPrimary, config)
+    ) {
         return true;
     }
 
@@ -2311,6 +2551,22 @@ function isSuppressedCapabilityCandidate(
     }
 
     return false;
+}
+
+function shouldRelaxHardSuppression(
+    name: string,
+    sourcePath: string,
+    record: CapabilityCandidateRecord | undefined,
+    sourcePolicy: SourceCapabilityPolicy
+) {
+    if (sourcePolicy !== 'agent') {
+        return false;
+    }
+
+    return (
+        hasAgentCapabilitySignal(name, sourcePath, undefined, record?.demand ?? [], record?.answer ?? []) ||
+        isWorkflowLikeName(name)
+    );
 }
 
 function shouldPromoteCapabilityByScore(
@@ -2462,7 +2718,7 @@ function hasAgentCapabilitySignal(
         ...answer,
         ...demand
     ])}`;
-    return /(agent|chat|conversation|orchestr|planner|tool|function|memory|session|assistant|reasoning|router)/i.test(
+    return /(chat|conversation|orchestr|planner|tool|function|memory|session|assistant|reasoning|router|dispatch|message|prompt|completion|registry|executor|coordinator)/i.test(
         semanticText
     );
 }
@@ -2479,11 +2735,17 @@ function hasCliCapabilitySignal(
         return false;
     }
 
+    if (/(^|\/)(commands?|handlers?|parsers?|subcommands?)(\/|$)/.test(normalizedPath)) {
+        return true;
+    }
+
     const semanticText = `${methodName} ${className ?? ''} ${getSemanticSourcePathTail(sourcePath)} ${getFirstDomainContractName([
         ...answer,
         ...demand
     ])}`;
-    return /(cli|command|subcommand|argv|option|flag|serve|start|deploy|init|main|entry|program)/i.test(semanticText);
+    return /(cli|commands?|subcommands?|handlers?|argv|option|flag|serve|start|deploy|init|main|entry|program|parser|subparser|register|load|plugin|auth|mcp)/i.test(
+        semanticText
+    );
 }
 
 function hasCrossModuleCallSignal(demand: string[]) {
@@ -2503,7 +2765,9 @@ function hasCrossModuleCallSignal(demand: string[]) {
 }
 
 function isWorkflowLikeName(value: string) {
-    return /(workflow|pipeline|stage|step|transition|handler|controller|service|adapter|gateway|tool|worker|operator|kernel|agent|command|consumer|endpoint)/i.test(value);
+    return /(workflow|pipeline|stage|step|transition|handler|controller|service|adapter|gateway|tool|worker|operator|kernel|agent|command|consumer|endpoint|orchestrator|planner|router|dispatcher|executor|registry|conversation|session|memory)/i.test(
+        value
+    );
 }
 
 function hasDomainContract(entries: string[], config?: TriadConfig) {
@@ -2828,7 +3092,8 @@ function collectPythonCapabilityNodes(
     const topLevelRecords = rootNode.namedChildren
         .map((child) => unwrapPythonDefinition(child, 'function_definition'))
         .filter((node): node is Parser.SyntaxNode => Boolean(node))
-        .map((node) => buildPythonExecutableRecord(node, ghostContext, moduleName));
+        .map((node) => buildPythonExecutableRecord(node, ghostContext, moduleName))
+        .concat(collectPythonCliRegistrationRecords(rootNode, sourcePath, moduleName));
 
     const promotableTopLevel = topLevelRecords.filter((record) => !isPythonNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
@@ -2967,7 +3232,7 @@ function buildPythonExecutableRecord(
     ghostContext: GhostBindingContext,
     ownerName: string,
     classPropertyTypes?: Map<string, string>
-) {
+): PythonExecutableRecord {
     const name = getNameText(executableNode.childForFieldName('name')) ?? 'execute';
     const decorators = getPythonDecorators(executableNode);
     const ghostDemand = collectPythonGhostDemand(executableNode, ghostContext, classPropertyTypes);
@@ -2977,6 +3242,117 @@ function buildPythonExecutableRecord(
         demand: mergeDemandEntries(parsePythonParametersAst(executableNode.childForFieldName('parameters')), ghostDemand),
         answer: [extractPythonReturnType(executableNode)],
         ownerName
+    };
+}
+
+function collectPythonCliRegistrationRecords(
+    rootNode: Parser.SyntaxNode,
+    sourcePath: string,
+    moduleName: string
+) {
+    if (inferSourceCapabilityPolicy(sourcePath) !== 'cli') {
+        return [] as PythonExecutableRecord[];
+    }
+
+    const parserBindings = new Map<string, string>();
+    const records: PythonExecutableRecord[] = [];
+
+    for (const child of rootNode.namedChildren) {
+        if (child.type !== 'expression_statement') {
+            continue;
+        }
+
+        const expressionNode = child.namedChildren[0] ?? null;
+        if (!expressionNode) {
+            continue;
+        }
+
+        if (expressionNode.type === 'assignment') {
+            const bindingName = normalizeText(getNameText(expressionNode.childForFieldName('left')));
+            const rightNode = expressionNode.childForFieldName('right') ?? expressionNode.namedChildren[1] ?? null;
+            const descriptor = extractCliRegistrationDescriptor(rightNode, moduleName);
+            if (bindingName && descriptor?.commandName) {
+                parserBindings.set(bindingName, descriptor.commandName);
+            }
+            if (descriptor) {
+                records.push({
+                    name: descriptor.name,
+                    decorators: [],
+                    demand: [],
+                    answer: deriveCliSyntheticAnswer(descriptor.name),
+                    ownerName: descriptor.ownerName
+                });
+            }
+            continue;
+        }
+
+        const descriptor = extractCliRegistrationDescriptor(expressionNode, moduleName);
+        if (descriptor) {
+            records.push({
+                name: descriptor.name,
+                decorators: [],
+                demand: [],
+                answer: deriveCliSyntheticAnswer(descriptor.name),
+                ownerName: descriptor.ownerName
+            });
+        }
+
+        const boundDescriptor = extractPythonCliBoundHandlerDescriptor(expressionNode, moduleName, parserBindings);
+        if (boundDescriptor) {
+            records.push({
+                name: boundDescriptor.name,
+                decorators: [],
+                demand: [],
+                answer: deriveCliSyntheticAnswer(boundDescriptor.name),
+                ownerName: boundDescriptor.ownerName
+            });
+        }
+    }
+
+    return records.filter((record, index, entries) => {
+        return entries.findIndex((candidate) => candidate.ownerName === record.ownerName && candidate.name === record.name) === index;
+    });
+}
+
+function deriveCliSyntheticAnswer(name: string) {
+    return [/^(command|load|register)$/i.test(String(name ?? '').trim()) ? 'CliCommand' : 'CliCommandHandler'];
+}
+
+function extractPythonCliBoundHandlerDescriptor(
+    expressionNode: Parser.SyntaxNode,
+    moduleName: string,
+    parserBindings: Map<string, string>
+) {
+    if (expressionNode.type !== 'call') {
+        return null;
+    }
+
+    const calleeNode = expressionNode.childForFieldName('function') ?? expressionNode.namedChildren[0] ?? null;
+    const argsNode =
+        expressionNode.childForFieldName('arguments') ??
+        expressionNode.namedChildren.find((child) => child.type === 'argument_list') ??
+        null;
+    if (!calleeNode || calleeNode.type !== 'attribute') {
+        return null;
+    }
+
+    const objectNode = calleeNode.childForFieldName('object') ?? calleeNode.namedChildren[0] ?? null;
+    const propertyNode = calleeNode.childForFieldName('attribute') ?? calleeNode.namedChildren[1] ?? null;
+    const methodName = normalizeText(getNameText(propertyNode));
+    if (!CLI_HANDLER_REGISTRATION_METHODS.has(methodName)) {
+        return null;
+    }
+
+    const bindingName = normalizeText(getNameText(objectNode));
+    const commandName = parserBindings.get(bindingName);
+    if (!commandName) {
+        return null;
+    }
+
+    const actionName = extractCliHandlerName(argsNode);
+    return {
+        ownerName: toPascalCase(commandName || moduleName || 'cli'),
+        name: normalizeCliRegistrationNodeName(actionName, commandName, new Set(['command', methodName]))
     };
 }
 
@@ -3051,18 +3427,7 @@ const PYTHON_PRIMARY_CAPABILITY_PREFIXES = [
     'schedule'
 ];
 
-const PYTHON_CAPABILITY_CLASS_SUFFIXES = [
-    'Service',
-    'Node',
-    'Workflow',
-    'Pipeline',
-    'Step',
-    'Handler',
-    'Controller',
-    'Tool',
-    'Agent',
-    'Manager'
-];
+const PYTHON_CAPABILITY_CLASS_SUFFIXES = GENERIC_CAPABILITY_CONTAINER_SUFFIXES;
 
 function isPythonNoiseCapability(name: string, config?: TriadConfig, sourcePath = '', record?: CapabilityCandidateRecord) {
     return isSuppressedCapabilityCandidate(
@@ -5971,6 +6336,64 @@ function dedupeNodes(nodes: TriadNode[]) {
     });
 }
 
+export function canonicalizeTriadNodes(nodes: TriadNode[], config: TriadConfig) {
+    const diagnostics: TreeSitterParseDiagnostic[] = [];
+    const canonicalized = nodes.map((node) => {
+        const resolvedCategory = resolveCategoryBySourcePath(node.sourcePath, config.categories);
+        if (resolvedCategory !== 'unknown' && String(node.category ?? '').trim() !== resolvedCategory) {
+            diagnostics.push({
+                level: 'warning',
+                code: 'TRIAD_SOURCE_CATEGORY_MISMATCH_AUTO_FIXED',
+                message: 'sourcePath/category mismatch auto-fixed by category resolver',
+                sourcePath: node.sourcePath,
+                nodeId: node.nodeId,
+                originalCategory: node.category,
+                resolvedCategory
+            });
+            return {
+                ...node,
+                category: resolvedCategory
+            };
+        }
+
+        if (resolvedCategory === 'unknown') {
+            diagnostics.push({
+                level: 'info',
+                code: 'TRIAD_SOURCE_CATEGORY_UNRESOLVED',
+                message: 'sourcePath could not be resolved to a configured category',
+                sourcePath: node.sourcePath,
+                nodeId: node.nodeId,
+                originalCategory: node.category
+            });
+        }
+
+        return node;
+    });
+
+    return {
+        nodes: canonicalized,
+        diagnostics
+    };
+}
+
+function dedupeParserDiagnostics(diagnostics: TreeSitterParseDiagnostic[]) {
+    const seen = new Set<string>();
+    return diagnostics.filter((diagnostic) => {
+        const key = [
+            diagnostic.code,
+            diagnostic.sourcePath ?? '',
+            diagnostic.nodeId ?? '',
+            diagnostic.originalCategory ?? '',
+            diagnostic.resolvedCategory ?? ''
+        ].join('::');
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
 function aggregateNodesForScanMode(nodes: TriadNode[], config: TriadConfig) {
     if (config.parser.scanMode === 'module') {
         return buildAggregatedNodes(nodes, config, 'module');
@@ -6181,6 +6604,13 @@ function ensureStringSet(map: Map<string, Set<string>>, key: string) {
 function normalizeTypeText(value: string) {
     const normalized = value.trim().replace(/\s+/g, ' ');
     return normalized || 'unknown';
+}
+
+function normalizeText(value: string) {
+    return String(value ?? '')
+        .replace(/^['"`]+|['"`]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 function normalizeGenericContractType(value: string) {

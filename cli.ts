@@ -1308,7 +1308,21 @@ function writeViewMapArtifactsBestEffort(
                 runtimeNodes: 0,
                 capabilityNodes: 0,
                 leafNodes: 0,
-                linkCount: 0
+                linkCount: 0,
+                runtimeMatchedNodes: 0,
+                runtimeUnmatchedNodes: 0,
+                runtimeMatchRate: 0,
+                capabilityMatchedNodes: 0,
+                capabilityUnmatchedNodes: 0,
+                capabilityLeafMatchRate: 0,
+                leafMatchedNodes: 0,
+                leafUnmatchedNodes: 0,
+                leafCapabilityMatchRate: 0,
+                runtimeToCapabilityLinkCount: 0,
+                capabilityToLeafLinkCount: 0,
+                runtimeToLeafLinkCount: 0,
+                endToEndTraceableRuntimeNodes: 0,
+                endToEndTraceabilityRate: 0
             },
             links: [],
             diagnostics: [
@@ -1358,7 +1372,12 @@ function reportViewMapStatus(
     result: {
         recovered: boolean;
         viewMap: {
-            stats?: { linkCount?: number };
+            stats?: {
+                linkCount?: number;
+                runtimeMatchRate?: number;
+                capabilityLeafMatchRate?: number;
+                endToEndTraceabilityRate?: number;
+            };
             diagnostics?: Array<{ code?: string; level: 'info' | 'warning' | 'error'; message: string }>;
         };
     }
@@ -1380,7 +1399,11 @@ function reportViewMapStatus(
     }
     console.log(
         chalk.green(
-            `✅ View map written: ${paths.viewMapFile} (links=${result.viewMap.stats?.linkCount ?? 0})`
+            `✅ View map written: ${paths.viewMapFile} (links=${result.viewMap.stats?.linkCount ?? 0}, runtime=${(
+                result.viewMap.stats?.runtimeMatchRate ?? 0
+            ).toFixed(3)}, capabilityLeaf=${(result.viewMap.stats?.capabilityLeafMatchRate ?? 0).toFixed(3)}, e2e=${(
+                result.viewMap.stats?.endToEndTraceabilityRate ?? 0
+            ).toFixed(3)})`
         )
     );
     console.log(chalk.green(`✅ View map diagnostics written: ${paths.viewMapDiagnosticsFile}`));

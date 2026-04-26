@@ -42,5 +42,8 @@ export class WorkflowService {
     const payload = JSON.parse(fs.readFileSync(viewMapFile, 'utf-8'));
     assert.equal(payload.schemaVersion, '1.0');
     assert.ok(typeof payload.stats?.linkCount === 'number');
+    assert.ok(typeof payload.stats?.runtimeMatchRate === 'number');
+    assert.ok(typeof payload.stats?.capabilityLeafMatchRate === 'number');
+    assert.ok(typeof payload.stats?.endToEndTraceabilityRate === 'number');
     assert.ok(Array.isArray(payload.diagnostics));
 });

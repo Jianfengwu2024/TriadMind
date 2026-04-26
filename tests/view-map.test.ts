@@ -240,3 +240,163 @@ test('view-map uses runtime evidence sourcePath and category alignment for runti
         true
     );
 });
+
+test('view-map canonicalizes custom categories and reports end-to-end completeness for mixed-language fixtures', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-view-map-generic-'));
+    const paths = getWorkspacePaths(root);
+
+    writeFixture(root, '.triadmind/config.json', {
+        schemaVersion: '1.1',
+        architecture: {
+            language: 'typescript',
+            parserEngine: 'tree-sitter',
+            adapter: '@triadmind/plugin-ts'
+        },
+        categories: {
+            dialogue_core: ['flows/dialogue'],
+            surface_web: ['surface/http'],
+            terminal_lane: ['ops/cli'],
+            core: ['shared']
+        },
+        parser: {
+            scanCategories: ['dialogue_core', 'surface_web', 'terminal_lane'],
+            scanMode: 'capability'
+        }
+    });
+
+    writeFixture(root, '.triadmind/profile.json', {
+        schemaVersion: '1.0',
+        scanScopes: [
+            { name: 'dialogue', kind: 'agent', match: { pathPrefixes: ['flows/dialogue'] } },
+            { name: 'surface', kind: 'api', match: { pathPrefixes: ['surface/http'] } },
+            { name: 'terminal', kind: 'cli', match: { pathPrefixes: ['ops/cli'] } }
+        ]
+    });
+
+    writeFixture(root, '.triadmind/triad-map.json', [
+        {
+            nodeId: 'ReplyController.post_reply',
+            category: 'dialogue_core',
+            sourcePath: 'surface/http/reply.ts',
+            fission: {
+                problem: 'Post reply',
+                demand: ['ReplyCommand (command)'],
+                answer: ['ReplyResult']
+            }
+        },
+        {
+            nodeId: 'ReplyOrchestrator.dispatch_turn',
+            category: 'surface_web',
+            sourcePath: 'flows/dialogue/orchestrator.py',
+            topology: {
+                foldedLeaves: ['ReplyOrchestrator._prepare_context']
+            },
+            fission: {
+                problem: 'Dispatch turn',
+                demand: ['TurnRequest (request)'],
+                answer: ['TurnReply']
+            }
+        }
+    ]);
+
+    writeFixture(root, '.triadmind/leaf-map.json', [
+        {
+            nodeId: 'ReplyController.post_reply',
+            category: 'dialogue_core',
+            sourcePath: 'surface/http/reply.ts',
+            fission: {
+                problem: 'Post reply',
+                demand: ['ReplyCommand (command)'],
+                answer: ['ReplyResult']
+            }
+        },
+        {
+            nodeId: 'ReplyOrchestrator.dispatch_turn',
+            category: 'surface_web',
+            sourcePath: 'flows/dialogue/orchestrator.py',
+            fission: {
+                problem: 'Dispatch turn',
+                demand: ['TurnRequest (request)'],
+                answer: ['TurnReply']
+            }
+        },
+        {
+            nodeId: 'ReplyOrchestrator._prepare_context',
+            category: 'surface_web',
+            sourcePath: 'flows/dialogue/orchestrator.py',
+            fission: {
+                problem: 'Prepare context',
+                demand: ['TurnRequest (request)'],
+                answer: ['TurnContext']
+            }
+        }
+    ]);
+
+    writeFixture(root, '.triadmind/runtime-map.json', {
+        schemaVersion: '1.0',
+        project: 'view-map-generic-test',
+        generatedAt: new Date().toISOString(),
+        nodes: [
+            {
+                id: 'ApiRoute.POST./reply',
+                type: 'ApiRoute',
+                label: 'POST /reply',
+                category: 'dialogue_core',
+                sourcePath: 'surface/http/reply.ts',
+                metadata: {
+                    handler: 'post_reply'
+                }
+            },
+            {
+                id: 'Workflow.ReplyOrchestrator.dispatch_turn',
+                type: 'Workflow',
+                label: 'dispatch turn',
+                category: 'surface_web',
+                evidence: [
+                    {
+                        sourcePath: 'flows/dialogue/orchestrator.py',
+                        kind: 'call',
+                        text: 'dispatch turn'
+                    }
+                ]
+            }
+        ],
+        edges: []
+    });
+
+    const viewMap = generateViewMap(paths);
+    assert.equal(viewMap.stats.runtimeMatchRate, 1);
+    assert.equal(viewMap.stats.capabilityLeafMatchRate, 1);
+    assert.equal(viewMap.stats.endToEndTraceabilityRate, 1);
+    assert.equal(viewMap.stats.runtimeToCapabilityLinkCount >= 2, true);
+    assert.equal(viewMap.stats.capabilityToLeafLinkCount >= 3, true);
+    assert.equal(viewMap.stats.runtimeToLeafLinkCount >= 3, true);
+    assert.equal(
+        viewMap.diagnostics.some((item) => item.code === 'VIEW_MAP_CAPABILITY_CATEGORY_MISMATCH_AUTO_FIXED'),
+        true
+    );
+    assert.equal(
+        viewMap.diagnostics.some((item) => item.code === 'VIEW_MAP_RUNTIME_CATEGORY_MISMATCH_AUTO_FIXED'),
+        true
+    );
+    assert.equal(
+        viewMap.links.some(
+            (link) =>
+                link.fromView === 'runtime' &&
+                link.fromId === 'ApiRoute.POST./reply' &&
+                link.toView === 'capability' &&
+                link.toId === 'ReplyController.post_reply'
+        ),
+        true
+    );
+    assert.equal(
+        viewMap.links.some(
+            (link) =>
+                link.fromView === 'runtime' &&
+                link.fromId === 'Workflow.ReplyOrchestrator.dispatch_turn' &&
+                link.toView === 'leaf' &&
+                link.toId === 'ReplyOrchestrator._prepare_context'
+        ),
+        true
+    );
+});

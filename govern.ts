@@ -222,6 +222,7 @@ export function runGovern(paths: WorkspacePaths, options: GovernRunOptions): Gov
         total_source_files: coverageReport.summary.totalSourceFiles
     };
     metrics.coverage_by_root = buildCoverageMetricSnapshot(coverageReport);
+    metrics.view_mapping_summary = buildViewMapMetricSnapshot(paths.viewMapFile);
     const diagnosticsShapeErrors = validateRuntimeDiagnosticsShape(paths.runtimeDiagnosticsFile);
     if (diagnosticsShapeErrors.length > 0) {
         report.checks.push({
@@ -1096,6 +1097,27 @@ function buildCoverageMetricSnapshot(report: CoverageReport) {
                 }
             ])
         )
+    };
+}
+
+function buildViewMapMetricSnapshot(viewMapPath: string) {
+    const parsed = readJsonIfExists(viewMapPath);
+    const stats = parsed && typeof parsed === 'object' ? (parsed as { stats?: Record<string, unknown> }).stats : undefined;
+    if (!stats || typeof stats !== 'object') {
+        return {
+            present: false
+        };
+    }
+
+    return {
+        present: true,
+        runtime_match_rate: toFiniteNumber(stats.runtimeMatchRate) ?? 0,
+        capability_leaf_match_rate: toFiniteNumber(stats.capabilityLeafMatchRate) ?? 0,
+        leaf_capability_match_rate: toFiniteNumber(stats.leafCapabilityMatchRate) ?? 0,
+        end_to_end_traceability_rate: toFiniteNumber(stats.endToEndTraceabilityRate) ?? 0,
+        runtime_to_capability_links: toFiniteNumber(stats.runtimeToCapabilityLinkCount) ?? 0,
+        capability_to_leaf_links: toFiniteNumber(stats.capabilityToLeafLinkCount) ?? 0,
+        runtime_to_leaf_links: toFiniteNumber(stats.runtimeToLeafLinkCount) ?? 0
     };
 }
 

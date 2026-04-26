@@ -151,6 +151,25 @@ function createTestConfig(): TriadConfig {
             maxAutoRetries: 3,
             requireHumanApprovalForContractChanges: true,
             snapshotStrategy: 'manual'
+        },
+        profile: {
+            schemaVersion: '1.0',
+            categories: {},
+            scanScopes: [
+                { name: 'tests', kind: 'tests', match: { pathSegments: ['tests', 'test', '__tests__'] } },
+                { name: 'migrations', kind: 'migrations', match: { pathSegments: ['migrations', 'alembic'] } },
+                { name: 'types', kind: 'types', match: { pathSegments: ['types', 'schemas', 'schema', 'models', 'model', 'entities', 'entity', 'dto', 'vo'] } },
+                { name: 'api', kind: 'api', match: { pathSegments: ['api', 'routes'] } },
+                { name: 'nodes', kind: 'nodes', match: { pathSegments: ['nodes', 'node'] } },
+                { name: 'tasks', kind: 'tasks', match: { pathSegments: ['workflow', 'workflows', 'tasks', 'task'] } },
+                { name: 'services', kind: 'services', match: { pathSegments: ['services', 'service'] } },
+                { name: 'utils', kind: 'utils', match: { pathSegments: ['utils', 'util'] } }
+            ],
+            languageAdapters: {},
+            extractors: {
+                parser: [],
+                runtime: []
+            }
         }
     };
 }

@@ -1,0 +1,247 @@
+{
+  "schemaVersion": "1.0",
+  "categories": {
+    "core": []
+  },
+  "scanScopes": [
+    {
+      "name": "tests",
+      "kind": "tests",
+      "priority": 100,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "test",
+          "tests",
+          "__tests__"
+        ],
+        "filePatterns": [
+          "test_*.py",
+          "*_test.py",
+          "*.test.ts",
+          "*.test.tsx",
+          "*.spec.ts",
+          "*.spec.tsx",
+          "*.test.js",
+          "*.spec.js"
+        ],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "migrations",
+      "kind": "migrations",
+      "priority": 95,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "migration",
+          "migrations",
+          "alembic"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "types",
+      "kind": "types",
+      "priority": 90,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "types",
+          "schemas",
+          "schema",
+          "models",
+          "model",
+          "entities",
+          "entity",
+          "dto",
+          "vo"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "api",
+      "kind": "api",
+      "priority": 80,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "api",
+          "apis",
+          "routes",
+          "route",
+          "endpoint",
+          "endpoints",
+          "transport",
+          "http"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "ui",
+      "kind": "ui",
+      "priority": 70,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "ui",
+          "app",
+          "pages",
+          "page",
+          "layouts",
+          "layout",
+          "components",
+          "hooks",
+          "screens",
+          "views"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "cli",
+      "kind": "cli",
+      "priority": 70,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "cli",
+          "command",
+          "commands",
+          "subcommands",
+          "handlers",
+          "parsers"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "agentic",
+      "kind": "agent",
+      "priority": 65,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "chat",
+          "conversation",
+          "assistant",
+          "memory",
+          "planner",
+          "reasoning",
+          "tools",
+          "tooling",
+          "function_calling",
+          "session"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "tasks",
+      "kind": "tasks",
+      "priority": 60,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "workflow",
+          "workflows",
+          "tasks",
+          "task",
+          "jobs",
+          "job",
+          "orchestration",
+          "pipelines",
+          "pipeline",
+          "stages",
+          "stage"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "nodes",
+      "kind": "nodes",
+      "priority": 55,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "nodes",
+          "node"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "services",
+      "kind": "services",
+      "priority": 50,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "services",
+          "service",
+          "integrations",
+          "integration",
+          "adapters",
+          "adapter",
+          "gateways",
+          "gateway"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    },
+    {
+      "name": "utils",
+      "kind": "utils",
+      "priority": 40,
+      "match": {
+        "pathPrefixes": [],
+        "pathSegments": [
+          "utils",
+          "util",
+          "helpers",
+          "helper"
+        ],
+        "filePatterns": [],
+        "includePatterns": [],
+        "excludePatterns": []
+      }
+    }
+  ],
+  "languageAdapters": {
+    "typescript": "@triadmind/plugin-ts",
+    "javascript": "@triadmind/plugin-js",
+    "python": "@triadmind/plugin-python",
+    "go": "@triadmind/plugin-go",
+    "rust": "@triadmind/plugin-rust",
+    "cpp": "@triadmind/plugin-cpp",
+    "java": "@triadmind/plugin-java"
+  },
+  "extractors": {
+    "parser": [],
+    "runtime": []
+  }
+}

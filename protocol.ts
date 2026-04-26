@@ -22,7 +22,7 @@ export function normalizeCategory(category?: string, fallback: TriadCategory = '
     }
 
     const normalized = category.trim().toLowerCase();
-    return getPrefixCategoryMap()[normalized] ?? fallback;
+    return getPrefixCategoryMap()[normalized] ?? normalized;
 }
 
 /**

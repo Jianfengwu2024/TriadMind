@@ -27,6 +27,7 @@ export interface CoverageBucketReport {
     triadCoverage: number;
     runtimeCoverage: number;
     combinedCoverage: number;
+    coveredSamples: string[];
     uncoveredSamples: string[];
 }
 
@@ -254,6 +255,7 @@ function buildBucketReport(input: {
         triadCoverage: safeRatio(triadCoveredFiles.length, input.totalFiles.length),
         runtimeCoverage: safeRatio(runtimeCoveredFiles.length, input.totalFiles.length),
         combinedCoverage: safeRatio(combinedCoveredFiles.length, input.totalFiles.length),
+        coveredSamples: combinedCoveredFiles.slice(0, MAX_UNCOVERED_SAMPLES),
         uncoveredSamples: uncovered.slice(0, MAX_UNCOVERED_SAMPLES)
     } satisfies CoverageBucketReport;
 }

@@ -106,6 +106,50 @@ function createCoverageFixture() {
         'utf-8'
     );
 
+    fs.writeFileSync(
+        path.join(triadDir, 'config.json'),
+        JSON.stringify(
+            {
+                schemaVersion: '1.1',
+                architecture: {
+                    language: 'python',
+                    parserEngine: 'tree-sitter',
+                    adapter: '@triadmind/plugin-python'
+                },
+                categories: {
+                    backend: ['backend'],
+                    frontend: ['frontend'],
+                    agent: ['agent'],
+                    rheo_cli: ['rheo_cli'],
+                    core: ['shared']
+                },
+                parser: {
+                    scanCategories: ['backend', 'frontend', 'agent', 'rheo_cli']
+                }
+            },
+            null,
+            2
+        ),
+        'utf-8'
+    );
+    fs.writeFileSync(
+        path.join(triadDir, 'profile.json'),
+        JSON.stringify(
+            {
+                schemaVersion: '1.0',
+                scanScopes: [
+                    { name: 'api', kind: 'api', match: { pathSegments: ['backend'] } },
+                    { name: 'ui', kind: 'ui', match: { pathSegments: ['frontend'] } },
+                    { name: 'agent', kind: 'agent', match: { pathSegments: ['agent', 'chat'] } },
+                    { name: 'cli', kind: 'cli', match: { pathSegments: ['rheo_cli'] } }
+                ]
+            },
+            null,
+            2
+        ),
+        'utf-8'
+    );
+
     fs.writeFileSync(path.join(triadDir, 'runtime-diagnostics.json'), '[]', 'utf-8');
     return root;
 }

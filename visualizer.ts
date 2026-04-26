@@ -125,8 +125,13 @@ const STATUS_COLORS: Record<NodeStatus, { background: string; border: string; hi
 };
 
 const COMMUNITY_COLORS: Record<string, string> = {
-    frontend: '#4E79A7', backend: '#F28E2B', core: '#59A14F', protocol: '#B07AA1', macro: '#E15759'
+    frontend: '#4E79A7',
+    backend: '#F28E2B',
+    core: '#59A14F',
+    protocol: '#B07AA1',
+    macro: '#E15759'
 };
+const COMMUNITY_FALLBACK_PALETTE = ['#4E79A7', '#F28E2B', '#59A14F', '#E15759', '#76B7B2', '#EDC949', '#AF7AA1', '#FF9DA7'];
 
 const MACRO_CLUSTER_PALETTE = ['#f43f5e', '#38bdf8', '#f59e0b', '#22c55e', '#a78bfa', '#14b8a6'];
 export function generateDashboard(mapPath: string, protocolPath: string, outputPath: string, dashboardOptions: DashboardOptions = {}) {
@@ -418,7 +423,9 @@ function getMethodName(nodeId: string) {
 function buildLegend(nodes: Array<KnowledgeNode & { degree: number }>) {
     const communities = new Map<string, { cid: string; label: string; color: string; count: number }>();
     nodes.forEach((node) => {
-        const current = communities.get(node.community) ?? { cid: node.community, label: node.communityName, color: COMMUNITY_COLORS[node.community] ?? '#BAB0AC', count: 0 };
+        const current =
+            communities.get(node.community) ??
+            { cid: node.community, label: node.communityName, color: resolveCommunityColor(node.community), count: 0 };
         current.count += 1;
         communities.set(node.community, current);
     });
@@ -426,10 +433,32 @@ function buildLegend(nodes: Array<KnowledgeNode & { degree: number }>) {
 }
 
 function toCommunityName(category: string) {
-    if (category === 'frontend') return 'Frontend';
-    if (category === 'backend') return 'Backend';
-    if (category === 'protocol') return 'Protocol';
-    return 'Core';
+    const normalized = String(category ?? '').trim();
+    if (!normalized) return 'Unknown';
+    if (normalized === 'protocol') return 'Protocol';
+    if (normalized === 'macro') return 'Macro';
+    return normalized
+        .split(/[_./-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function resolveCommunityColor(category: string) {
+    const normalized = String(category ?? '').trim();
+    if (!normalized) {
+        return '#BAB0AC';
+    }
+    const preset = COMMUNITY_COLORS[normalized];
+    if (preset) {
+        return preset;
+    }
+
+    let hash = 0;
+    for (const ch of normalized) {
+        hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    }
+    return COMMUNITY_FALLBACK_PALETTE[hash % COMMUNITY_FALLBACK_PALETTE.length];
 }
 function buildHtml(
     graph: ReturnType<typeof buildKnowledgeGraph>,

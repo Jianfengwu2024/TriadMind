@@ -248,11 +248,14 @@ function syncPolyglotTreeSitterTopology(paths: WorkspacePaths, config: ReturnTyp
     );
     const mergedLeafNodes = mergeMultiLanguageNodes(results.flatMap((result) => result.leafNodes), rewritePlan);
     const mergedCapabilityNodes = mergeMultiLanguageNodes(results.flatMap((result) => result.projectedNodes), rewritePlan);
+    const mergedDiagnostics = results.flatMap((result) => result.diagnostics ?? []);
 
     fs.mkdirSync(path.dirname(paths.leafMapFile), { recursive: true });
     fs.mkdirSync(path.dirname(paths.mapFile), { recursive: true });
+    fs.mkdirSync(path.dirname(paths.triadDiagnosticsFile), { recursive: true });
     fs.writeFileSync(paths.leafMapFile, JSON.stringify(mergedLeafNodes, null, 2), 'utf-8');
     fs.writeFileSync(paths.mapFile, JSON.stringify(mergedCapabilityNodes, null, 2), 'utf-8');
+    fs.writeFileSync(paths.triadDiagnosticsFile, JSON.stringify(mergedDiagnostics, null, 2), 'utf-8');
 
     console.log(
         chalk.gray(

@@ -9,6 +9,19 @@ export type TriadParserEngine = 'native' | 'tree-sitter';
 export type TriadScanMode = 'leaf' | 'capability' | 'module' | 'domain';
 export type HelperVerbPolicy = 'suppress' | 'allow';
 export type GhostPolicyLanguageKey = TriadLanguage | 'default';
+export type TriadSourcePolicy =
+    | 'api'
+    | 'ui'
+    | 'cli'
+    | 'agent'
+    | 'types'
+    | 'tests'
+    | 'migrations'
+    | 'nodes'
+    | 'tasks'
+    | 'services'
+    | 'utils'
+    | 'other';
 
 export interface GhostLanguagePolicy {
     includeInDemand: boolean;
@@ -17,6 +30,34 @@ export interface GhostLanguagePolicy {
 }
 
 export type GhostPolicyByLanguage = Partial<Record<GhostPolicyLanguageKey, GhostLanguagePolicy>>;
+export type TriadCategoryMap = Record<string, string[]>;
+
+export interface TriadScanScopeRule {
+    pathPrefixes?: string[];
+    pathSegments?: string[];
+    filePatterns?: string[];
+    includePatterns?: string[];
+    excludePatterns?: string[];
+}
+
+export interface TriadScanScope {
+    name: string;
+    kind: TriadSourcePolicy;
+    priority?: number;
+    category?: string;
+    match?: TriadScanScopeRule;
+}
+
+export interface TriadProfile {
+    schemaVersion: string;
+    categories?: TriadCategoryMap;
+    scanScopes?: TriadScanScope[];
+    languageAdapters?: Partial<Record<TriadLanguage, string>>;
+    extractors?: {
+        parser?: string[];
+        runtime?: string[];
+    };
+}
 
 export interface TriadConfig {
     schemaVersion: string;
@@ -25,11 +66,11 @@ export interface TriadConfig {
         parserEngine: TriadParserEngine;
         adapter: string;
     };
-    categories: Record<TriadCategory, string[]>;
+    categories: TriadCategoryMap;
     parser: {
         excludePatterns: string[];
         excludePathPatterns: string[];
-        scanCategories: TriadCategory[];
+        scanCategories: string[];
         scanMode: TriadScanMode;
         leafOutputFile: string;
         capabilityOutputFile: string;
@@ -93,6 +134,7 @@ export interface TriadConfig {
         requireHumanApprovalForContractChanges: boolean;
         snapshotStrategy: 'manual' | 'git_commit';
     };
+    profile?: TriadProfile;
 }
 
 const DEFAULT_CONFIG: TriadConfig = {
@@ -103,11 +145,7 @@ const DEFAULT_CONFIG: TriadConfig = {
         adapter: '@triadmind/plugin-ts'
     },
     categories: {
-        frontend: ['src/frontend', 'frontend', 'src/client', 'client', 'src/web', 'web', 'src/app', 'app', 'apps/frontend', 'packages/frontend'],
-        backend: ['src/backend', 'backend', 'src/server', 'server', 'src/api', 'api', 'apps/backend', 'packages/backend'],
-        agent: ['src/agent', 'agent', 'apps/agent', 'packages/agent'],
-        rheo_cli: ['src/rheo_cli', 'rheo_cli', 'src/cli', 'cli', 'apps/cli', 'packages/cli'],
-        core: ['src/core', 'core', 'src/shared', 'shared', 'src/lib', 'lib']
+        core: []
     },
     parser: {
         excludePatterns: ['node_modules', '.triadmind'],
@@ -134,7 +172,7 @@ const DEFAULT_CONFIG: TriadConfig = {
             'dist',
             'build'
         ],
-        scanCategories: ['frontend', 'backend', 'agent', 'rheo_cli'],
+        scanCategories: ['core'],
         scanMode: 'capability',
         leafOutputFile: '.triadmind/leaf-map.json',
         capabilityOutputFile: '.triadmind/triad-map.json',
@@ -308,7 +346,8 @@ const DEFAULT_CONFIG: TriadConfig = {
         maxAutoRetries: 3,
         requireHumanApprovalForContractChanges: true,
         snapshotStrategy: 'manual'
-    }
+    },
+    profile: undefined
 };
 
 const LANGUAGE_ADAPTER_PACKAGE: Record<TriadLanguage, string> = {
@@ -329,6 +368,107 @@ const LANGUAGE_PARSER_ENGINE: Record<TriadLanguage, TriadParserEngine> = {
     rust: 'tree-sitter',
     cpp: 'tree-sitter',
     java: 'tree-sitter'
+};
+
+const DEFAULT_PROFILE: TriadProfile = {
+    schemaVersion: '1.0',
+    categories: {},
+    scanScopes: [
+        {
+            name: 'tests',
+            kind: 'tests',
+            priority: 100,
+            match: {
+                pathSegments: ['test', 'tests', '__tests__'],
+                filePatterns: ['test_*.py', '*_test.py', '*.test.ts', '*.test.tsx', '*.spec.ts', '*.spec.tsx', '*.test.js', '*.spec.js']
+            }
+        },
+        {
+            name: 'migrations',
+            kind: 'migrations',
+            priority: 95,
+            match: {
+                pathSegments: ['migration', 'migrations', 'alembic']
+            }
+        },
+        {
+            name: 'types',
+            kind: 'types',
+            priority: 90,
+            match: {
+                pathSegments: ['types', 'schemas', 'schema', 'models', 'model', 'entities', 'entity', 'dto', 'vo']
+            }
+        },
+        {
+            name: 'api',
+            kind: 'api',
+            priority: 80,
+            match: {
+                pathSegments: ['api', 'apis', 'routes', 'route', 'endpoint', 'endpoints', 'transport', 'http']
+            }
+        },
+        {
+            name: 'ui',
+            kind: 'ui',
+            priority: 70,
+            match: {
+                pathSegments: ['ui', 'app', 'pages', 'page', 'layouts', 'layout', 'components', 'hooks', 'screens', 'views']
+            }
+        },
+        {
+            name: 'cli',
+            kind: 'cli',
+            priority: 70,
+            match: {
+                pathSegments: ['cli', 'command', 'commands', 'subcommands', 'handlers', 'parsers']
+            }
+        },
+        {
+            name: 'agentic',
+            kind: 'agent',
+            priority: 65,
+            match: {
+                pathSegments: ['chat', 'conversation', 'assistant', 'memory', 'planner', 'reasoning', 'tools', 'tooling', 'function_calling', 'session']
+            }
+        },
+        {
+            name: 'tasks',
+            kind: 'tasks',
+            priority: 60,
+            match: {
+                pathSegments: ['workflow', 'workflows', 'tasks', 'task', 'jobs', 'job', 'orchestration', 'pipelines', 'pipeline', 'stages', 'stage']
+            }
+        },
+        {
+            name: 'nodes',
+            kind: 'nodes',
+            priority: 55,
+            match: {
+                pathSegments: ['nodes', 'node']
+            }
+        },
+        {
+            name: 'services',
+            kind: 'services',
+            priority: 50,
+            match: {
+                pathSegments: ['services', 'service', 'integrations', 'integration', 'adapters', 'adapter', 'gateways', 'gateway']
+            }
+        },
+        {
+            name: 'utils',
+            kind: 'utils',
+            priority: 40,
+            match: {
+                pathSegments: ['utils', 'util', 'helpers', 'helper']
+            }
+        }
+    ],
+    languageAdapters: LANGUAGE_ADAPTER_PACKAGE,
+    extractors: {
+        parser: [],
+        runtime: []
+    }
 };
 
 const HARD_EXCLUDE_SEGMENTS = new Set([
@@ -377,6 +517,8 @@ export function ensureTriadConfig(paths: WorkspacePaths, force = false) {
         const detectedLanguage = detectProjectLanguage(paths.projectRoot);
         fs.writeFileSync(paths.configFile, JSON.stringify(buildDefaultConfig(detectedLanguage), null, 2), 'utf-8');
     }
+
+    ensureTriadProfile(paths, force);
 }
 
 export function loadTriadConfig(paths: WorkspacePaths): TriadConfig {
@@ -389,9 +531,31 @@ export function loadTriadConfig(paths: WorkspacePaths): TriadConfig {
         if (JSON.stringify(parsed) !== JSON.stringify(merged)) {
             fs.writeFileSync(paths.configFile, JSON.stringify(merged, null, 2), 'utf-8');
         }
+        return applyProfileToConfig(merged, loadTriadProfile(paths));
+    } catch {
+        return applyProfileToConfig(DEFAULT_CONFIG, loadTriadProfile(paths));
+    }
+}
+
+export function ensureTriadProfile(paths: WorkspacePaths, force = false) {
+    fs.mkdirSync(paths.triadDir, { recursive: true });
+    if (force || !fs.existsSync(paths.profileFile)) {
+        fs.writeFileSync(paths.profileFile, JSON.stringify(buildDefaultProfile(), null, 2), 'utf-8');
+    }
+}
+
+export function loadTriadProfile(paths: WorkspacePaths): TriadProfile {
+    ensureTriadProfile(paths);
+    try {
+        const raw = fs.readFileSync(paths.profileFile, 'utf-8').replace(/^\uFEFF/, '');
+        const parsed = JSON.parse(raw) as Partial<TriadProfile>;
+        const merged = mergeProfileWithDefault(parsed);
+        if (JSON.stringify(parsed) !== JSON.stringify(merged)) {
+            fs.writeFileSync(paths.profileFile, JSON.stringify(merged, null, 2), 'utf-8');
+        }
         return merged;
     } catch {
-        return DEFAULT_CONFIG;
+        return buildDefaultProfile();
     }
 }
 
@@ -402,7 +566,7 @@ export function resolveCategoryFromConfig(sourcePath: string, config: TriadConfi
 
 export function resolveCategoryBySourcePath(
     sourcePath: string | undefined,
-    categories: Record<TriadCategory, string[]>
+    categories: TriadCategoryMap
 ): TriadCategory | 'unknown' {
     const normalizedPath = normalizePath(String(sourcePath ?? '')).toLowerCase().replace(/^\/+/, '');
     if (!normalizedPath) {
@@ -436,6 +600,33 @@ export function resolveCategoryBySourcePath(
     }
 
     return bestMatch?.category ?? 'unknown';
+}
+
+export function resolveSourceScanScope(sourcePath: string | undefined, config: TriadConfig) {
+    const normalizedPath = normalizeScopePath(String(sourcePath ?? ''));
+    if (!normalizedPath) {
+        return undefined;
+    }
+
+    const segments = normalizedPath.split('/').filter(Boolean);
+    const scopes = config.profile?.scanScopes ?? [];
+    let bestMatch: { scope: TriadScanScope; score: number } | undefined;
+
+    for (const scope of scopes) {
+        const score = scoreScanScopeMatch(normalizedPath, segments, scope);
+        if (score <= 0) {
+            continue;
+        }
+
+        if (!bestMatch || score > bestMatch.score) {
+            bestMatch = {
+                scope,
+                score
+            };
+        }
+    }
+
+    return bestMatch?.scope;
 }
 
 export function shouldExcludeSourcePath(sourcePath: string, config: TriadConfig) {
@@ -499,6 +690,7 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
         value.architecture?.adapter,
         DEFAULT_CONFIG.architecture.language
     );
+    const mergedCategories = mergeCategoryRecord(value.categories, DEFAULT_CONFIG.categories);
 
     return {
         schemaVersion: DEFAULT_CONFIG.schemaVersion,
@@ -507,20 +699,14 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
             parserEngine: normalizeParserEngine(value.architecture?.parserEngine, language),
             adapter: value.architecture?.adapter ?? LANGUAGE_ADAPTER_PACKAGE[language]
         },
-        categories: {
-            frontend: mergeCategoryPatterns(value.categories?.frontend, DEFAULT_CONFIG.categories.frontend),
-            backend: mergeCategoryPatterns(value.categories?.backend, DEFAULT_CONFIG.categories.backend),
-            agent: mergeCategoryPatterns(value.categories?.agent, DEFAULT_CONFIG.categories.agent),
-            rheo_cli: mergeCategoryPatterns(value.categories?.rheo_cli, DEFAULT_CONFIG.categories.rheo_cli),
-            core: mergeCategoryPatterns(value.categories?.core, DEFAULT_CONFIG.categories.core)
-        },
+        categories: mergedCategories,
         parser: {
             excludePatterns: value.parser?.excludePatterns ?? DEFAULT_CONFIG.parser.excludePatterns,
             excludePathPatterns: mergeStringList(
                 value.parser?.excludePathPatterns,
                 DEFAULT_CONFIG.parser.excludePathPatterns
             ),
-            scanCategories: normalizeScanCategories(value.parser?.scanCategories),
+            scanCategories: normalizeScanCategories(value.parser?.scanCategories, mergedCategories),
             scanMode: normalizeScanMode(value.parser?.scanMode),
             leafOutputFile: normalizeRelativeOutputFile(
                 value.parser?.leafOutputFile,
@@ -667,7 +853,8 @@ function mergeWithDefault(value: Partial<TriadConfig>): TriadConfig {
                 value.runtimeHealing?.requireHumanApprovalForContractChanges ??
                 DEFAULT_CONFIG.runtimeHealing.requireHumanApprovalForContractChanges,
             snapshotStrategy: value.runtimeHealing?.snapshotStrategy ?? DEFAULT_CONFIG.runtimeHealing.snapshotStrategy
-        }
+        },
+        profile: undefined
     };
 }
 
@@ -682,13 +869,15 @@ function buildDefaultConfig(language: TriadLanguage): TriadConfig {
     };
 }
 
-function normalizeScanCategories(value: TriadCategory[] | undefined) {
+function normalizeScanCategories(value: string[] | undefined, categories: TriadCategoryMap = DEFAULT_CONFIG.categories) {
     if (!Array.isArray(value) || value.length === 0) {
         return [...DEFAULT_CONFIG.parser.scanCategories];
     }
 
-    const allowed = new Set<TriadCategory>(['frontend', 'backend', 'agent', 'rheo_cli', 'core']);
-    const normalized = value.filter((entry): entry is TriadCategory => allowed.has(entry));
+    const allowed = new Set(Object.keys(categories).filter(Boolean));
+    const normalized = value
+        .map((entry) => String(entry ?? '').trim())
+        .filter((entry) => allowed.has(entry));
     return normalized.length > 0 ? Array.from(new Set(normalized)) : [...DEFAULT_CONFIG.parser.scanCategories];
 }
 
@@ -821,8 +1010,128 @@ function mergeCategoryPatterns(value: string[] | undefined, fallback: string[]) 
     return Array.from(new Set([...items, ...fallback].filter((item) => typeof item === 'string' && item.trim())));
 }
 
+function mergeCategoryRecord(value: TriadCategoryMap | undefined, fallback: TriadCategoryMap) {
+    const keys = new Set<string>([
+        ...Object.keys(fallback ?? {}).filter(Boolean),
+        ...Object.keys(value ?? {}).filter(Boolean)
+    ]);
+    const merged: TriadCategoryMap = {};
+    for (const key of keys) {
+        merged[key] = mergeCategoryPatterns(value?.[key], fallback?.[key] ?? []);
+    }
+    if (!merged.core) {
+        merged.core = [];
+    }
+    return merged;
+}
+
+function buildDefaultProfile(): TriadProfile {
+    return {
+        schemaVersion: DEFAULT_PROFILE.schemaVersion,
+        categories: { ...(DEFAULT_PROFILE.categories ?? {}) },
+        scanScopes: (DEFAULT_PROFILE.scanScopes ?? []).map((scope) => ({
+            ...scope,
+            match: {
+                ...(scope.match ?? {})
+            }
+        })),
+        languageAdapters: {
+            ...(DEFAULT_PROFILE.languageAdapters ?? {})
+        },
+        extractors: {
+            parser: [...(DEFAULT_PROFILE.extractors?.parser ?? [])],
+            runtime: [...(DEFAULT_PROFILE.extractors?.runtime ?? [])]
+        }
+    };
+}
+
+function mergeProfileWithDefault(value: Partial<TriadProfile> | undefined): TriadProfile {
+    const defaults = buildDefaultProfile();
+    return {
+        schemaVersion: defaults.schemaVersion,
+        categories: mergeCategoryRecord(value?.categories, defaults.categories ?? {}),
+        scanScopes: normalizeScanScopes(value?.scanScopes, defaults.scanScopes ?? []),
+        languageAdapters: {
+            ...(defaults.languageAdapters ?? {}),
+            ...(value?.languageAdapters ?? {})
+        },
+        extractors: {
+            parser: mergeStringList(value?.extractors?.parser, defaults.extractors?.parser ?? []),
+            runtime: mergeStringList(value?.extractors?.runtime, defaults.extractors?.runtime ?? [])
+        }
+    };
+}
+
+function applyProfileToConfig(config: TriadConfig, profile: TriadProfile): TriadConfig {
+    const mergedCategories = mergeCategoryRecord(profile.categories, config.categories);
+    return {
+        ...config,
+        categories: mergedCategories,
+        parser: {
+            ...config.parser,
+            scanCategories: normalizeScanCategories(config.parser.scanCategories, mergedCategories)
+        },
+        architecture: {
+            ...config.architecture,
+            adapter: profile.languageAdapters?.[config.architecture.language] ?? config.architecture.adapter
+        },
+        profile
+    };
+}
+
+function normalizeScanScopes(value: TriadScanScope[] | undefined, fallback: TriadScanScope[]) {
+    const scopes = Array.isArray(value) && value.length > 0 ? value : fallback;
+    return scopes
+        .map((scope) => ({
+            name: String(scope?.name ?? '').trim(),
+            kind: normalizeSourcePolicy(scope?.kind),
+            priority: Number.isFinite(scope?.priority) ? Number(scope?.priority) : 0,
+            category: String(scope?.category ?? '').trim() || undefined,
+            match: {
+                pathPrefixes: normalizeStringArray(scope?.match?.pathPrefixes),
+                pathSegments: normalizeStringArray(scope?.match?.pathSegments).map((entry) => normalizeScopePath(entry)),
+                filePatterns: normalizeStringArray(scope?.match?.filePatterns),
+                includePatterns: normalizeStringArray(scope?.match?.includePatterns),
+                excludePatterns: normalizeStringArray(scope?.match?.excludePatterns)
+            }
+        }))
+        .filter((scope) => scope.name && scope.kind);
+}
+
+function normalizeSourcePolicy(value: TriadSourcePolicy | undefined): TriadSourcePolicy {
+    switch (value) {
+        case 'api':
+        case 'ui':
+        case 'cli':
+        case 'agent':
+        case 'types':
+        case 'tests':
+        case 'migrations':
+        case 'nodes':
+        case 'tasks':
+        case 'services':
+        case 'utils':
+        case 'other':
+            return value;
+        default:
+            return 'other';
+    }
+}
+
+function normalizeStringArray(value: string[] | undefined) {
+    return Array.isArray(value)
+        ? Array.from(
+              new Set(
+                  value
+                      .map((entry) => String(entry ?? '').trim())
+                      .filter(Boolean)
+              )
+          )
+        : [];
+}
+
 function resolveActiveScanPatterns(projectRoot: string, config: TriadConfig) {
-    const scanCategories = normalizeScanCategories(config.parser.scanCategories);
+    const scanCategories = normalizeScanCategories(config.parser.scanCategories, config.categories);
     const patterns = scanCategories.flatMap((category) => config.categories[category] ?? []);
 
     return Array.from(
@@ -833,6 +1142,60 @@ function resolveActiveScanPatterns(projectRoot: string, config: TriadConfig) {
                 .filter((pattern) => fs.existsSync(path.join(projectRoot, pattern)))
         )
     );
+}
+
+function scoreScanScopeMatch(normalizedPath: string, segments: string[], scope: TriadScanScope) {
+    const match = scope.match ?? {};
+    const normalizedSegments = new Set(segments.map((entry) => normalizeScopePath(entry)));
+    let score = 0;
+
+    for (const prefix of match.pathPrefixes ?? []) {
+        const normalizedPrefix = normalizeScopePath(prefix);
+        if (!normalizedPrefix) {
+            continue;
+        }
+        if (normalizedPath === normalizedPrefix || normalizedPath.startsWith(`${normalizedPrefix}/`)) {
+            score = Math.max(score, 1000 + normalizedPrefix.length);
+        }
+    }
+
+    const segmentHits = (match.pathSegments ?? []).filter((segment) => normalizedSegments.has(segment)).length;
+    if (segmentHits > 0) {
+        score = Math.max(score, 500 + segmentHits * 10);
+    }
+
+    const filePatternHits = (match.filePatterns ?? []).filter((pattern) => matchesFileGlob(normalizedPath, pattern)).length;
+    if (filePatternHits > 0) {
+        score = Math.max(score, 300 + filePatternHits * 10);
+    }
+
+    const includeHits = (match.includePatterns ?? []).filter((pattern) => matchesSourcePathPattern(normalizedPath, pattern)).length;
+    if (includeHits > 0) {
+        score = Math.max(score, 200 + includeHits * 10);
+    }
+
+    if ((match.excludePatterns ?? []).some((pattern) => matchesSourcePathPattern(normalizedPath, pattern))) {
+        return 0;
+    }
+
+    return score > 0 ? score + (scope.priority ?? 0) : 0;
+}
+
+function matchesFileGlob(normalizedPath: string, pattern: string) {
+    const normalizedPattern = String(pattern ?? '').trim();
+    if (!normalizedPattern) {
+        return false;
+    }
+
+    const escaped = normalizedPattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+    try {
+        return new RegExp(`^${escaped}$`, 'i').test(normalizedPath.split('/').pop() ?? normalizedPath);
+    } catch {
+        return false;
+    }
 }
 
 function normalizeScopePath(value: string) {

@@ -12,13 +12,18 @@ type ParsedTriadNode = {
     sourcePath: string;
 };
 
-function createTestConfig(language: 'typescript' | 'javascript'): TriadConfig {
+function createTestConfig(language: 'typescript' | 'javascript' | 'python'): TriadConfig {
     return {
         schemaVersion: '1.1',
         architecture: {
             language,
             parserEngine: 'tree-sitter',
-            adapter: language === 'typescript' ? '@triadmind/plugin-ts' : '@triadmind/plugin-js'
+            adapter:
+                language === 'typescript'
+                    ? '@triadmind/plugin-ts'
+                    : language === 'javascript'
+                      ? '@triadmind/plugin-js'
+                      : '@triadmind/plugin-python'
         },
         categories: {
             frontend: ['frontend', 'src/frontend', 'src/app', 'app'],
@@ -68,7 +73,8 @@ function createTestConfig(language: 'typescript' | 'javascript'): TriadConfig {
             ghostPolicyByLanguage: {
                 default: { includeInDemand: true, topK: 5, minConfidence: 4 },
                 typescript: { includeInDemand: true, topK: 4, minConfidence: 4 },
-                javascript: { includeInDemand: false, topK: 0, minConfidence: 5 }
+                javascript: { includeInDemand: false, topK: 0, minConfidence: 5 },
+                python: { includeInDemand: false, topK: 0, minConfidence: 5 }
             },
             jsDocTags: {
                 triadNode: 'TriadNode',
@@ -112,6 +118,20 @@ function createTestConfig(language: 'typescript' | 'javascript'): TriadConfig {
             maxAutoRetries: 3,
             requireHumanApprovalForContractChanges: true,
             snapshotStrategy: 'manual'
+        },
+        profile: {
+            schemaVersion: '1.0',
+            categories: {},
+            scanScopes: [
+                { name: 'ui', kind: 'ui', match: { pathSegments: ['frontend', 'app', 'pages', 'page', 'dashboard', 'settings'] } },
+                { name: 'agent', kind: 'agent', match: { pathSegments: ['agent', 'chat', 'session'] } },
+                { name: 'cli', kind: 'cli', match: { pathSegments: ['rheo_cli', 'commands', 'cli'] } }
+            ],
+            languageAdapters: {},
+            extractors: {
+                parser: [],
+                runtime: []
+            }
         }
     };
 }
@@ -122,7 +142,7 @@ function writeFixture(root: string, relativePath: string, content: string) {
     fs.writeFileSync(targetPath, content, 'utf-8');
 }
 
-function parseFixture(language: 'typescript' | 'javascript', files: Record<string, string>) {
+function parseFixture(language: 'typescript' | 'javascript' | 'python', files: Record<string, string>) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), `triadmind-capability-${language}-`));
     for (const [relativePath, content] of Object.entries(files)) {
         writeFixture(root, relativePath, content);
@@ -223,6 +243,22 @@ export default agents;
     assert.deepEqual(leafIds, ['Agents.load']);
 });
 
+test('typescript cli registration chains create synthetic command coverage nodes', () => {
+    const { triadMap, leafMap } = parseFixture('typescript', {
+        'rheo_cli/commands/registry.ts': `
+const cli = createCli();
+cli.command('deploy', 'Deploy release', buildDeploy, runDeploy);
+program.command('agents').description('Manage agents').action(loadAgents);
+`
+    });
+
+    const triadIds = triadMap.filter((node) => node.sourcePath === 'rheo_cli/commands/registry.ts').map((node) => node.nodeId).sort();
+    const leafIds = leafMap.filter((node) => node.sourcePath === 'rheo_cli/commands/registry.ts').map((node) => node.nodeId).sort();
+
+    assert.deepEqual(triadIds, ['Agents.loadAgents', 'Deploy.runDeploy']);
+    assert.deepEqual(leafIds, ['Agents.loadAgents', 'Deploy.runDeploy']);
+});
+
 test('javascript frontend default-export identifier resolves back to executable capability', () => {
     const { triadMap } = parseFixture('javascript', {
         'frontend/src/app/settings/page.jsx': `
@@ -246,4 +282,19 @@ export default {
 
     const ids = triadMap.filter((node) => node.sourcePath === 'rheo_cli/commands/deploy/index.js').map((node) => node.nodeId);
     assert.deepEqual(ids, ['Index.load']);
+});
+
+test('python argparse registration modules create synthetic cli capability nodes', () => {
+    const { triadMap, leafMap } = parseFixture('python', {
+        'rheo_cli/commands/deploy.py': `
+deploy = subparsers.add_parser("deploy")
+deploy.set_defaults(func=deploy_handler)
+`
+    });
+
+    const triadIds = triadMap.filter((node) => node.sourcePath === 'rheo_cli/commands/deploy.py').map((node) => node.nodeId).sort();
+    const leafIds = leafMap.filter((node) => node.sourcePath === 'rheo_cli/commands/deploy.py').map((node) => node.nodeId).sort();
+
+    assert.deepEqual(triadIds, ['Deploy.command', 'Deploy.deploy_handler']);
+    assert.deepEqual(leafIds, ['Deploy.command', 'Deploy.deploy_handler']);
 });

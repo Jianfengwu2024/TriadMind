@@ -15,8 +15,10 @@ export interface WorkspacePaths {
     cursorRulesDir: string;
     cursorRuleFile: string;
     configFile: string;
+    profileFile: string;
     mapFile: string;
     leafMapFile: string;
+    triadDiagnosticsFile: string;
     runtimeMapFile: string;
     runtimeVisualizerFile: string;
     runtimeDiagnosticsFile: string;
@@ -101,8 +103,10 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         cursorRulesDir: path.join(projectRoot, '.cursor', 'rules'),
         cursorRuleFile: path.join(projectRoot, '.cursor', 'rules', 'triadmind.mdc'),
         configFile: path.join(triadDir, 'config.json'),
+        profileFile: path.join(triadDir, 'profile.json'),
         mapFile: path.join(triadDir, 'triad-map.json'),
         leafMapFile: path.join(triadDir, 'leaf-map.json'),
+        triadDiagnosticsFile: path.join(triadDir, 'triad-diagnostics.json'),
         runtimeMapFile: path.join(triadDir, 'runtime-map.json'),
         runtimeVisualizerFile: path.join(triadDir, 'runtime-visualizer.html'),
         runtimeDiagnosticsFile: path.join(triadDir, 'runtime-diagnostics.json'),

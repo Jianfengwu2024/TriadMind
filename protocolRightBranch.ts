@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type TriadCategory = 'frontend' | 'backend' | 'agent' | 'rheo_cli' | 'core';
+export type TriadCategory = string;
 export type TriadOp = 'reuse' | 'modify' | 'create_child';
 
 export interface TriadFission {
@@ -126,17 +126,11 @@ export interface ProtocolValidationContext {
 }
 
 export const PREFIX_CATEGORY_MAP: Record<string, TriadCategory> = {
-    frontend: 'frontend',
-    backend: 'backend',
-    agent: 'agent',
-    rheo_cli: 'rheo_cli',
-    'rheo-cli': 'rheo_cli',
-    cli: 'rheo_cli',
     core: 'core'
 };
 
 const nonEmptyStringSchema = z.string().trim().min(1);
-const triadCategorySchema = z.enum(['frontend', 'backend', 'agent', 'rheo_cli', 'core']);
+const triadCategorySchema = nonEmptyStringSchema;
 const triadOpSchema = z.enum(['reuse', 'modify', 'create_child']);
 
 export const triadFissionSchema = z.object({

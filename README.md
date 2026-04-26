@@ -39,9 +39,11 @@ triadmind init
 - `.triadmind/triad-map.json`
 - `.triadmind/leaf-map.json`
 - `.triadmind/runtime-map.json`
+- `.triadmind/view-map.json`
 - `.triadmind/runtime-diagnostics.json`
 - `.triadmind/govern-policy.json`
 - `.triadmind/verify-baseline.json`
+- `.triadmind/profile.json`
 - `AGENTS.md`（TriadMind managed rules 区块）
 - `skills.md`（会话 SOP）
 - `.triadmind/session-bootstrap.sh`
@@ -119,6 +121,8 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - `.triadmind/runtime-map.json`：运行时拓扑图
 - `.triadmind/runtime-diagnostics.json`：提取诊断
 - `.triadmind/runtime-visualizer.html`：运行时可视化页面
+- `.triadmind/view-map.json`：`runtime ↔ capability ↔ leaf` 交叉映射
+- `.triadmind/view-map-diagnostics.json`：映射诊断与完整率摘要
 
 ### 3.3 治理层（Hard Gate）
 
@@ -164,6 +168,8 @@ triadmind apply
 ### 4.3 质量校验
 
 ```bash
+triadmind coverage --json
+triadmind view-map --json
 triadmind verify --json
 triadmind verify --strict --json
 ```
@@ -231,6 +237,25 @@ bash .triadmind/session-bootstrap.sh
 - `docs/tm-session.sh`
 - `docs/tm-session.ps1`
 
+### 4.7 Profile 注入（通用项目）
+
+```text
+.triadmind/profile.json
+```
+
+`profile.json` 是项目把“扫描域 / 分类 / 语言适配器 / 抽取器”注入 TriadMind 的主入口：
+
+- `categories`：声明项目自己的分类与路径前缀
+- `scanScopes`：声明 API / UI / CLI / agent / workflow 等抽象扫描语义
+- `languageAdapters`：按语言覆盖默认 adapter
+- `extractors`：挂接 parser/runtime 抽取扩展
+
+推荐原则：
+
+- 项目差异写进 `profile.json`
+- 核心 CLI 只消费抽象接口，不写死仓库目录名
+- 新项目优先复制并修改 `profile.json`，而不是改核心源码
+
 `govern` 退出码：
 
 - `0`: pass
@@ -282,7 +307,15 @@ CI 最小门禁建议：
 triadmind bootstrap doctor --json
 triadmind sync --force
 triadmind runtime --visualize --view full
+triadmind coverage --json
+triadmind view-map --json
 triadmind govern ci --policy .triadmind/govern-policy.json --json
+```
+
+一键验收建议：
+
+```bash
+triadmind bootstrap doctor --json && triadmind sync --force && triadmind runtime --visualize --view full && triadmind coverage --json && triadmind view-map --json && triadmind verify --strict --json && triadmind govern ci --policy .triadmind/govern-policy.json --json
 ```
 
 ### 6.3 变更治理

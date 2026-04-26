@@ -15,7 +15,9 @@ Run one of:
 - `.triadmind/triad-map.json`
 - `.triadmind/runtime-map.json`
 - `.triadmind/runtime-diagnostics.json`
+- `.triadmind/view-map.json`
 - `.triadmind/bootstrap-verify.json` (latest session gate result)
+- `.triadmind/profile.json`
 
 ## 3) Fail-closed rule
 
@@ -25,6 +27,8 @@ If `triadmind verify --strict --json` fails, stop implementation and fix diagnos
 
 - `triadmind sync --force`
 - `triadmind runtime --visualize --view full`
+- `triadmind coverage --json`
+- `triadmind view-map --json`
 - `triadmind plan --no-open --view architecture`
 - `triadmind apply`
 - `triadmind verify --strict --json`

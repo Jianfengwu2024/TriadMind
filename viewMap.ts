@@ -25,6 +25,23 @@ type TriadNode = {
 
 type RuntimeNode = RuntimeMap['nodes'][number];
 
+type CanonicalTriadNode = {
+    nodeId: string;
+    category: string;
+    sourcePath: string;
+    topology?: {
+        foldedLeaves?: string[];
+    };
+};
+
+type CanonicalRuntimeNode = RuntimeNode & {
+    id: string;
+    sourcePath?: string;
+    __sourcePaths: string[];
+    __resolvedCategory: string;
+    __resolvedSourcePath?: string;
+};
+
 export interface ViewMapDiagnostic {
     level: 'info' | 'warning' | 'error';
     code: string;
@@ -44,19 +61,32 @@ export interface ViewMapLink {
     sourcePath?: string;
 }
 
+export interface ViewMapStats {
+    runtimeNodes: number;
+    capabilityNodes: number;
+    leafNodes: number;
+    linkCount: number;
+    runtimeMatchedNodes: number;
+    runtimeUnmatchedNodes: number;
+    runtimeMatchRate: number;
+    capabilityMatchedNodes: number;
+    capabilityUnmatchedNodes: number;
+    capabilityLeafMatchRate: number;
+    leafMatchedNodes: number;
+    leafUnmatchedNodes: number;
+    leafCapabilityMatchRate: number;
+    runtimeToCapabilityLinkCount: number;
+    capabilityToLeafLinkCount: number;
+    runtimeToLeafLinkCount: number;
+    endToEndTraceableRuntimeNodes: number;
+    endToEndTraceabilityRate: number;
+}
+
 export interface ViewMap {
     schemaVersion: '1.0';
     project: string;
     generatedAt: string;
-    stats: {
-        runtimeNodes: number;
-        capabilityNodes: number;
-        leafNodes: number;
-        linkCount: number;
-        runtimeMatchedNodes: number;
-        runtimeUnmatchedNodes: number;
-        runtimeMatchRate: number;
-    };
+    stats: ViewMapStats;
     links: ViewMapLink[];
     diagnostics: ViewMapDiagnostic[];
 }
@@ -75,80 +105,78 @@ type RuntimeCapabilityCandidate = {
 export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions = {}): ViewMap {
     const config = loadTriadConfig(paths);
     const diagnostics: ViewMapDiagnostic[] = [];
-    const capabilityNodes = readTriadNodes(paths.mapFile, diagnostics, 'VIEW_MAP_MISSING_TRIAD_MAP');
-    const leafNodes = readTriadNodes(paths.leafMapFile, diagnostics, 'VIEW_MAP_MISSING_LEAF_MAP');
+    const capabilityNodes = canonicalizeViewTriadNodes(
+        readTriadNodes(paths.mapFile, diagnostics, 'VIEW_MAP_MISSING_TRIAD_MAP'),
+        'capability',
+        config.categories,
+        diagnostics
+    );
+    const leafNodes = canonicalizeViewTriadNodes(
+        readTriadNodes(paths.leafMapFile, diagnostics, 'VIEW_MAP_MISSING_LEAF_MAP'),
+        'leaf',
+        config.categories,
+        diagnostics
+    );
     const runtimeMap = readRuntimeMap(paths.runtimeMapFile, diagnostics);
+    const runtimeNodes = canonicalizeRuntimeNodes(runtimeMap?.nodes ?? [], config.categories, diagnostics);
     const maxCandidatesPerRuntimeNode = normalizePositiveInteger(options.maxCandidatesPerRuntimeNode, 3);
 
     const linksByKey = new Map<string, ViewMapLink>();
-    const capabilityById = new Map<string, TriadNode>();
-    const leafById = new Map<string, TriadNode>();
+    const capabilityById = new Map<string, CanonicalTriadNode>();
+    const leafById = new Map<string, CanonicalTriadNode>();
     const capabilityToLeaf = new Map<string, Set<string>>();
     const leafToCapability = new Map<string, Set<string>>();
+    const runtimeMatchedIds = new Set<string>();
 
     for (const node of capabilityNodes) {
-        const nodeId = normalizeNodeId(node.nodeId);
-        if (nodeId) {
-            capabilityById.set(nodeId, node);
-        }
+        capabilityById.set(node.nodeId, node);
     }
     for (const node of leafNodes) {
-        const nodeId = normalizeNodeId(node.nodeId);
-        if (nodeId) {
-            leafById.set(nodeId, node);
-        }
+        leafById.set(node.nodeId, node);
     }
 
     for (const [capabilityId, capabilityNode] of capabilityById.entries()) {
         const linkedLeafIds = new Set<string>();
         if (leafById.has(capabilityId)) {
             linkedLeafIds.add(capabilityId);
-            addBidirectionalLink(
-                linksByKey,
-                {
-                    fromView: 'capability',
-                    fromId: capabilityId,
-                    toView: 'leaf',
-                    toId: capabilityId,
-                    relation: 'exact',
-                    confidence: 0.99,
-                    reason: 'capability nodeId exactly matches leaf nodeId',
-                    sourcePath: capabilityNode.sourcePath
-                }
-            );
+            addBidirectionalLink(linksByKey, {
+                fromView: 'capability',
+                fromId: capabilityId,
+                toView: 'leaf',
+                toId: capabilityId,
+                relation: 'exact',
+                confidence: 0.99,
+                reason: 'capability nodeId exactly matches leaf nodeId',
+                sourcePath: capabilityNode.sourcePath
+            });
         }
 
         const foldedLeaves = Array.isArray(capabilityNode.topology?.foldedLeaves)
             ? capabilityNode.topology?.foldedLeaves ?? []
             : [];
-        for (const foldedLeaf of foldedLeaves) {
-            const foldedLeafId = normalizeNodeId(foldedLeaf);
+        for (const foldedLeafId of foldedLeaves) {
             if (!foldedLeafId || !leafById.has(foldedLeafId)) {
                 continue;
             }
             linkedLeafIds.add(foldedLeafId);
-            addBidirectionalLink(
-                linksByKey,
-                {
-                    fromView: 'capability',
-                    fromId: capabilityId,
-                    toView: 'leaf',
-                    toId: foldedLeafId,
-                    relation: 'folded_leaf',
-                    confidence: 0.96,
-                    reason: 'capability topology.foldedLeaves references this leaf node',
-                    sourcePath: capabilityNode.sourcePath
-                }
-            );
+            addBidirectionalLink(linksByKey, {
+                fromView: 'capability',
+                fromId: capabilityId,
+                toView: 'leaf',
+                toId: foldedLeafId,
+                relation: 'folded_leaf',
+                confidence: 0.96,
+                reason: 'capability topology.foldedLeaves references this leaf node',
+                sourcePath: capabilityNode.sourcePath
+            });
         }
 
         const owner = extractOwner(capabilityId);
-        const sourcePath = normalizeSourcePath(capabilityNode.sourcePath);
+        const sourcePath = capabilityNode.sourcePath;
         if (owner) {
             const ownerCandidates = leafNodes
-                .filter((leafNode) => normalizeSourcePath(leafNode.sourcePath) === sourcePath)
-                .map((leafNode) => normalizeNodeId(leafNode.nodeId))
-                .filter((leafId): leafId is string => Boolean(leafId))
+                .filter((leafNode) => leafNode.sourcePath === sourcePath)
+                .map((leafNode) => leafNode.nodeId)
                 .filter((leafId) => extractOwner(leafId) === owner)
                 .slice(0, 12);
 
@@ -157,19 +185,16 @@ export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions =
                     continue;
                 }
                 linkedLeafIds.add(leafId);
-                addBidirectionalLink(
-                    linksByKey,
-                    {
-                        fromView: 'capability',
-                        fromId: capabilityId,
-                        toView: 'leaf',
-                        toId: leafId,
-                        relation: 'owner_match',
-                        confidence: 0.78,
-                        reason: 'capability and leaf share sourcePath + owner name',
-                        sourcePath
-                    }
-                );
+                addBidirectionalLink(linksByKey, {
+                    fromView: 'capability',
+                    fromId: capabilityId,
+                    toView: 'leaf',
+                    toId: leafId,
+                    relation: 'owner_match',
+                    confidence: 0.78,
+                    reason: 'capability and leaf share sourcePath plus owner name',
+                    sourcePath
+                });
             }
         }
 
@@ -181,16 +206,11 @@ export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions =
         }
     }
 
-    const runtimeNodes = runtimeMap?.nodes ?? [];
     let runtimeUnmatchedCount = 0;
     const unmatchedSamples: string[] = [];
     for (const runtimeNode of runtimeNodes) {
-        const runtimeId = normalizeNodeId(runtimeNode.id);
-        if (!runtimeId) {
-            continue;
-        }
-
-        const candidates = collectRuntimeCapabilityCandidates(runtimeNode, capabilityById, config.categories);
+        const runtimeId = runtimeNode.id;
+        const candidates = collectRuntimeCapabilityCandidates(runtimeNode, capabilityById);
         if (candidates.length === 0) {
             runtimeUnmatchedCount += 1;
             if (unmatchedSamples.length < 10) {
@@ -199,36 +219,31 @@ export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions =
             continue;
         }
 
+        runtimeMatchedIds.add(runtimeId);
         for (const candidate of candidates.slice(0, maxCandidatesPerRuntimeNode)) {
-            addBidirectionalLink(
-                linksByKey,
-                {
-                    fromView: 'runtime',
-                    fromId: runtimeId,
-                    toView: 'capability',
-                    toId: candidate.capabilityId,
-                    relation: 'runtime_capability',
-                    confidence: normalizeConfidence(candidate.score / 100),
-                    reason: candidate.reason,
-                    sourcePath: candidate.sourcePath
-                }
-            );
+            addBidirectionalLink(linksByKey, {
+                fromView: 'runtime',
+                fromId: runtimeId,
+                toView: 'capability',
+                toId: candidate.capabilityId,
+                relation: 'runtime_capability',
+                confidence: normalizeConfidence(candidate.score / 100),
+                reason: candidate.reason,
+                sourcePath: candidate.sourcePath
+            });
 
             const linkedLeafIds = capabilityToLeaf.get(candidate.capabilityId) ?? new Set<string>();
             for (const leafId of Array.from(linkedLeafIds).slice(0, 8)) {
-                addBidirectionalLink(
-                    linksByKey,
-                    {
-                        fromView: 'runtime',
-                        fromId: runtimeId,
-                        toView: 'leaf',
-                        toId: leafId,
-                        relation: 'runtime_leaf_derived',
-                        confidence: normalizeConfidence(candidate.score / 120),
-                        reason: 'runtime node matched capability; leaf link derived from capability↔leaf mapping',
-                        sourcePath: candidate.sourcePath
-                    }
-                );
+                addBidirectionalLink(linksByKey, {
+                    fromView: 'runtime',
+                    fromId: runtimeId,
+                    toView: 'leaf',
+                    toId: leafId,
+                    relation: 'runtime_leaf_derived',
+                    confidence: normalizeConfidence(candidate.score / 120),
+                    reason: 'runtime node matched capability; leaf link derived from capability-to-leaf mapping',
+                    sourcePath: candidate.sourcePath
+                });
             }
         }
     }
@@ -242,29 +257,82 @@ export function generateViewMap(paths: WorkspacePaths, options: ViewMapOptions =
             }`
         });
     }
+
+    const links = Array.from(linksByKey.values()).sort((left, right) => left.id.localeCompare(right.id));
+    const runtimeToCapabilityLinkCount = links.filter(
+        (link) => link.fromView === 'runtime' && link.toView === 'capability' && link.relation === 'runtime_capability'
+    ).length;
+    const capabilityToLeafLinkCount = links.filter(
+        (link) =>
+            link.fromView === 'capability' &&
+            link.toView === 'leaf' &&
+            (link.relation === 'exact' || link.relation === 'folded_leaf' || link.relation === 'owner_match')
+    ).length;
+    const runtimeToLeafLinkCount = links.filter(
+        (link) => link.fromView === 'runtime' && link.toView === 'leaf' && link.relation === 'runtime_leaf_derived'
+    ).length;
+    const capabilityMatchedNodes = Array.from(capabilityToLeaf.values()).filter((linkedLeafIds) => linkedLeafIds.size > 0).length;
+    const leafMatchedNodes = leafToCapability.size;
+    const endToEndTraceableRuntimeNodes = new Set(
+        links
+            .filter(
+                (link) =>
+                    link.fromView === 'runtime' && link.toView === 'leaf' && link.relation === 'runtime_leaf_derived'
+            )
+            .map((link) => link.fromId)
+    ).size;
+
     diagnostics.push({
         level: 'info',
         code: 'VIEW_MAP_RUNTIME_MATCH_SUMMARY',
-        message: `Runtime match rate: ${runtimeNodes.length - runtimeUnmatchedCount}/${runtimeNodes.length} (${safeRatio(
-            runtimeNodes.length - runtimeUnmatchedCount,
+        message: `Runtime match rate: ${runtimeMatchedIds.size}/${runtimeNodes.length} (${safeRatio(
+            runtimeMatchedIds.size,
+            runtimeNodes.length
+        ).toFixed(3)})`
+    });
+    diagnostics.push({
+        level: 'info',
+        code: 'VIEW_MAP_CAPABILITY_LEAF_SUMMARY',
+        message: `Capability-to-leaf traceability: ${capabilityMatchedNodes}/${capabilityById.size} (${safeRatio(
+            capabilityMatchedNodes,
+            capabilityById.size
+        ).toFixed(3)})`
+    });
+    diagnostics.push({
+        level: 'info',
+        code: 'VIEW_MAP_END_TO_END_SUMMARY',
+        message: `Runtime-to-capability-to-leaf traceability: ${endToEndTraceableRuntimeNodes}/${runtimeNodes.length} (${safeRatio(
+            endToEndTraceableRuntimeNodes,
             runtimeNodes.length
         ).toFixed(3)})`
     });
 
-    const links = Array.from(linksByKey.values()).sort((left, right) => left.id.localeCompare(right.id));
+    const stats: ViewMapStats = {
+        runtimeNodes: runtimeNodes.length,
+        capabilityNodes: capabilityById.size,
+        leafNodes: leafById.size,
+        linkCount: links.length,
+        runtimeMatchedNodes: runtimeMatchedIds.size,
+        runtimeUnmatchedNodes: runtimeUnmatchedCount,
+        runtimeMatchRate: safeRatio(runtimeMatchedIds.size, runtimeNodes.length),
+        capabilityMatchedNodes,
+        capabilityUnmatchedNodes: Math.max(0, capabilityById.size - capabilityMatchedNodes),
+        capabilityLeafMatchRate: safeRatio(capabilityMatchedNodes, capabilityById.size),
+        leafMatchedNodes,
+        leafUnmatchedNodes: Math.max(0, leafById.size - leafMatchedNodes),
+        leafCapabilityMatchRate: safeRatio(leafMatchedNodes, leafById.size),
+        runtimeToCapabilityLinkCount,
+        capabilityToLeafLinkCount,
+        runtimeToLeafLinkCount,
+        endToEndTraceableRuntimeNodes,
+        endToEndTraceabilityRate: safeRatio(endToEndTraceableRuntimeNodes, runtimeNodes.length)
+    };
+
     return {
         schemaVersion: '1.0',
         project: path.basename(paths.projectRoot),
         generatedAt: new Date().toISOString(),
-        stats: {
-            runtimeNodes: runtimeNodes.length,
-            capabilityNodes: capabilityById.size,
-            leafNodes: leafById.size,
-            linkCount: links.length,
-            runtimeMatchedNodes: runtimeNodes.length - runtimeUnmatchedCount,
-            runtimeUnmatchedNodes: runtimeUnmatchedCount,
-            runtimeMatchRate: safeRatio(runtimeNodes.length - runtimeUnmatchedCount, runtimeNodes.length)
-        },
+        stats,
         links,
         diagnostics
     };
@@ -279,24 +347,23 @@ export function writeViewMapArtifacts(paths: WorkspacePaths, options: ViewMapOpt
 }
 
 function collectRuntimeCapabilityCandidates(
-    runtimeNode: RuntimeNode,
-    capabilityById: Map<string, TriadNode>,
-    categories: Record<string, string[]>
+    runtimeNode: CanonicalRuntimeNode,
+    capabilityById: Map<string, CanonicalTriadNode>
 ) {
-    const runtimeSourcePaths = collectRuntimeSourcePathCandidates(runtimeNode);
+    const runtimeSourcePaths = runtimeNode.__sourcePaths;
     const runtimeTokens = tokenize(`${runtimeNode.id} ${runtimeNode.label} ${runtimeSourcePaths.join(' ')}`);
     const handlerToken = normalizeText(
         typeof runtimeNode.metadata?.handler === 'string' ? String(runtimeNode.metadata?.handler) : ''
     );
     const serviceMethod = parseServiceRuntimeId(runtimeNode.id);
-    const runtimeCategory = resolveRuntimeCategory(runtimeNode, runtimeSourcePaths, categories);
+    const runtimeCategory = normalizeCategoryKey(runtimeNode.__resolvedCategory);
     const candidates: RuntimeCapabilityCandidate[] = [];
 
     for (const [capabilityId, capabilityNode] of capabilityById.entries()) {
         let score = 0;
         const reasons: string[] = [];
-        const capabilitySourcePath = normalizeSourcePath(capabilityNode.sourcePath);
-        const capabilityCategory = normalizeTriadCategory(capabilityNode.category);
+        const capabilitySourcePath = capabilityNode.sourcePath;
+        const capabilityCategory = normalizeCategoryKey(capabilityNode.category);
         const capabilityTokens = tokenize(`${capabilityId} ${capabilitySourcePath}`);
 
         const sourcePathScore = scoreRuntimeSourcePathMatch(runtimeSourcePaths, capabilitySourcePath);
@@ -367,34 +434,6 @@ function collectRuntimeSourcePathCandidates(runtimeNode: RuntimeNode) {
         }
     }
     return Array.from(sourcePaths);
-}
-
-function resolveRuntimeCategory(
-    runtimeNode: RuntimeNode,
-    runtimeSourcePaths: string[],
-    categories: Record<string, string[]>
-) {
-    for (const sourcePath of runtimeSourcePaths) {
-        const resolved = resolveCategoryBySourcePath(sourcePath, categories as any);
-        if (resolved !== 'unknown') {
-            return resolved;
-        }
-    }
-    return normalizeTriadCategory(runtimeNode.category);
-}
-
-function normalizeTriadCategory(value: string | undefined) {
-    const normalized = String(value ?? '').trim().toLowerCase();
-    if (
-        normalized === 'frontend' ||
-        normalized === 'backend' ||
-        normalized === 'agent' ||
-        normalized === 'rheo_cli' ||
-        normalized === 'core'
-    ) {
-        return normalized;
-    }
-    return '';
 }
 
 function scoreRuntimeSourcePathMatch(runtimeSourcePaths: string[], capabilitySourcePath: string) {
@@ -583,8 +622,170 @@ function normalizeSourcePath(value: string | undefined) {
     return normalizeText(value).replace(/\\/g, '/').toLowerCase();
 }
 
+function normalizeCategoryLabel(value: string | undefined) {
+    return normalizeText(value) || 'unknown';
+}
+
+function normalizeCategoryKey(value: string | undefined) {
+    return normalizeCategoryLabel(value).toLowerCase();
+}
+
 function normalizeText(value: string | undefined) {
     return String(value ?? '').trim();
+}
+
+function canonicalizeViewTriadNodes(
+    nodes: TriadNode[],
+    view: 'capability' | 'leaf',
+    categories: Record<string, string[]>,
+    diagnostics: ViewMapDiagnostic[]
+) {
+    const canonicalized: CanonicalTriadNode[] = [];
+    for (const node of nodes) {
+        const normalized = canonicalizeViewTriadNode(node, view, categories, diagnostics);
+        if (normalized) {
+            canonicalized.push(normalized);
+        }
+    }
+    return canonicalized;
+}
+
+function canonicalizeViewTriadNode(
+    node: TriadNode,
+    view: 'capability' | 'leaf',
+    categories: Record<string, string[]>,
+    diagnostics: ViewMapDiagnostic[]
+) {
+    const nodeId = normalizeNodeId(node.nodeId);
+    if (!nodeId) {
+        return undefined;
+    }
+
+    const sourcePath = normalizeSourcePath(node.sourcePath);
+    const declaredCategory = normalizeCategoryLabel(node.category);
+    const resolvedCategory = sourcePath ? resolveCategoryBySourcePath(sourcePath, categories) : 'unknown';
+    let category = declaredCategory;
+
+    if (sourcePath) {
+        if (resolvedCategory !== 'unknown') {
+            if (
+                declaredCategory !== 'unknown' &&
+                normalizeCategoryKey(declaredCategory) !== normalizeCategoryKey(resolvedCategory)
+            ) {
+                diagnostics.push({
+                    level: 'warning',
+                    code: `VIEW_MAP_${view.toUpperCase()}_CATEGORY_MISMATCH_AUTO_FIXED`,
+                    message: `${view} category/sourcePath mismatch auto-fixed by category resolver`,
+                    sourcePath
+                });
+            }
+            category = resolvedCategory;
+        } else {
+            if (declaredCategory !== 'unknown') {
+                diagnostics.push({
+                    level: 'warning',
+                    code: `VIEW_MAP_${view.toUpperCase()}_CATEGORY_UNRESOLVED`,
+                    message: `${view} sourcePath could not be resolved to a configured category; downgraded to unknown`,
+                    sourcePath
+                });
+            }
+            category = 'unknown';
+        }
+    }
+
+    return {
+        nodeId,
+        category,
+        sourcePath,
+        topology: {
+            foldedLeaves: normalizeFoldedLeaves(node.topology?.foldedLeaves)
+        }
+    } satisfies CanonicalTriadNode;
+}
+
+function canonicalizeRuntimeNodes(
+    nodes: RuntimeNode[],
+    categories: Record<string, string[]>,
+    diagnostics: ViewMapDiagnostic[]
+) {
+    const canonicalized: CanonicalRuntimeNode[] = [];
+    for (const node of nodes) {
+        const normalized = canonicalizeRuntimeNode(node, categories, diagnostics);
+        if (normalized) {
+            canonicalized.push(normalized);
+        }
+    }
+    return canonicalized;
+}
+
+function canonicalizeRuntimeNode(
+    node: RuntimeNode,
+    categories: Record<string, string[]>,
+    diagnostics: ViewMapDiagnostic[]
+) {
+    const runtimeId = normalizeNodeId(node.id);
+    if (!runtimeId) {
+        return undefined;
+    }
+
+    const sourcePaths = collectRuntimeSourcePathCandidates(node);
+    const directSourcePath = normalizeSourcePath(node.sourcePath);
+    const primarySourcePath = sourcePaths[0] ?? (directSourcePath || undefined);
+    const declaredCategory = normalizeCategoryLabel(node.category);
+    const resolvedCategory = resolveFirstMappedCategory(sourcePaths, categories);
+    let category = declaredCategory;
+
+    if (sourcePaths.length > 0) {
+        if (resolvedCategory !== 'unknown') {
+            if (
+                declaredCategory !== 'unknown' &&
+                normalizeCategoryKey(declaredCategory) !== normalizeCategoryKey(resolvedCategory)
+            ) {
+                diagnostics.push({
+                    level: 'warning',
+                    code: 'VIEW_MAP_RUNTIME_CATEGORY_MISMATCH_AUTO_FIXED',
+                    message: 'runtime category/sourcePath mismatch auto-fixed by category resolver',
+                    sourcePath: primarySourcePath
+                });
+            }
+            category = resolvedCategory;
+        } else {
+            if (declaredCategory !== 'unknown') {
+                diagnostics.push({
+                    level: 'warning',
+                    code: 'VIEW_MAP_RUNTIME_CATEGORY_UNRESOLVED',
+                    message: 'runtime sourcePath could not be resolved to a configured category; downgraded to unknown',
+                    sourcePath: primarySourcePath
+                });
+            }
+            category = 'unknown';
+        }
+    }
+
+    return {
+        ...node,
+        id: runtimeId,
+        sourcePath: primarySourcePath ?? node.sourcePath,
+        __sourcePaths: sourcePaths,
+        __resolvedCategory: category,
+        __resolvedSourcePath: primarySourcePath
+    } satisfies CanonicalRuntimeNode;
+}
+
+function resolveFirstMappedCategory(sourcePaths: string[], categories: Record<string, string[]>) {
+    for (const sourcePath of sourcePaths) {
+        const resolved = resolveCategoryBySourcePath(sourcePath, categories);
+        if (resolved !== 'unknown') {
+            return resolved;
+        }
+    }
+    return 'unknown';
+}
+
+function normalizeFoldedLeaves(values: string[] | undefined) {
+    return Array.isArray(values)
+        ? values.map((value) => normalizeNodeId(value)).filter((value): value is string => Boolean(value))
+        : [];
 }
 
 function normalizeConfidence(value: number) {
@@ -618,7 +819,6 @@ const GENERIC_TOKENS = new Set([
     'file',
     'api',
     'route',
-    'frontend',
-    'backend',
-    'core'
+    'capability',
+    'leaf'
 ]);
