@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CoverageReport, runCoverage } from './coverage';
+import { loadTriadConfig, TriadCoverageGate } from './config';
 import {
     GovernCoverageRule,
     ForbiddenRunMutation,
@@ -111,6 +112,16 @@ interface GovernCoverageRuleNormalized {
     mustPass: boolean;
 }
 
+interface ConfigCoverageGateNormalized {
+    target: string;
+    scope: 'category' | 'root';
+    metric: 'triad' | 'runtime' | 'combined';
+    op: 'gt' | 'gte';
+    value: number;
+    mustPass: boolean;
+    phase?: string;
+}
+
 interface GovernPolicyNormalized {
     version: string;
     mode: 'hard';
@@ -213,6 +224,7 @@ export function runGovern(paths: WorkspacePaths, options: GovernRunOptions): Gov
         baselinePath
     });
     const coverageReport = runCoverage(paths);
+    const config = loadTriadConfig(paths);
 
     const metrics = { ...(verifyReport.metrics as VerifyMetrics) } as Record<string, unknown>;
     metrics.coverage_summary = {
@@ -250,6 +262,7 @@ export function runGovern(paths: WorkspacePaths, options: GovernRunOptions): Gov
     report.baseline = mustPassEvaluation.baseline;
     mustPassEvaluation.errors.forEach((item) => report.failures.push(item));
     report.checks.push(...evaluateCoverageRules(loadedPolicy.policy.coverageByRoot, coverageReport));
+    report.checks.push(...evaluateConfiguredCoverageGates(config.profile?.governance?.coverageGates, coverageReport));
 
     const triadNodes = readTriadNodes(paths.mapFile);
     const languagePolicy = evaluateLanguageGhostPolicy(triadNodes, loadedPolicy.policy.languageGhostPolicy);
@@ -1146,6 +1159,65 @@ function evaluateCoverageRules(
             mustPass: rule.mustPass
         } satisfies GovernCheckResult;
     });
+}
+
+function evaluateConfiguredCoverageGates(
+    coverageGates: TriadCoverageGate[] | undefined,
+    coverageReport: CoverageReport
+) {
+    return normalizeConfiguredCoverageGates(coverageGates).map((gate) => {
+        const bucket =
+            gate.scope === 'category'
+                ? coverageReport.byCategory[gate.target]
+                : coverageReport.byRoot[gate.target];
+        const actual = bucket ? selectCoverageMetric(bucket, gate.metric) : null;
+        const totalFiles = bucket?.totalSourceFiles ?? 0;
+        const passed =
+            typeof actual === 'number' &&
+            totalFiles > 0 &&
+            (gate.op === 'gt' ? actual > gate.value : actual >= gate.value);
+
+        return {
+            key: `coverage_gate.${gate.scope}.${gate.target}`,
+            status: passed ? 'pass' : 'fail',
+            expected: `${gate.op === 'gt' ? '>' : '>='} ${gate.value} (${gate.metric})`,
+            actual,
+            detail:
+                bucket && totalFiles > 0
+                    ? `${gate.scope}:${gate.target} ${gate.metric} coverage across ${totalFiles} source files${gate.phase ? ` [phase=${gate.phase}]` : ''}`
+                    : `${gate.scope}:${gate.target} has no discoverable source files in coverage report${gate.phase ? ` [phase=${gate.phase}]` : ''}`,
+            mustPass: gate.mustPass
+        } satisfies GovernCheckResult;
+    });
+}
+
+function normalizeConfiguredCoverageGates(coverageGates: TriadCoverageGate[] | undefined) {
+    const normalized: ConfigCoverageGateNormalized[] = [];
+    for (const gate of Array.isArray(coverageGates) ? coverageGates : []) {
+        const target = String(gate?.target ?? '').trim();
+        const scope: ConfigCoverageGateNormalized['scope'] = gate?.scope === 'root' ? 'root' : 'category';
+        const metric: ConfigCoverageGateNormalized['metric'] =
+            gate?.metric === 'triad' || gate?.metric === 'runtime' || gate?.metric === 'combined'
+                ? gate.metric
+                : 'combined';
+        const op: ConfigCoverageGateNormalized['op'] = gate?.op === 'gt' || gate?.op === 'gte' ? gate.op : 'gte';
+        const value = toFiniteNumber(gate?.value);
+        const mustPass = gate?.mustPass === true;
+        const phase = String(gate?.phase ?? '').trim() || undefined;
+        if (!target || typeof value !== 'number' || value < 0 || value > 1) {
+            continue;
+        }
+        normalized.push({
+            target,
+            scope,
+            metric,
+            op,
+            value,
+            mustPass,
+            phase
+        });
+    }
+    return normalized;
 }
 
 function selectCoverageMetric(

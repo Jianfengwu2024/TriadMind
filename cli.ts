@@ -29,6 +29,7 @@ import {
     writeImplementationHandoff,
     writePromptPacket
 } from './workflow';
+import { normalizePath } from './workspace';
 import { extractRuntimeTopology } from './runtime/extractRuntimeTopology';
 import { normalizeRuntimeView } from './runtime/filterRuntimeMapByView';
 import { writeRuntimeMapArtifacts } from './runtime/runtimeMapWriter';
@@ -89,7 +90,8 @@ program
         ensureTriadSpec(paths);
         if (!options.skipBootstrap) {
             const bootstrapResult = bootstrapScaffoldService.init(paths, {
-                nonInteractive: true
+                nonInteractive: true,
+                triadmindCommand: resolveBootstrapCliCommand(paths)
             });
             reportBootstrapInitResult(paths, bootstrapResult);
         }
@@ -122,7 +124,8 @@ bootstrapCommand
         ensureTriadSpec(paths);
         const result = bootstrapScaffoldService.init(paths, {
             force: Boolean(options.force),
-            nonInteractive: Boolean(options.nonInteractive)
+            nonInteractive: Boolean(options.nonInteractive),
+            triadmindCommand: resolveBootstrapCliCommand(paths)
         });
         reportBootstrapInitResult(paths, result);
     });
@@ -134,7 +137,9 @@ bootstrapCommand
     .action((options: { json?: boolean }) => {
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
-        const report = bootstrapScaffoldService.doctor(paths);
+        const report = bootstrapScaffoldService.doctor(paths, {
+            triadmindCommand: resolveBootstrapCliCommand(paths)
+        });
         if (options.json) {
             console.log(JSON.stringify(report, null, 2));
         } else {
@@ -1504,6 +1509,22 @@ function formatBootstrapDoctorReport(report: BootstrapDoctorReport) {
         }
     }
     return lines.join('\n');
+}
+
+function resolveBootstrapCliCommand(paths: ReturnType<typeof getWorkspacePaths>) {
+    const invokedScript = path.resolve(process.argv[1] ?? '');
+    const projectCliTs = path.join(paths.projectRoot, 'cli.ts');
+    const projectCliJs = path.join(paths.projectRoot, 'dist', 'cli.js');
+
+    if (invokedScript && normalizePath(invokedScript) === normalizePath(projectCliTs) && fs.existsSync(projectCliTs)) {
+        return 'node --import tsx cli.ts';
+    }
+
+    if (invokedScript && normalizePath(invokedScript) === normalizePath(projectCliJs) && fs.existsSync(projectCliJs)) {
+        return 'node dist/cli.js';
+    }
+
+    return 'triadmind';
 }
 
 function readCurrentTriadMap(paths: ReturnType<typeof getWorkspacePaths>) {

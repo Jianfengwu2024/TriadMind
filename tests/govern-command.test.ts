@@ -308,3 +308,74 @@ test('govern ci blocks when coverage_by_root must_pass rule fails', () => {
         true
     );
 });
+
+test('govern ci enforces profile-driven coverage gates without policy edits', () => {
+    const root = createGovernFixture({
+        sourceFiles: {
+            'backend/routes.ts': 'export const routes = 1;\n',
+            'backend/service.ts': 'export const service = 2;\n',
+            'frontend/page.tsx': 'export default function Page() { return null; }\n'
+        },
+        triadNodes: [
+            {
+                nodeId: 'Routes.handle',
+                category: 'backend',
+                sourcePath: 'backend/routes.ts',
+                fission: {
+                    problem: 'route handling',
+                    demand: ['Input'],
+                    answer: ['Output']
+                }
+            },
+            {
+                nodeId: 'Page.render',
+                category: 'frontend',
+                sourcePath: 'frontend/page.tsx',
+                fission: {
+                    problem: 'page render',
+                    demand: ['Props'],
+                    answer: ['View']
+                }
+            }
+        ]
+    });
+    fs.writeFileSync(
+        path.join(root, '.triadmind', 'profile.json'),
+        JSON.stringify(
+            {
+                schemaVersion: '1.0',
+                categories: {
+                    backend: ['backend'],
+                    frontend: ['frontend']
+                },
+                governance: {
+                    coverageGates: [
+                        { target: 'backend', scope: 'category', metric: 'combined', op: 'gte', value: 0.8, mustPass: true, phase: 'phase-1' },
+                        { target: 'frontend', scope: 'category', metric: 'combined', op: 'gte', value: 0.6, mustPass: true, phase: 'phase-1' }
+                    ]
+                }
+            },
+            null,
+            2
+        ),
+        'utf-8'
+    );
+
+    const result = runCli(root, ['govern', 'ci', '--json']);
+    assert.equal(result.status, 2, `expected gate_fail(2), got ${result.status}: ${result.stderr || result.stdout}`);
+    const report = parseJsonStdout(result.stdout);
+    assert.equal(
+        report.checks.some(
+            (check: { key?: string; status?: string; mustPass?: boolean }) =>
+                check.key === 'coverage_gate.category.backend' && check.status === 'fail' && check.mustPass === true
+        ),
+        true
+    );
+    assert.equal(
+        report.checks.some(
+            (check: { key?: string; status?: string; mustPass?: boolean }) =>
+                check.key === 'coverage_gate.category.frontend' && check.status === 'pass' && check.mustPass === true
+        ),
+        true
+    );
+});

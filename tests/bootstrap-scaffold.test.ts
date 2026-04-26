@@ -101,15 +101,19 @@ test('windows bootstrap scripts are generated with expected command chain', () =
 
     const ps1 = fs.readFileSync(paths.sessionBootstrapPs1File, 'utf-8');
     const cmd = fs.readFileSync(paths.sessionBootstrapCmdFile, 'utf-8');
+    const sh = fs.readFileSync(paths.sessionBootstrapShellFile, 'utf-8');
 
-    assert.match(ps1, /triadmind sync --force/);
-    assert.match(ps1, /triadmind runtime --visualize --view full/);
-    assert.match(ps1, /triadmind plan --no-open --view architecture/);
-    assert.match(ps1, /triadmind verify --strict --json/);
+    assert.match(ps1, /Invoke-TriadMind "sync --force"/);
+    assert.match(ps1, /Invoke-TriadMind "runtime --visualize --view full"/);
+    assert.match(ps1, /plan --no-open --view architecture/);
+    assert.match(ps1, /verify --strict --json/);
     assert.match(ps1, /bootstrap-verify\.json/);
+    assert.match(ps1, /Set-Location \$ProjectRoot/);
+    assert.match(sh, /cd "\$\{PROJECT_ROOT\}"/);
 
     assert.match(cmd, /powershell/i);
     assert.match(cmd, /session-bootstrap\.ps1/i);
+    assert.match(cmd, /pushd "%SCRIPT_DIR%\.\."/i);
 });
 
 test('session bootstrap script generates .triadmind/bootstrap-verify.json', () => {

@@ -48,6 +48,24 @@ export interface TriadScanScope {
     match?: TriadScanScopeRule;
 }
 
+export type TriadCoverageGateScope = 'category' | 'root';
+export type TriadCoverageGateMetric = 'triad' | 'runtime' | 'combined';
+export type TriadCoverageGateOperator = 'gt' | 'gte';
+
+export interface TriadCoverageGate {
+    target: string;
+    scope?: TriadCoverageGateScope;
+    metric?: TriadCoverageGateMetric;
+    op?: TriadCoverageGateOperator;
+    value: number;
+    mustPass?: boolean;
+    phase?: string;
+}
+
+export interface TriadGovernanceProfile {
+    coverageGates?: TriadCoverageGate[];
+}
+
 export interface TriadProfile {
     schemaVersion: string;
     categories?: TriadCategoryMap;
@@ -57,6 +75,7 @@ export interface TriadProfile {
         parser?: string[];
         runtime?: string[];
     };
+    governance?: TriadGovernanceProfile;
 }
 
 export interface TriadConfig {
@@ -468,6 +487,9 @@ const DEFAULT_PROFILE: TriadProfile = {
     extractors: {
         parser: [],
         runtime: []
+    },
+    governance: {
+        coverageGates: []
     }
 };
 
@@ -1041,6 +1063,9 @@ function buildDefaultProfile(): TriadProfile {
         extractors: {
             parser: [...(DEFAULT_PROFILE.extractors?.parser ?? [])],
             runtime: [...(DEFAULT_PROFILE.extractors?.runtime ?? [])]
+        },
+        governance: {
+            coverageGates: [...(DEFAULT_PROFILE.governance?.coverageGates ?? [])]
         }
     };
 }
@@ -1058,6 +1083,9 @@ function mergeProfileWithDefault(value: Partial<TriadProfile> | undefined): Tria
         extractors: {
             parser: mergeStringList(value?.extractors?.parser, defaults.extractors?.parser ?? []),
             runtime: mergeStringList(value?.extractors?.runtime, defaults.extractors?.runtime ?? [])
+        },
+        governance: {
+            coverageGates: normalizeCoverageGates(value?.governance?.coverageGates, defaults.governance?.coverageGates ?? [])
         }
     };
 }
@@ -1096,6 +1124,39 @@ function normalizeScanScopes(value: TriadScanScope[] | undefined, fallback: Tria
             }
         }))
         .filter((scope) => scope.name && scope.kind);
+}
+
+function normalizeCoverageGates(value: TriadCoverageGate[] | undefined, fallback: TriadCoverageGate[]) {
+    const gates = Array.isArray(value) ? value : fallback;
+    const normalized: TriadCoverageGate[] = [];
+    for (const gate of gates) {
+        const target = String(gate?.target ?? '').trim();
+        const scope: TriadCoverageGateScope = gate?.scope === 'root' ? 'root' : 'category';
+        const metric: TriadCoverageGateMetric =
+            gate?.metric === 'triad' || gate?.metric === 'runtime' || gate?.metric === 'combined'
+                ? gate.metric
+                : 'combined';
+        const op: TriadCoverageGateOperator = gate?.op === 'gt' || gate?.op === 'gte' ? gate.op : 'gte';
+        const valueNumber = Number(gate?.value);
+        const mustPass = gate?.mustPass === true;
+        const phase = String(gate?.phase ?? '').trim() || undefined;
+
+        if (!target || !Number.isFinite(valueNumber) || valueNumber < 0 || valueNumber > 1) {
+            continue;
+        }
+
+        normalized.push({
+            target,
+            scope,
+            metric,
+            op,
+            value: valueNumber,
+            mustPass,
+            phase
+        });
+    }
+
+    return normalized;
 }
 
 function normalizeSourcePolicy(value: TriadSourcePolicy | undefined): TriadSourcePolicy {

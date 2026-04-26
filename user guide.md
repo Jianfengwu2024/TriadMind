@@ -1,21 +1,41 @@
 # TriadMind 用户指南
 
-这份指南面向第一次接触 TriadMind 的开发者，目标是让你用最少命令，把工程从“凭感觉改代码”升级到“先看拓扑、再做变更、最后过门禁”。
+这份指南面向第一次接触 TriadMind 的开发者，目标很简单：
+
+> 先看拓扑，再改代码；先过门禁，再合并。
+
+TriadMind 不是“无人驾驶写码器”，而是一个多语言工程副驾驶，帮助你把需求、结构、运行链路和治理门禁串成一条稳定流程。
+
+支持语言：
+
+- Python
+- TypeScript
+- JavaScript
+- Rust
+- Go
+- Java
+- C++
 
 ---
 
-## 1. TriadMind 是什么
+## 1. 它到底做什么
 
-TriadMind 不是自动驾驶式编程器，而是一个**工程副驾驶**：
+TriadMind 主要负责四件事：
 
-1. 帮你看清系统有哪些能力：`triad-map.json` / `leaf-map.json`
-2. 帮你看清运行时如何协作：`runtime-map.json` / `runtime-visualizer.html`
-3. 帮你判断这次改动能不能安全合并：`verify` / `govern ci`
+1. 生成能力拓扑：`triad-map.json` / `leaf-map.json`
+2. 生成运行时拓扑：`runtime-map.json` / `runtime-visualizer.html`
+3. 建立交叉映射：`view-map.json`
+4. 执行质量门禁：`verify` / `govern ci`
 
-一句话：
+如果你只想记住一条主线，请记这个：
 
-```text
-先看图，再改代码；先过门禁，再合并。
+```bash
+triadmind sync --force
+triadmind runtime --visualize --view full
+triadmind plan --no-open --view architecture
+triadmind apply
+triadmind verify --strict --json
+triadmind govern ci --policy .triadmind/govern-policy.json --json
 ```
 
 ---
@@ -29,21 +49,23 @@ triadmind init
 triadmind bootstrap doctor --json
 ```
 
-初始化后会得到这些核心文件：
+初始化后会自动准备：
 
 - `.triadmind/triad-map.json`
 - `.triadmind/leaf-map.json`
 - `.triadmind/runtime-map.json`
 - `.triadmind/runtime-diagnostics.json`
 - `.triadmind/view-map.json`
-- `.triadmind/view-map-diagnostics.json`
 - `.triadmind/govern-policy.json`
 - `.triadmind/verify-baseline.json`
 - `.triadmind/profile.json`
 - `AGENTS.md`
 - `skills.md`
+- `.triadmind/session-bootstrap.sh`
+- `.triadmind/session-bootstrap.ps1`
+- `.triadmind/session-bootstrap.cmd`
 
-如果你只想初始化工作区、暂时不生成会话脚手架：
+如果只想初始化工作区、暂时跳过会话脚手架：
 
 ```bash
 triadmind init --skip-bootstrap
@@ -51,9 +73,9 @@ triadmind init --skip-bootstrap
 
 ---
 
-## 3. 每个新终端窗口先做什么
+## 3. 每个新终端先做什么
 
-推荐每开一个新窗口就执行一次 bootstrap。
+推荐每次开新窗口先跑一次 bootstrap。
 
 Linux / macOS：
 
@@ -73,135 +95,150 @@ Windows CMD：
 .triadmind\session-bootstrap.cmd
 ```
 
-这一步会自动完成：
+它会自动执行：
 
-- `triadmind sync --force`
-- `triadmind runtime --visualize --view full`
-- `triadmind plan --no-open --view architecture`
-- `triadmind verify --strict --json`
+1. `triadmind sync --force`
+2. `triadmind runtime --visualize --view full`
+3. `triadmind plan --no-open --view architecture`
+4. `triadmind verify --strict --json`
 
-结果会写到：
+结果会写入：
 
 - `.triadmind/bootstrap-verify.json`
 
+注意：
+
+- Windows 如果只有 `bash.exe` 启动器、但没有可用 WSL `/bin/bash`，请直接使用 `.ps1` 或 `.cmd`
+
 ---
 
-## 4. 日常开发的标准路径
+## 4. 日常开发标准路径
 
-### 第 1 步：刷新当前拓扑
+### 第一步：同步结构
 
 ```bash
 triadmind sync --force
 triadmind runtime --visualize --view full
 ```
 
-### 第 2 步：补充覆盖率和交叉映射观察
+### 第二步：看覆盖率和映射
 
 ```bash
 triadmind coverage --json
 triadmind view-map --json
 ```
 
-这两步分别回答：
+你主要看四件事：
 
-- `coverage`：源码文件里，哪些已经进入 triad / runtime / combined 视图
-- `view-map`：运行时节点能否追到 capability，再追到 leaf
+- 哪些源码文件进入了 triad
+- 哪些源码文件进入了 runtime
+- `runtime -> capability -> leaf` 是否能追通
+- 是否出现 diagnostics / ghost / unmatched route
 
-### 第 3 步：生成协议
+### 第三步：生成协议
 
 ```bash
 triadmind plan --no-open --view architecture
 ```
 
-### 第 4 步：按协议落地
+### 第四步：按协议落地
 
 ```bash
 triadmind apply
 ```
 
-### 第 5 步：严格校验
+### 第五步：严格校验
 
 ```bash
 triadmind verify --strict --json
 triadmind govern ci --policy .triadmind/govern-policy.json --json
 ```
 
-只要 `verify` 或 `govern` 失败，就先修结构和诊断，不继续实现。
+规则只有一条：
+
+> `verify` 或 `govern` 失败，就先停下修结构，不继续堆实现。
 
 ---
 
-## 5. 你需要理解的几个核心工件
+## 5. 关键工件怎么看
 
-### 5.1 Capability / Leaf
+### 能力层
 
 - `.triadmind/triad-map.json`：主能力图
 - `.triadmind/leaf-map.json`：实现细节图
-- `.triadmind/visualizer.html`：主能力可视化页面
+- `.triadmind/visualizer.html`：能力可视化
 
-### 5.2 Runtime
+### 运行时层
 
 - `.triadmind/runtime-map.json`：运行时节点与边
-- `.triadmind/runtime-diagnostics.json`：运行时提取告警/信息
-- `.triadmind/runtime-visualizer.html`：运行时图页面
+- `.triadmind/runtime-diagnostics.json`：运行时提取诊断
+- `.triadmind/runtime-visualizer.html`：运行时可视化
 
-### 5.3 Cross View
+### 交叉映射层
 
-- `.triadmind/view-map.json`：`runtime ↔ capability ↔ leaf` 映射
-- `.triadmind/view-map-diagnostics.json`：映射告警与完整率摘要
+- `.triadmind/view-map.json`
+- `.triadmind/view-map-diagnostics.json`
 
-`view-map` 里你重点看三件事：
+重点关注：
 
 - `runtimeMatchRate`
 - `capabilityLeafMatchRate`
 - `endToEndTraceabilityRate`
 
-### 5.4 Govern
+### 治理层
 
-- `.triadmind/govern-policy.json`：硬门禁策略
-- `.triadmind/verify-baseline.json`：相对阈值基线
-- `.triadmind/govern-report.json`：门禁结果
-- `.triadmind/govern-audit.log`：审计轨迹
+- `.triadmind/govern-policy.json`
+- `.triadmind/verify-baseline.json`
+- `.triadmind/govern-report.json`
+- `.triadmind/govern-audit.log`
 
 ---
 
-## 6. profile.json：项目如何注入自己的结构
+## 6. `profile.json`：让 TriadMind 适配任何项目
 
-TriadMind 的通用化入口是：
+TriadMind 的通用注入入口是：
 
 ```text
 .triadmind/profile.json
 ```
 
-它解决的是“不同项目目录结构不同，但核心逻辑不应该写死”。
+你应该把“项目差异”写进这里，而不是改核心源码。
 
-推荐这样理解：
+常用字段：
 
 - `categories`：你的业务分类和路径前缀
-- `scanScopes`：你的 API / UI / CLI / agent / workflow 等抽象扫描语义
-- `languageAdapters`：语言适配器覆盖
-- `extractors`：额外 parser/runtime 抽取器
+- `scanScopes`：API / UI / CLI / agent / workflow 等抽象扫描域
+- `languageAdapters`：按语言覆盖 adapter
+- `extractors`：扩展 parser/runtime 抽取器
+- `governance.coverageGates`：按项目声明 coverage 门禁
 
-示意：
+示例：
 
 ```json
 {
   "schemaVersion": "1.0",
   "categories": {
-    "dialogue_core": ["flows/dialogue"],
-    "surface_web": ["surface/http"],
-    "terminal_lane": ["ops/cli"]
+    "frontend": ["frontend"],
+    "backend": ["backend"]
   },
   "scanScopes": [
-    { "name": "dialogue", "kind": "agent", "match": { "pathPrefixes": ["flows/dialogue"] } },
-    { "name": "surface", "kind": "api", "match": { "pathPrefixes": ["surface/http"] } },
-    { "name": "terminal", "kind": "cli", "match": { "pathPrefixes": ["ops/cli"] } }
-  ]
+    { "name": "api", "kind": "api", "match": { "pathSegments": ["api", "routes", "transport"] } },
+    { "name": "ui", "kind": "ui", "match": { "pathSegments": ["app", "pages", "components"] } }
+  ],
+  "governance": {
+    "coverageGates": [
+      { "target": "backend", "scope": "category", "metric": "combined", "op": "gte", "value": 0.8, "mustPass": true, "phase": "phase-1" },
+      { "target": "frontend", "scope": "category", "metric": "combined", "op": "gte", "value": 0.6, "mustPass": true, "phase": "phase-1" }
+    ]
+  }
 }
 ```
 
-原则只有一个：
+原则：
 
-> 项目差异写到 profile，核心只消费抽象接口。
+- Phase-1 先聚焦 `frontend + backend`
+- Phase-2 再纳入 `agent / cli / workflow / 其它域`
+- 核心 CLI 只消费抽象声明，不写死仓库目录名
 
 ---
 
@@ -245,6 +282,14 @@ triadmind verify --strict --json
 triadmind govern ci --policy .triadmind/govern-policy.json --json
 ```
 
+### Bootstrap
+
+```bash
+triadmind bootstrap init
+triadmind bootstrap init --force
+triadmind bootstrap doctor --json
+```
+
 ---
 
 ## 8. CI 最小推荐链路
@@ -259,7 +304,7 @@ triadmind verify --strict --json
 triadmind govern ci --policy .triadmind/govern-policy.json --json
 ```
 
-如果你只想记住一条“一键验收命令”，就用：
+如果你只想记住一条一键验收命令：
 
 ```bash
 triadmind bootstrap doctor --json && triadmind sync --force && triadmind runtime --visualize --view full && triadmind coverage --json && triadmind view-map --json && triadmind verify --strict --json && triadmind govern ci --policy .triadmind/govern-policy.json --json
@@ -271,23 +316,23 @@ triadmind bootstrap doctor --json && triadmind sync --force && triadmind runtime
 
 ### Q1：为什么不是直接改代码？
 
-因为 TriadMind 要先确认能力结构、运行链路和影响范围，避免“代码改对了，架构改坏了”。
+因为 TriadMind 先确认能力结构、运行链路和影响范围，避免“代码改对了，架构改坏了”。
 
-### Q2：view-map 有什么用？
+### Q2：`view-map` 有什么用？
 
-它能回答一个大问题：
+它回答一个大问题：
 
-> 运行时看到的节点，能不能解释到 capability，再解释到 leaf？
+> 运行时看到的节点，能不能稳定解释回 capability，再解释回 leaf？
 
 这对多语言工程尤其重要。
 
-### Q3：项目目录和示例不同怎么办？
+### Q3：项目目录和示例不一样怎么办？
 
-不要改核心代码，先改 `.triadmind/profile.json`。
+先改 `.triadmind/profile.json`，不要先改核心源码。
 
-### Q4：verify 或 govern 失败怎么办？
+### Q4：`verify` 或 `govern` 失败怎么办？
 
-失败即停止实现，先修 diagnostics、映射一致性、ghost 治理或 runtime 提取问题。
+先修 diagnostics、映射一致性、ghost 治理或 runtime 提取问题；不要一边失败一边继续开发。
 
 ---
 
@@ -296,10 +341,10 @@ triadmind bootstrap doctor --json && triadmind sync --force && triadmind runtime
 把 TriadMind 当成三层系统：
 
 1. `triad / leaf`：系统有什么能力
-2. `runtime / view-map`：这些能力在运行时如何连接、能否解释到底
+2. `runtime / view-map`：这些能力在运行时如何连接、能否解释到实现
 3. `verify / govern`：这次改动是否达标
 
-如果你能稳定执行下面这条链路，TriadMind 就已经在帮你驾驭工程了：
+只要你稳定执行这条链路，TriadMind 就已经在帮助你驾驭工程：
 
 ```bash
 triadmind sync --force && triadmind runtime --visualize --view full && triadmind coverage --json && triadmind view-map --json && triadmind verify --strict --json && triadmind govern ci --policy .triadmind/govern-policy.json --json

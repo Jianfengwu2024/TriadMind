@@ -232,6 +232,8 @@ bash .triadmind/session-bootstrap.sh
 .triadmind\session-bootstrap.cmd
 ```
 
+> Windows 如果只有 `C:\Windows\System32\bash.exe` 启动器、但没有可用 WSL `/bin/bash`，请优先使用 `session-bootstrap.ps1` 或 `session-bootstrap.cmd`。
+
 仓库还提供可直接复用的会话脚本示例：
 
 - `docs/tm-session.sh`
@@ -249,12 +251,31 @@ bash .triadmind/session-bootstrap.sh
 - `scanScopes`：声明 API / UI / CLI / agent / workflow 等抽象扫描语义
 - `languageAdapters`：按语言覆盖默认 adapter
 - `extractors`：挂接 parser/runtime 抽取扩展
+- `governance.coverageGates`：按项目声明 coverage must-pass 门禁
 
 推荐原则：
 
 - 项目差异写进 `profile.json`
 - 核心 CLI 只消费抽象接口，不写死仓库目录名
 - 新项目优先复制并修改 `profile.json`，而不是改核心源码
+
+Phase-1 建议先只纳入 `frontend + backend` coverage 门禁；`agent / cli / workflow` 等域在 Phase-2 再逐步接入。
+
+```json
+{
+  "schemaVersion": "1.0",
+  "categories": {
+    "frontend": ["frontend"],
+    "backend": ["backend"]
+  },
+  "governance": {
+    "coverageGates": [
+      { "target": "backend", "scope": "category", "metric": "combined", "op": "gte", "value": 0.8, "mustPass": true, "phase": "phase-1" },
+      { "target": "frontend", "scope": "category", "metric": "combined", "op": "gte", "value": 0.6, "mustPass": true, "phase": "phase-1" }
+    ]
+  }
+}
+```
 
 `govern` 退出码：
 

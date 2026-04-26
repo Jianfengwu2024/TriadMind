@@ -1,11 +1,11 @@
-# TRIADMIND_BOOTSTRAP_VERSION={{BOOTSTRAP_VERSION}}
+# TRIADMIND_BOOTSTRAP_VERSION=1.0
 $ErrorActionPreference = 'Stop'
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir '..')
 Set-Location $ProjectRoot
 
-$TriadMindCommand = '{{TRIADMIND_COMMAND}}'
+$TriadMindCommand = 'node --import tsx cli.ts'
 
 function Invoke-TriadMind {
     param(

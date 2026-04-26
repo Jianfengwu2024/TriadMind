@@ -35,7 +35,7 @@ function createTestConfig(language: 'typescript' | 'javascript' | 'python'): Tri
         parser: {
             excludePatterns: ['node_modules', '.triadmind'],
             excludePathPatterns: ['tests', 'test', 'dist', 'build', '.next'],
-            scanCategories: ['frontend', 'agent', 'rheo_cli'],
+            scanCategories: ['frontend', 'backend', 'agent', 'rheo_cli'],
             scanMode: 'capability',
             leafOutputFile: '.triadmind/leaf-map.json',
             capabilityOutputFile: '.triadmind/triad-map.json',
@@ -123,6 +123,7 @@ function createTestConfig(language: 'typescript' | 'javascript' | 'python'): Tri
             schemaVersion: '1.0',
             categories: {},
             scanScopes: [
+                { name: 'api', kind: 'api', match: { pathSegments: ['backend', 'api', 'routes', 'route', 'transport'] } },
                 { name: 'ui', kind: 'ui', match: { pathSegments: ['frontend', 'app', 'pages', 'page', 'dashboard', 'settings'] } },
                 { name: 'agent', kind: 'agent', match: { pathSegments: ['agent', 'chat', 'session'] } },
                 { name: 'cli', kind: 'cli', match: { pathSegments: ['rheo_cli', 'commands', 'cli'] } }
@@ -257,6 +258,22 @@ program.command('agents').description('Manage agents').action(loadAgents);
 
     assert.deepEqual(triadIds, ['Agents.loadAgents', 'Deploy.runDeploy']);
     assert.deepEqual(leafIds, ['Agents.loadAgents', 'Deploy.runDeploy']);
+});
+
+test('typescript api registration chains create synthetic route coverage nodes', () => {
+    const { triadMap, leafMap } = parseFixture('typescript', {
+        'backend/routes/registry.ts': `
+const router = createRouter();
+router.get('/users/:id', listUsers);
+api.route(\`/orders/\${orderId}\`).post(submitOrder);
+`
+    });
+
+    const triadIds = triadMap.filter((node) => node.sourcePath === 'backend/routes/registry.ts').map((node) => node.nodeId).sort();
+    const leafIds = leafMap.filter((node) => node.sourcePath === 'backend/routes/registry.ts').map((node) => node.nodeId).sort();
+
+    assert.deepEqual(triadIds, ['Orders.submitOrder', 'Users.listUsers']);
+    assert.deepEqual(leafIds, ['Orders.submitOrder', 'Users.listUsers']);
 });
 
 test('javascript frontend default-export identifier resolves back to executable capability', () => {

@@ -396,7 +396,8 @@ function collectTypeScriptLeafNodes(
 
     const topLevelRecords = [
         ...collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config),
-        ...collectTypeScriptCliRegistrationRecords(rootNode, sourcePath, moduleName)
+        ...collectTypeScriptCliRegistrationRecords(rootNode, sourcePath, moduleName),
+        ...collectTypeScriptApiRegistrationRecords(rootNode, sourcePath, moduleName)
     ];
     for (const record of topLevelRecords) {
         triadGraph.push(
@@ -957,7 +958,8 @@ function collectJavaScriptLeafNodes(
         : rootNode.namedChildren.filter((node) => node.type === 'export_statement');
     const topLevelRecords = [
         ...topLevelNodes.flatMap((node) => collectJavaScriptTopLevelCapabilityRecords(node, rootNode, moduleName, ghostContext)),
-        ...collectJavaScriptCliRegistrationRecords(rootNode, sourcePath, moduleName)
+        ...collectJavaScriptCliRegistrationRecords(rootNode, sourcePath, moduleName),
+        ...collectJavaScriptApiRegistrationRecords(rootNode, sourcePath, moduleName)
     ];
     for (const record of topLevelRecords) {
         triadGraph.push(
@@ -1297,7 +1299,8 @@ function collectTypeScriptCapabilityNodes(
 
     const topLevelRecords = [
         ...collectTypeScriptTopLevelExecutableRecords(rootNode, moduleName, ghostContext, source, config),
-        ...collectTypeScriptCliRegistrationRecords(rootNode, sourcePath, moduleName)
+        ...collectTypeScriptCliRegistrationRecords(rootNode, sourcePath, moduleName),
+        ...collectTypeScriptApiRegistrationRecords(rootNode, sourcePath, moduleName)
     ];
     const promotableTopLevel = topLevelRecords.filter((record) => !isTypeScriptNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
@@ -1531,6 +1534,75 @@ function collectTypeScriptCliRegistrationRecords(
         );
 }
 
+function collectTypeScriptApiRegistrationRecords(
+    rootNode: Parser.SyntaxNode,
+    sourcePath: string,
+    moduleName: string
+) {
+    if (inferSourceCapabilityPolicy(sourcePath) !== 'api') {
+        return [] as TypeScriptExecutableRecord[];
+    }
+
+    return rootNode.namedChildren
+        .flatMap((child) => {
+            if (child.type !== 'expression_statement') {
+                return [];
+            }
+            const expressionNode = child.namedChildren[0] ?? null;
+            const descriptor = extractApiRegistrationDescriptor(expressionNode, moduleName);
+            if (!descriptor) {
+                return [];
+            }
+            return [
+                {
+                    name: descriptor.name,
+                    ownerName: descriptor.ownerName,
+                    demand: [],
+                    answer: ['ApiRouteHandler'],
+                    isExported: true,
+                    decorators: [`route:${descriptor.method}:${descriptor.routePath}`]
+                } satisfies TypeScriptExecutableRecord
+            ];
+        })
+        .filter((record, index, records) =>
+            records.findIndex((candidate) => candidate.ownerName === record.ownerName && candidate.name === record.name) === index
+        );
+}
+
+function collectJavaScriptApiRegistrationRecords(
+    rootNode: Parser.SyntaxNode,
+    sourcePath: string,
+    moduleName: string
+) {
+    if (inferSourceCapabilityPolicy(sourcePath) !== 'api') {
+        return [] as JavaScriptExecutableRecord[];
+    }
+
+    return rootNode.namedChildren
+        .flatMap((child) => {
+            if (child.type !== 'expression_statement') {
+                return [];
+            }
+            const expressionNode = child.namedChildren[0] ?? null;
+            const descriptor = extractApiRegistrationDescriptor(expressionNode, moduleName);
+            if (!descriptor) {
+                return [];
+            }
+            return [
+                {
+                    name: descriptor.name,
+                    ownerName: descriptor.ownerName,
+                    demand: [],
+                    answer: ['ApiRouteHandler'],
+                    isExported: true
+                } satisfies JavaScriptExecutableRecord
+            ];
+        })
+        .filter((record, index, records) =>
+            records.findIndex((candidate) => candidate.ownerName === record.ownerName && candidate.name === record.name) === index
+        );
+}
+
 function collectTypeScriptClassCapabilityNodes(
     classNode: Parser.SyntaxNode,
     source: string,
@@ -1719,6 +1791,7 @@ function collectJavaScriptCapabilityNodes(
     const topLevelRecords = topLevelNodes.flatMap((node) =>
         collectJavaScriptTopLevelCapabilityRecords(node, rootNode, moduleName, ghostContext)
     );
+    topLevelRecords.push(...collectJavaScriptApiRegistrationRecords(rootNode, sourcePath, moduleName));
     const promotableTopLevel = topLevelRecords.filter((record) => !isJavaScriptNoiseCapability(record.name, config, sourcePath, record));
     const promotedTopLevel = promotableTopLevel.filter((record) =>
         shouldPromoteJavaScriptCapability(record.name, sourcePath, record.ownerName, record.isExported, config, record)
@@ -2073,6 +2146,7 @@ const CLI_COMMAND_REGISTRATION_METHODS = new Set([
 ]);
 
 const CLI_HANDLER_REGISTRATION_METHODS = new Set(['action', 'handler', 'callback', 'set_defaults', 'setdefaults']);
+const API_REGISTRATION_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'del', 'options', 'head', 'all']);
 
 function extractCliRegistrationDescriptor(callNode: Parser.SyntaxNode | null, moduleName: string) {
     if (!callNode || (callNode.type !== 'call_expression' && callNode.type !== 'call')) {
@@ -2145,6 +2219,83 @@ function extractCliRegistrationDescriptor(callNode: Parser.SyntaxNode | null, mo
     };
 }
 
+function extractApiRegistrationDescriptor(callNode: Parser.SyntaxNode | null, moduleName: string) {
+    if (!callNode || (callNode.type !== 'call_expression' && callNode.type !== 'call')) {
+        return null;
+    }
+
+    const methods: string[] = [];
+    let routePath = '';
+    let handlerName = '';
+
+    const visit = (node: Parser.SyntaxNode | null) => {
+        if (!node || (node.type !== 'call_expression' && node.type !== 'call')) {
+            return;
+        }
+
+        const calleeNode = node.namedChildren[0] ?? null;
+        const argsNode = node.namedChildren.find((child) => child.type === 'arguments' || child.type === 'argument_list') ?? null;
+
+        if (calleeNode?.type === 'member_expression' || calleeNode?.type === 'attribute') {
+            const objectNode = calleeNode.namedChildren[0] ?? null;
+            const propertyName = normalizeText(getNameText(calleeNode.namedChildren[1] ?? null)).toLowerCase();
+            if (propertyName) {
+                methods.push(propertyName);
+                if (propertyName === 'route' && !routePath) {
+                    routePath = extractApiRoutePath(argsNode);
+                }
+                if (API_REGISTRATION_METHODS.has(propertyName)) {
+                    if (!routePath) {
+                        routePath = extractApiRoutePath(argsNode);
+                    }
+                    if (!handlerName) {
+                        handlerName = extractApiHandlerName(argsNode);
+                    }
+                }
+            }
+            if (objectNode?.type === 'call_expression' || objectNode?.type === 'call') {
+                visit(objectNode);
+            }
+            return;
+        }
+
+        if (calleeNode?.type === 'identifier') {
+            const calleeName = normalizeText(calleeNode.text).toLowerCase();
+            if (calleeName === 'route') {
+                methods.push(calleeName);
+                if (!routePath) {
+                    routePath = extractApiRoutePath(argsNode);
+                }
+                return;
+            }
+            if (API_REGISTRATION_METHODS.has(calleeName)) {
+                methods.push(calleeName);
+                if (!routePath) {
+                    routePath = extractApiRoutePath(argsNode);
+                }
+                if (!handlerName) {
+                    handlerName = extractApiHandlerName(argsNode);
+                }
+            }
+        }
+    };
+
+    visit(callNode);
+
+    const methodSet = new Set(methods);
+    const method = [...methodSet].find((entry) => API_REGISTRATION_METHODS.has(entry));
+    if (!method || !routePath) {
+        return null;
+    }
+
+    return {
+        ownerName: normalizeApiOwnerName(routePath, moduleName),
+        name: normalizeApiRegistrationNodeName(handlerName, routePath),
+        routePath,
+        method
+    };
+}
+
 function extractCliCommandName(argsNode: Parser.SyntaxNode | null) {
     if (!argsNode) {
         return '';
@@ -2203,6 +2354,115 @@ function normalizeCliRegistrationNodeName(actionName: string, commandName: strin
         return 'command';
     }
     return 'command';
+}
+
+function extractApiRoutePath(argsNode: Parser.SyntaxNode | null) {
+    if (!argsNode) {
+        return '';
+    }
+
+    for (const child of argsNode.namedChildren) {
+        const direct = extractStaticStringLikeValue(child);
+        if (direct && direct.startsWith('/')) {
+            return normalizeApiRoutePath(direct);
+        }
+    }
+
+    return '';
+}
+
+function extractApiHandlerName(argsNode: Parser.SyntaxNode | null) {
+    if (!argsNode) {
+        return '';
+    }
+
+    const children = [...argsNode.namedChildren].reverse();
+    for (const child of children) {
+        if (child.type === 'identifier' || child.type === 'property_identifier') {
+            return normalizeText(child.text);
+        }
+        if (child.type === 'member_expression' || child.type === 'attribute') {
+            const valueName = normalizeText(getNameText(child));
+            if (valueName) {
+                return valueName.split('.').pop() ?? valueName;
+            }
+        }
+        if (child.type === 'arrow_function' || child.type === 'function' || child.type === 'function_definition') {
+            return 'handler';
+        }
+        if (child.type === 'call_expression' || child.type === 'call') {
+            const valueName = normalizeText(getNameText(child.namedChildren[0] ?? null));
+            if (valueName) {
+                return valueName.split('.').pop() ?? valueName;
+            }
+        }
+    }
+
+    return '';
+}
+
+function normalizeApiOwnerName(routePath: string, moduleName: string) {
+    const normalizedPath = normalizeApiRoutePath(routePath);
+    const segments = normalizedPath.split('/').filter(Boolean).filter((segment) => !isDynamicApiSegment(segment));
+    return toPascalCase(segments[segments.length - 1] ?? moduleName ?? 'api');
+}
+
+function normalizeApiRegistrationNodeName(handlerName: string, routePath: string) {
+    const normalizedHandler = normalizeText(handlerName);
+    if (normalizedHandler) {
+        return normalizedHandler;
+    }
+    const normalizedPath = normalizeApiRoutePath(routePath);
+    const fallback = normalizedPath
+        .split('/')
+        .filter(Boolean)
+        .reverse()
+        .find((segment) => !isDynamicApiSegment(segment));
+    return normalizeText(fallback ?? 'handler') || 'handler';
+}
+
+function normalizeApiRoutePath(routePath: string) {
+    const normalized = normalizeText(routePath)
+        .replace(/\/{2,}/g, '/')
+        .replace(/\$\{[^}]+\}/g, ':param')
+        .replace(/\[[^\]]+\]/g, ':param')
+        .replace(/\{[^}]+\}/g, ':param');
+    if (!normalized) {
+        return '';
+    }
+    return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
+function isDynamicApiSegment(segment: string) {
+    const normalized = normalizeText(segment);
+    return !normalized || normalized.startsWith(':');
+}
+
+function extractStaticStringLikeValue(node: Parser.SyntaxNode | null) {
+    if (!node) {
+        return '';
+    }
+
+    if (node.type === 'string') {
+        const fragment = node.namedChildren.find((child) => child.type === 'string_fragment' || child.type === 'string_content');
+        return normalizeText(fragment?.text ?? node.text);
+    }
+    if (node.type === 'template_string') {
+        const pieces = node.namedChildren
+            .map((child) => {
+                if (child.type === 'string_fragment' || child.type === 'string_content') {
+                    return child.text;
+                }
+                if (child.type === 'template_substitution' || child.type === 'interpolation') {
+                    return ':param';
+                }
+                return '';
+            })
+            .join('');
+        return normalizeText(pieces);
+    }
+
+    return '';
 }
 
 function inferJavaScriptExecutableReturnType(executableNode: Parser.SyntaxNode) {
