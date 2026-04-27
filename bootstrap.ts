@@ -97,6 +97,8 @@ export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtoc
             principle: 'reuse_first_minimal_change'
         },
         macroSplit: {
+            triadizationFocus: 'Workflow.buildMasterPrompt',
+            recommendedOperation: 'split',
             anchorNodeId: 'Workflow.buildMasterPrompt',
             vertexGoal: 'TriadMind 作为架构演进顶点，连接动态执行链路与静态约束链路。',
             leftBranch: [
@@ -119,6 +121,8 @@ export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtoc
             ]
         },
         mesoSplit: {
+            triadizationFocus: 'Workflow.buildMasterPrompt',
+            recommendedOperation: 'split',
             classes: [
                 {
                     className: 'Workflow',
@@ -170,6 +174,8 @@ export function buildSelfBootstrapProtocol(paths: WorkspacePaths): UpgradeProtoc
             ]
         },
         microSplit: {
+            triadizationFocus: 'Workflow.buildMasterPrompt',
+            recommendedOperation: 'split',
             classes: [
                 {
                     className: 'HealingRightBranch',

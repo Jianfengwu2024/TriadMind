@@ -10,10 +10,11 @@ TriadMind Core 是一个把“拓扑先行”落地到工程实践的 CLI。
 
 - `triadmind sync`：刷新能力拓扑（capability/leaf）
 - `triadmind runtime`：刷新运行时拓扑（API/Service/Worker/Resource）
-- `triadmind plan`：生成可审阅协议（draft protocol）
+- `triadmind triadize`：指出当前应先三元化的节点，并建议 `aggregate / split / renormalize`
+- `triadmind plan`：在三元化诊断基础上生成可审阅协议（draft protocol）
 - `triadmind apply`：按协议改代码（而不是自由发挥）
 - `triadmind dream run`：空闲式“做梦”体检，输出治理建议
-- `triadmind verify`：质量指标校验
+- `triadmind verify`：质量指标校验，包含三元完整性门禁
 - `triadmind govern ci`：硬门禁（fail-closed）
 
 一句话：
@@ -63,7 +64,7 @@ triadmind bootstrap init
 triadmind bootstrap doctor --json
 ```
 
-### 2.2 每次需求开发（推荐 6 步）
+### 2.2 每次需求开发（推荐 7 步）
 
 1) **先同步现状图谱**
 
@@ -77,25 +78,33 @@ triadmind sync --force
 triadmind runtime --visualize --view full
 ```
 
-3) **产出协议**
+3) **先做三元化诊断并确认焦点**
+
+```bash
+triadmind triadize
+# 或直接记录确认
+triadmind triadize --confirm
+```
+
+4) **产出协议**
 
 ```bash
 triadmind plan --no-open --view architecture
 ```
 
-4) **执行协议改动**
+5) **执行协议改动**
 
 ```bash
 triadmind apply
 ```
 
-5) **质量校验**
+6) **质量校验**
 
 ```bash
 triadmind verify --strict --json --max-execute-like-ratio 0.10 --max-ghost-ratio 0.40 --max-unmatched-routes 22
 ```
 
-6) **最终硬门禁（CI 同款）**
+7) **最终硬门禁（CI 同款）**
 
 ```bash
 triadmind govern ci --policy .triadmind/govern-policy.json --json
@@ -105,6 +114,12 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 > - 开发者脑中模型和系统真实拓扑一致
 > - 变更可追溯（协议驱动）
 > - 回归可自动化（verify + govern）
+
+补充一点：
+
+- 如果你跳过显式 `triadmind triadize`，`plan` / `apply` 也会先生成 triadization diagnosis，并要求确认当前是先做 `aggregate`、`split` 还是 `renormalize`。
+- `macro-split.json`、`meso-split.json`、`micro-split.json` 现在会显式携带 `triadizationFocus` 与 `recommendedOperation`，避免三轮拆分中途漂移焦点。
+- `draft-protocol.json` 现在也会校验 triadization focus；如果最终协议与当前主提案不一致，`plan` / `apply` 会直接失败。
 
 ---
 
@@ -116,7 +131,13 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - `.triadmind/leaf-map.json`：叶子实现图（细节钻取）
 - `.triadmind/visualizer.html`：能力可视化页面
 
-### 3.2 运行时层
+### 3.2 三元化诊断层
+
+- `.triadmind/triadization-report.json`：当前轮次的三元化诊断报告
+- `.triadmind/triadization-task.md`：供 AI / 开发者确认的三元化任务单
+- `.triadmind/triadization-confirmation.json`：已确认的三元化演进方案
+
+### 3.3 运行时层
 
 - `.triadmind/runtime-map.json`：运行时拓扑图
 - `.triadmind/runtime-diagnostics.json`：提取诊断
@@ -124,7 +145,7 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - `.triadmind/view-map.json`：`runtime ↔ capability ↔ leaf` 交叉映射
 - `.triadmind/view-map-diagnostics.json`：映射诊断与完整率摘要
 
-### 3.3 治理层（Hard Gate）
+### 3.4 治理层（Hard Gate）
 
 - `.triadmind/govern-policy.json`：硬门禁策略
 - `.triadmind/verify-baseline.json`：基线（用于相对阈值）
@@ -132,7 +153,7 @@ triadmind govern ci --policy .triadmind/govern-policy.json --json
 - `.triadmind/govern-audit.log`：审计日志
 - `.triadmind/govern-fixes.patch`：fix 模式输出的修复补丁建议
 
-### 3.4 Dream 层（空闲治理建议）
+### 3.5 Dream 层（空闲治理建议）
 
 - `.triadmind/dream-report.json`：本次 Dream 分析总报告
 - `.triadmind/dream-proposals.json`：建议清单（含可审阅 protocol draft）
@@ -161,6 +182,8 @@ triadmind runtime --view resources --visualize
 ### 4.2 协议驱动改造
 
 ```bash
+triadmind triadize
+triadmind triadize --confirm
 triadmind plan --no-open --view architecture
 triadmind apply
 ```
@@ -173,6 +196,14 @@ triadmind view-map --json
 triadmind verify --json
 triadmind verify --strict --json
 ```
+
+`verify` 现在会额外校验三元完整性：
+
+- `left_only_vertices`：裸左支
+- `right_only_vertices`：裸右支
+- `empty_vertices`：空顶点
+- `scale_mixing_vertices`：同一顶点里混入编排尺度与 helper 尺度
+- `triad_completeness`：三元完整性总门禁
 
 ### 4.4 Dream 建议生成
 

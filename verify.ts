@@ -1,12 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadTriadConfig, TriadLanguage } from './config';
+import { buildTopologyIR, TriadOperationIR } from './ir';
+import { TriadNodeDefinition } from './protocolRightBranch';
 import { RuntimeMap } from './runtime/types';
 import { calculateRuntimeRenderStats } from './runtime/runtimeVisualizer';
 import { WorkspacePaths } from './workspace';
 
 export interface VerifyMetrics {
     triad_nodes: number;
+    triad_vertices: number;
     execute_like_count: number;
     execute_like_ratio: number;
     ghost_nodes: number;
@@ -21,6 +24,13 @@ export interface VerifyMetrics {
     ghost_ratio_by_language: Record<string, number>;
     ghost_in_demand_count_by_language: Record<string, number>;
     ghost_policy_violations: number;
+    left_only_vertices: number;
+    right_only_vertices: number;
+    empty_vertices: number;
+    scale_mixing_vertices: number;
+    triad_completeness_violations: number;
+    protocol_focus_alignment_violations: number;
+    focus_closure_violations: number;
 }
 
 export interface VerifyThresholds {
@@ -30,6 +40,13 @@ export interface VerifyThresholds {
     rendered_edges_consistency: boolean;
     runtime_unmatched_route_count?: number;
     ghost_policy_compliance: boolean;
+    left_only_vertices: number;
+    right_only_vertices: number;
+    empty_vertices: number;
+    scale_mixing_vertices: number;
+    triad_completeness: boolean;
+    protocol_focus_alignment: boolean;
+    triad_focus_closure: boolean;
 }
 
 export interface VerifyCheckResult {
@@ -47,6 +64,8 @@ export interface VerifyReport {
         triadMapFile: string;
         runtimeMapFile: string;
         runtimeDiagnosticsFile: string;
+        draftProtocolFile: string;
+        microSplitFile: string;
     };
     strict: boolean;
     thresholds: VerifyThresholds;
@@ -69,11 +88,28 @@ export interface VerifyOptions {
     updateBaseline?: boolean;
 }
 
+export type TriadizationFocusGateFailureKind = 'protocol_focus_alignment' | 'triad_focus_closure' | 'mixed';
+
+export interface TriadizationFocusGateReport {
+    status: 'pass' | 'fail' | 'skip';
+    failureKind?: TriadizationFocusGateFailureKind;
+    canonicalFocus?: string;
+    recommendedOperation?: string;
+    summary: string;
+    repairTarget?: string;
+    details: string[];
+    alignmentViolations: string[];
+    closureViolations: string[];
+}
+
 type TriadNodeLike = {
     nodeId?: string;
+    category?: string;
     sourcePath?: string;
     fission?: {
+        problem?: string;
         demand?: unknown[];
+        answer?: unknown[];
         evidence?: {
             ghostReads?: Array<{
                 raw?: string;
@@ -91,15 +127,84 @@ type RuntimeDiagnosticLike = {
     message?: string;
 };
 
+type TriadizationFocusReferenceLike = {
+    triadizationFocus?: unknown;
+    recommendedOperation?: unknown;
+};
+
+type MicroClassLike = {
+    className?: string;
+    staticRightBranch?: unknown[];
+    dynamicLeftBranch?: unknown[];
+    properties?: unknown[];
+    methods?: unknown[];
+};
+
+type MicroSplitLike = TriadizationFocusReferenceLike & {
+    classes?: Array<{
+        className?: string;
+        staticRightBranch?: unknown[];
+        dynamicLeftBranch?: unknown[];
+        properties?: unknown[];
+        methods?: unknown[];
+    }>;
+};
+
+type TriadCompletenessAnalysis = {
+    triadVertices: number;
+    leftOnlyVertices: string[];
+    rightOnlyVertices: string[];
+    emptyVertices: string[];
+    scaleMixingVertices: string[];
+};
+
+type DraftProtocolLike = {
+    macroSplit?: TriadizationFocusReferenceLike;
+    mesoSplit?: TriadizationFocusReferenceLike;
+    microSplit?: TriadizationFocusReferenceLike & {
+        classes?: MicroClassLike[];
+    };
+};
+
+type NormalizedFocusReference = {
+    source: string;
+    triadizationFocus: string;
+    recommendedOperation: string;
+};
+
+type FocusAlignmentAnalysis = {
+    artifactsInspected: string[];
+    focusReferences: NormalizedFocusReference[];
+    alignmentViolations: string[];
+};
+
+type FocusClosureAnalysis = {
+    focusReference?: NormalizedFocusReference;
+    closureViolations: string[];
+};
+
+type ParsedFocusTarget = {
+    raw: string;
+    owner: string;
+    method?: string;
+    sourcePath?: string;
+};
+
 const EXECUTE_LIKE_METHOD_PATTERN = /execute/i;
 
 const GHOST_DEMAND_PATTERN = /^\[Ghost:[^\]]+\]/i;
+const ORCHESTRATION_METHOD_PATTERN = /^(execute|run|handle|process|dispatch|apply|invoke|plan|schedule|orchestrate)$/i;
+const HELPER_METHOD_PATTERN = /^(build|parse|format|normalize|sanitize|validate|resolve|collect|load|save|get|set)$/i;
+const ORCHESTRATION_RESPONSIBILITY_PATTERN = /(workflow|orchestrat|pipeline|router|dispatch|command|stage|coordinat)/i;
+const NONE_TOKENS = new Set(['', 'none', 'void', 'null', 'undefined']);
 
 export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions = {}): VerifyReport {
     const triadNodes = readTriadNodes(paths.mapFile);
     const config = loadTriadConfig(paths);
     const runtimeMap = readRuntimeMap(paths.runtimeMapFile);
     const runtimeDiagnostics = readRuntimeDiagnostics(paths.runtimeDiagnosticsFile);
+    const draftProtocol = readDraftProtocol(paths.draftFile);
+    const microSplit = readMicroSplit(paths.microSplitFile);
     const runtimeRenderStats = runtimeMap
         ? calculateRuntimeRenderStats(runtimeMap, options.maxRenderEdges)
         : { sourceEdges: 0, renderedEdges: 0, edgeCapApplied: false, nodeCount: 0 };
@@ -121,6 +226,14 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
             { includeInDemand: boolean; topK: number; minConfidence: number } | undefined
         >
     );
+    const triadCompleteness = analyzeTriadCompleteness(
+        triadNodes,
+        microSplit,
+        config.architecture.language,
+        config.parser.genericContractIgnoreList
+    );
+    const focusAlignment = analyzeTriadizationFocusAlignment(draftProtocol, microSplit);
+    const focusClosure = analyzeTriadFocusClosure(draftProtocol, microSplit, focusAlignment.focusReferences);
 
     const baseline = readVerifyBaseline(resolveBaselinePath(paths, options.baselinePath));
     const unresolvedUnmatchedLimit =
@@ -133,11 +246,19 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
         ghost_ratio: normalizeRatioThreshold(options.maxGhostRatio, 0.4),
         rendered_edges_consistency: true,
         runtime_unmatched_route_count: unresolvedUnmatchedLimit,
-        ghost_policy_compliance: true
+        ghost_policy_compliance: true,
+        left_only_vertices: 0,
+        right_only_vertices: 0,
+        empty_vertices: 0,
+        scale_mixing_vertices: 0,
+        triad_completeness: true,
+        protocol_focus_alignment: true,
+        triad_focus_closure: true
     };
 
     const metrics: VerifyMetrics = {
         triad_nodes: triadNodes.length,
+        triad_vertices: triadCompleteness.triadVertices,
         execute_like_count: executeLikeCount,
         execute_like_ratio: safeRatio(executeLikeCount, triadNodes.length),
         ghost_nodes: ghostNodes,
@@ -151,7 +272,18 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
         diagnostics_no_code: diagnosticsNoCode,
         ghost_ratio_by_language: ghostByLanguage.ghostRatioByLanguage,
         ghost_in_demand_count_by_language: ghostByLanguage.ghostInDemandCountByLanguage,
-        ghost_policy_violations: ghostPolicyViolations.length
+        ghost_policy_violations: ghostPolicyViolations.length,
+        left_only_vertices: triadCompleteness.leftOnlyVertices.length,
+        right_only_vertices: triadCompleteness.rightOnlyVertices.length,
+        empty_vertices: triadCompleteness.emptyVertices.length,
+        scale_mixing_vertices: triadCompleteness.scaleMixingVertices.length,
+        triad_completeness_violations:
+            triadCompleteness.leftOnlyVertices.length +
+            triadCompleteness.rightOnlyVertices.length +
+            triadCompleteness.emptyVertices.length +
+            triadCompleteness.scaleMixingVertices.length,
+        protocol_focus_alignment_violations: focusAlignment.alignmentViolations.length,
+        focus_closure_violations: focusClosure.closureViolations.length
     };
 
     const checks: VerifyCheckResult[] = [
@@ -193,6 +325,99 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
                 : 'Language ghost policy constraints satisfied'
         )
     );
+    checks.push(
+        evaluateNumericThreshold(
+            'left_only_vertices',
+            metrics.left_only_vertices,
+            thresholds.left_only_vertices,
+            '<=',
+            buildTriadViolationDetail('Left-only vertices', triadCompleteness.leftOnlyVertices)
+        )
+    );
+    checks.push(
+        evaluateNumericThreshold(
+            'right_only_vertices',
+            metrics.right_only_vertices,
+            thresholds.right_only_vertices,
+            '<=',
+            buildTriadViolationDetail('Right-only vertices', triadCompleteness.rightOnlyVertices)
+        )
+    );
+    checks.push(
+        evaluateNumericThreshold(
+            'empty_vertices',
+            metrics.empty_vertices,
+            thresholds.empty_vertices,
+            '<=',
+            buildTriadViolationDetail('Empty vertices', triadCompleteness.emptyVertices)
+        )
+    );
+    checks.push(
+        evaluateNumericThreshold(
+            'scale_mixing_vertices',
+            metrics.scale_mixing_vertices,
+            thresholds.scale_mixing_vertices,
+            '<=',
+            buildTriadViolationDetail('Scale-mixing vertices', triadCompleteness.scaleMixingVertices)
+        )
+    );
+    checks.push(
+        evaluateBooleanThreshold(
+            'triad_completeness',
+            metrics.triad_completeness_violations === 0,
+            thresholds.triad_completeness,
+            metrics.triad_completeness_violations > 0
+                ? [
+                      buildTriadViolationDetail('Left-only vertices', triadCompleteness.leftOnlyVertices),
+                      buildTriadViolationDetail('Right-only vertices', triadCompleteness.rightOnlyVertices),
+                      buildTriadViolationDetail('Empty vertices', triadCompleteness.emptyVertices),
+                      buildTriadViolationDetail('Scale-mixing vertices', triadCompleteness.scaleMixingVertices)
+                  ]
+                      .filter((item) => !item.endsWith('none'))
+                      .join('; ')
+                : 'Triad completeness checks satisfied'
+        )
+    );
+    if (focusAlignment.artifactsInspected.length > 0) {
+        checks.push(
+            evaluateBooleanThreshold(
+                'protocol_focus_alignment',
+                metrics.protocol_focus_alignment_violations === 0,
+                thresholds.protocol_focus_alignment,
+                metrics.protocol_focus_alignment_violations > 0
+                    ? buildTriadViolationDetail('Protocol focus alignment', focusAlignment.alignmentViolations)
+                    : 'draft-protocol.json and micro-split.json stay on the same triadization focus'
+            )
+        );
+    } else {
+        checks.push({
+            key: 'protocol_focus_alignment',
+            status: 'skip',
+            expected: 'draft-protocol.json or micro-split.json present',
+            actual: null,
+            detail: 'Skipped protocol focus alignment because no triadization focus artifacts were found'
+        });
+    }
+    if (focusClosure.focusReference) {
+        checks.push(
+            evaluateBooleanThreshold(
+                'triad_focus_closure',
+                metrics.focus_closure_violations === 0,
+                thresholds.triad_focus_closure,
+                metrics.focus_closure_violations > 0
+                    ? buildTriadViolationDetail('Triad focus closure', focusClosure.closureViolations)
+                    : `Focused class closes around ${focusClosure.focusReference.triadizationFocus}`
+            )
+        );
+    } else {
+        checks.push({
+            key: 'triad_focus_closure',
+            status: 'skip',
+            expected: 'triadizationFocus available',
+            actual: null,
+            detail: 'Skipped triad focus closure because no canonical triadization focus could be resolved'
+        });
+    }
 
     const report: VerifyReport = {
         generatedAt: new Date().toISOString(),
@@ -200,7 +425,9 @@ export function runTopologyVerify(paths: WorkspacePaths, options: VerifyOptions 
         artifacts: {
             triadMapFile: paths.mapFile,
             runtimeMapFile: paths.runtimeMapFile,
-            runtimeDiagnosticsFile: paths.runtimeDiagnosticsFile
+            runtimeDiagnosticsFile: paths.runtimeDiagnosticsFile,
+            draftProtocolFile: paths.draftFile,
+            microSplitFile: paths.microSplitFile
         },
         strict: Boolean(options.strict),
         thresholds,
@@ -236,12 +463,14 @@ export function formatVerifyReport(report: VerifyReport) {
     return [
         `TriadMind Verify (${summary})`,
         `generatedAt=${report.generatedAt}`,
-        `triad_nodes=${report.metrics.triad_nodes}, runtime_nodes=${report.metrics.runtime_nodes}, runtime_edges=${report.metrics.runtime_edges}`,
+        `triad_nodes=${report.metrics.triad_nodes}, triad_vertices=${report.metrics.triad_vertices}, runtime_nodes=${report.metrics.runtime_nodes}, runtime_edges=${report.metrics.runtime_edges}`,
         `execute_like_ratio=${report.metrics.execute_like_ratio.toFixed(3)}, ghost_ratio=${report.metrics.ghost_ratio.toFixed(3)}`,
         `ghost_ratio_by_language=${JSON.stringify(report.metrics.ghost_ratio_by_language)}`,
         `ghost_in_demand_count_by_language=${JSON.stringify(report.metrics.ghost_in_demand_count_by_language)}`,
         `diagnostics_no_code=${report.metrics.diagnostics_no_code}, runtime_unmatched_route_count=${report.metrics.runtime_unmatched_route_count}`,
         `ghost_policy_violations=${report.metrics.ghost_policy_violations}`,
+        `left_only_vertices=${report.metrics.left_only_vertices}, right_only_vertices=${report.metrics.right_only_vertices}, empty_vertices=${report.metrics.empty_vertices}, scale_mixing_vertices=${report.metrics.scale_mixing_vertices}`,
+        `protocol_focus_alignment_violations=${report.metrics.protocol_focus_alignment_violations}, focus_closure_violations=${report.metrics.focus_closure_violations}`,
         `rendered_runtime_edges=${report.metrics.rendered_runtime_edges}, rendered_edges_consistency=${report.metrics.rendered_edges_consistency}`,
         ...checkLines
     ].join('\n');
@@ -251,7 +480,8 @@ function evaluateNumericThreshold(
     key: keyof VerifyThresholds,
     actual: number,
     expected: number,
-    operator: '<' | '<='
+    operator: '<' | '<=',
+    detailHint?: string
 ): VerifyCheckResult {
     const pass = operator === '<' ? actual < expected : actual <= expected;
     return {
@@ -259,7 +489,7 @@ function evaluateNumericThreshold(
         status: pass ? 'pass' : 'fail',
         expected,
         actual,
-        detail: operator === '<' ? `must be < ${expected}` : `must be <= ${expected}`
+        detail: detailHint ?? (operator === '<' ? `must be < ${expected}` : `must be <= ${expected}`)
     };
 }
 
@@ -331,6 +561,22 @@ function readRuntimeDiagnostics(filePath: string) {
         return ((parsed as { diagnostics?: unknown[] }).diagnostics ?? []) as RuntimeDiagnosticLike[];
     }
     return [] as RuntimeDiagnosticLike[];
+}
+
+function readMicroSplit(filePath: string) {
+    const parsed = readJsonIfExists(filePath);
+    if (!parsed || typeof parsed !== 'object') {
+        return undefined;
+    }
+    return parsed as MicroSplitLike;
+}
+
+function readDraftProtocol(filePath: string) {
+    const parsed = readJsonIfExists(filePath);
+    if (!parsed || typeof parsed !== 'object') {
+        return undefined;
+    }
+    return parsed as DraftProtocolLike;
 }
 
 function readVerifyBaseline(baselinePath: string) {
@@ -490,6 +736,512 @@ function inferLanguageFromSourcePath(sourcePath: string | undefined): TriadLangu
 
 function dedupeStrings(values: string[]) {
     return Array.from(new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean)));
+}
+
+function analyzeTriadCompleteness(
+    triadNodes: TriadNodeLike[],
+    microSplit: MicroSplitLike | undefined,
+    language: TriadLanguage,
+    genericContractIgnoreList: string[]
+): TriadCompletenessAnalysis {
+    const leftOnlyVertices = new Set<string>();
+    const rightOnlyVertices = new Set<string>();
+    const emptyVertices = new Set<string>();
+    const scaleMixingVertices = new Set<string>();
+    const triadDefinitions = triadNodes.filter(isTriadNodeDefinition);
+
+    for (const blueprint of Array.isArray(microSplit?.classes) ? microSplit!.classes! : []) {
+        const className = String(blueprint?.className ?? '').trim();
+        if (!className) {
+            continue;
+        }
+
+        const staticRightBranch = readBranchArray(blueprint?.staticRightBranch, blueprint?.properties);
+        const dynamicLeftBranch = readBranchArray(blueprint?.dynamicLeftBranch, blueprint?.methods);
+        const label = `micro:${className}`;
+
+        if (staticRightBranch.length === 0 && dynamicLeftBranch.length > 0) {
+            leftOnlyVertices.add(label);
+        }
+        if (staticRightBranch.length > 0 && dynamicLeftBranch.length === 0) {
+            rightOnlyVertices.add(label);
+        }
+        if (staticRightBranch.length === 0 && dynamicLeftBranch.length === 0) {
+            emptyVertices.add(label);
+        }
+        if (hasScaleMixingBranch(dynamicLeftBranch)) {
+            scaleMixingVertices.add(label);
+        }
+    }
+
+    const topology = buildTopologyIR(triadDefinitions, language);
+    for (const vertex of topology.vertices) {
+        const meaningfulStaticRightBranch = vertex.staticRightBranch.filter((entry) =>
+            isMeaningfulRightBranchContract(entry, genericContractIgnoreList)
+        );
+        const orchestrationCount = vertex.dynamicLeftBranch.filter((operation) => isOrchestrationOperation(operation)).length;
+        const label = `ir:${formatVertexLabel(vertex.nodeId, vertex.sourcePath)}`;
+
+        if (
+            meaningfulStaticRightBranch.length === 0 &&
+            orchestrationCount > 0 &&
+            vertex.dynamicLeftBranch.length >= 2
+        ) {
+            leftOnlyVertices.add(label);
+        }
+        if (hasScaleMixingOperations(vertex.dynamicLeftBranch)) {
+            scaleMixingVertices.add(label);
+        }
+    }
+
+    return {
+        triadVertices: topology.vertices.length,
+        leftOnlyVertices: Array.from(leftOnlyVertices).sort(),
+        rightOnlyVertices: Array.from(rightOnlyVertices).sort(),
+        emptyVertices: Array.from(emptyVertices).sort(),
+        scaleMixingVertices: Array.from(scaleMixingVertices).sort()
+    };
+}
+
+function analyzeTriadizationFocusAlignment(
+    draftProtocol: DraftProtocolLike | undefined,
+    microSplit: MicroSplitLike | undefined
+): FocusAlignmentAnalysis {
+    const artifactsInspected: string[] = [];
+    const focusReferences: NormalizedFocusReference[] = [];
+    const alignmentViolations: string[] = [];
+
+    if (draftProtocol) {
+        artifactsInspected.push('draft-protocol.json');
+        collectFocusReference('draft-protocol.json macroSplit', draftProtocol.macroSplit, focusReferences, alignmentViolations);
+        collectFocusReference('draft-protocol.json mesoSplit', draftProtocol.mesoSplit, focusReferences, alignmentViolations);
+        collectFocusReference('draft-protocol.json microSplit', draftProtocol.microSplit, focusReferences, alignmentViolations);
+    }
+
+    if (microSplit) {
+        artifactsInspected.push('micro-split.json');
+        collectFocusReference('micro-split.json', microSplit, focusReferences, alignmentViolations);
+    }
+
+    const canonicalReference = resolvePrimaryFocusReference(focusReferences);
+    if (!canonicalReference) {
+        return {
+            artifactsInspected,
+            focusReferences,
+            alignmentViolations: dedupeStrings(alignmentViolations)
+        };
+    }
+
+    for (const reference of focusReferences) {
+        if (
+            reference.triadizationFocus !== canonicalReference.triadizationFocus ||
+            reference.recommendedOperation !== canonicalReference.recommendedOperation
+        ) {
+            alignmentViolations.push(
+                `${reference.source} drifts from ${canonicalReference.source}: ${reference.triadizationFocus} -> ${reference.recommendedOperation}`
+            );
+        }
+    }
+
+    return {
+        artifactsInspected,
+        focusReferences,
+        alignmentViolations: dedupeStrings(alignmentViolations)
+    };
+}
+
+export function evaluateTriadizationFocusGateArtifacts(
+    draftProtocol: unknown,
+    microSplit: unknown
+): TriadizationFocusGateReport {
+    const normalizedDraftProtocol =
+        draftProtocol && typeof draftProtocol === 'object' ? (draftProtocol as DraftProtocolLike) : undefined;
+    const normalizedMicroSplit =
+        microSplit && typeof microSplit === 'object' ? (microSplit as MicroSplitLike) : undefined;
+    const focusAlignment = analyzeTriadizationFocusAlignment(normalizedDraftProtocol, normalizedMicroSplit);
+    const focusClosure = analyzeTriadFocusClosure(
+        normalizedDraftProtocol,
+        normalizedMicroSplit,
+        focusAlignment.focusReferences
+    );
+    const canonicalReference = focusClosure.focusReference ?? resolvePrimaryFocusReference(focusAlignment.focusReferences);
+    const alignmentViolations = focusAlignment.alignmentViolations;
+    const closureViolations = focusClosure.closureViolations;
+    const failureKind = resolveFocusGateFailureKind(alignmentViolations.length, closureViolations.length);
+    const canonicalFocus = canonicalReference?.triadizationFocus;
+    const recommendedOperation = canonicalReference?.recommendedOperation;
+
+    if (!canonicalReference && focusAlignment.artifactsInspected.length === 0) {
+        return {
+            status: 'skip',
+            summary: '尚未检测到可用的 triadization focus 工件',
+            details: [],
+            alignmentViolations,
+            closureViolations
+        };
+    }
+
+    if (!failureKind) {
+        return {
+            status: canonicalReference ? 'pass' : 'skip',
+            canonicalFocus,
+            recommendedOperation,
+            summary: canonicalReference
+                ? `焦点已对齐并闭环：${canonicalReference.triadizationFocus} -> ${canonicalReference.recommendedOperation}`
+                : '未解析出稳定的 triadization focus，但当前没有检测到显式漂移',
+            repairTarget: canonicalReference
+                ? `${canonicalReference.triadizationFocus} -> ${canonicalReference.recommendedOperation}`
+                : undefined,
+            details: canonicalReference
+                ? [`canonicalFocus: ${canonicalReference.triadizationFocus} -> ${canonicalReference.recommendedOperation}`]
+                : [],
+            alignmentViolations,
+            closureViolations
+        };
+    }
+
+    return {
+        status: 'fail',
+        failureKind,
+        canonicalFocus,
+        recommendedOperation,
+        summary: buildTriadizationFocusGateSummary(failureKind, canonicalReference),
+        repairTarget: buildTriadizationFocusGateRepairTarget(failureKind, canonicalReference),
+        details: [...alignmentViolations, ...closureViolations],
+        alignmentViolations,
+        closureViolations
+    };
+}
+
+function analyzeTriadFocusClosure(
+    draftProtocol: DraftProtocolLike | undefined,
+    microSplit: MicroSplitLike | undefined,
+    focusReferences: NormalizedFocusReference[]
+): FocusClosureAnalysis {
+    const focusReference = resolvePrimaryFocusReference(focusReferences);
+    if (!focusReference) {
+        return {
+            closureViolations: []
+        };
+    }
+
+    const focusTarget = parseFocusTarget(focusReference.triadizationFocus);
+    if (!focusTarget) {
+        return {
+            focusReference,
+            closureViolations: [`Unable to parse triadization focus ${focusReference.triadizationFocus}`]
+        };
+    }
+
+    const closureViolations: string[] = [];
+    closureViolations.push(
+        ...evaluateFocusedClassClosure('micro-split.json', readMicroClasses(microSplit?.classes), focusTarget)
+    );
+    if (draftProtocol?.microSplit) {
+        closureViolations.push(
+            ...evaluateFocusedClassClosure(
+                'draft-protocol.json microSplit',
+                readMicroClasses(draftProtocol.microSplit.classes),
+                focusTarget
+            )
+        );
+    }
+
+    return {
+        focusReference,
+        closureViolations: dedupeStrings(closureViolations)
+    };
+}
+
+function isTriadNodeDefinition(node: TriadNodeLike): node is TriadNodeDefinition {
+    return (
+        typeof node?.nodeId === 'string' &&
+        typeof node?.fission?.problem === 'string' &&
+        Array.isArray(node?.fission?.demand) &&
+        Array.isArray(node?.fission?.answer)
+    );
+}
+
+function readBranchArray(primary: unknown[] | undefined, fallback: unknown[] | undefined) {
+    if (Array.isArray(primary)) {
+        return primary;
+    }
+    return Array.isArray(fallback) ? fallback : [];
+}
+
+function readMicroClasses(classes: unknown[] | undefined) {
+    return Array.isArray(classes) ? (classes as MicroClassLike[]) : [];
+}
+
+function collectFocusReference(
+    source: string,
+    reference: TriadizationFocusReferenceLike | undefined,
+    focusReferences: NormalizedFocusReference[],
+    violations: string[]
+) {
+    if (!reference || typeof reference !== 'object') {
+        return;
+    }
+
+    const triadizationFocus = String(reference.triadizationFocus ?? '').trim();
+    const recommendedOperation = String(reference.recommendedOperation ?? '').trim().toLowerCase();
+    const hasOtherStructure = Object.entries(reference as Record<string, unknown>).some(([key, value]) => {
+        if (key === 'triadizationFocus' || key === 'recommendedOperation') {
+            return false;
+        }
+        if (Array.isArray(value)) {
+            return value.length > 0;
+        }
+        if (typeof value === 'string') {
+            return value.trim().length > 0;
+        }
+        return value !== undefined && value !== null;
+    });
+    if (!triadizationFocus && !recommendedOperation) {
+        if (hasOtherStructure) {
+            violations.push(`${source} is missing triadizationFocus and recommendedOperation`);
+        }
+        return;
+    }
+
+    if (!triadizationFocus || !recommendedOperation) {
+        violations.push(`${source} is missing triadizationFocus or recommendedOperation`);
+        return;
+    }
+
+    focusReferences.push({
+        source,
+        triadizationFocus,
+        recommendedOperation
+    });
+}
+
+function resolvePrimaryFocusReference(focusReferences: NormalizedFocusReference[]) {
+    if (focusReferences.length === 0) {
+        return undefined;
+    }
+
+    const preferredSourceOrder = [
+        'draft-protocol.json microSplit',
+        'micro-split.json',
+        'draft-protocol.json macroSplit',
+        'draft-protocol.json mesoSplit'
+    ];
+    for (const source of preferredSourceOrder) {
+        const match = focusReferences.find((reference) => reference.source === source);
+        if (match) {
+            return match;
+        }
+    }
+
+    return focusReferences[0];
+}
+
+function resolveFocusGateFailureKind(alignmentViolationCount: number, closureViolationCount: number) {
+    if (alignmentViolationCount > 0 && closureViolationCount > 0) {
+        return 'mixed' as const;
+    }
+    if (alignmentViolationCount > 0) {
+        return 'protocol_focus_alignment' as const;
+    }
+    if (closureViolationCount > 0) {
+        return 'triad_focus_closure' as const;
+    }
+    return undefined;
+}
+
+function buildTriadizationFocusGateSummary(
+    failureKind: TriadizationFocusGateFailureKind,
+    focusReference: NormalizedFocusReference | undefined
+) {
+    if (failureKind === 'protocol_focus_alignment') {
+        return focusReference
+            ? `焦点漂移：draft-protocol.json 与 micro-split.json 没有围绕同一个 triadization focus（当前应对齐到 ${focusReference.triadizationFocus} -> ${focusReference.recommendedOperation}）`
+            : '焦点漂移：draft-protocol.json 与 micro-split.json 没有围绕同一个 triadization focus';
+    }
+
+    if (failureKind === 'triad_focus_closure') {
+        return focusReference
+            ? `焦点未闭环：${focusReference.triadizationFocus} 还没有在同一类的左右分支中闭合`
+            : '焦点未闭环：当前 triadization focus 还没有在同一类的左右分支中闭合';
+    }
+
+    return focusReference
+        ? `焦点既漂移又未闭环：先把所有产物对齐到 ${focusReference.triadizationFocus} -> ${focusReference.recommendedOperation}，再补齐类级左右分支闭环`
+        : '焦点既漂移又未闭环：先统一 triadization focus，再补齐类级左右分支闭环';
+}
+
+function buildTriadizationFocusGateRepairTarget(
+    failureKind: TriadizationFocusGateFailureKind,
+    focusReference: NormalizedFocusReference | undefined
+) {
+    if (!focusReference) {
+        return failureKind === 'protocol_focus_alignment'
+            ? '统一 triadizationFocus / recommendedOperation'
+            : undefined;
+    }
+
+    if (failureKind === 'protocol_focus_alignment') {
+        return `${focusReference.triadizationFocus} -> ${focusReference.recommendedOperation}`;
+    }
+
+    const focusTarget = parseFocusTarget(focusReference.triadizationFocus);
+    if (!focusTarget) {
+        return `${focusReference.triadizationFocus} -> ${focusReference.recommendedOperation}`;
+    }
+
+    if (!focusTarget.method) {
+        return `${focusTarget.raw} (class ${focusTarget.owner})`;
+    }
+
+    return `${focusTarget.raw} (class ${focusTarget.owner}, method ${focusTarget.method})`;
+}
+
+function parseFocusTarget(triadizationFocus: string): ParsedFocusTarget | undefined {
+    const raw = String(triadizationFocus ?? '').trim();
+    if (!raw) {
+        return undefined;
+    }
+
+    const atIndex = raw.indexOf('@');
+    const nodePart = atIndex >= 0 ? raw.slice(0, atIndex).trim() : raw;
+    const sourcePath = atIndex >= 0 ? raw.slice(atIndex + 1).trim() : undefined;
+    const parts = nodePart.split('.').map((part) => part.trim()).filter(Boolean);
+    if (parts.length === 0) {
+        return undefined;
+    }
+
+    if (parts.length === 1) {
+        return {
+            raw,
+            owner: parts[0],
+            sourcePath
+        };
+    }
+
+    return {
+        raw,
+        owner: parts[parts.length - 2],
+        method: parts[parts.length - 1],
+        sourcePath
+    };
+}
+
+function evaluateFocusedClassClosure(label: string, classes: MicroClassLike[], focusTarget: ParsedFocusTarget) {
+    if (classes.length === 0) {
+        return [`${label} has no classes for focus ${focusTarget.raw}`];
+    }
+
+    const blueprint = classes.find(
+        (candidate) => String(candidate?.className ?? '').trim() === focusTarget.owner
+    );
+    if (!blueprint) {
+        return [`${label} is missing focused class ${focusTarget.owner}`];
+    }
+
+    const closureViolations: string[] = [];
+    const staticRightBranch = readBranchArray(blueprint.staticRightBranch, blueprint.properties);
+    const dynamicLeftBranch = readBranchArray(blueprint.dynamicLeftBranch, blueprint.methods);
+    if (staticRightBranch.length === 0) {
+        closureViolations.push(`${label} class ${focusTarget.owner} has no staticRightBranch`);
+    }
+    if (dynamicLeftBranch.length === 0) {
+        closureViolations.push(`${label} class ${focusTarget.owner} has no dynamicLeftBranch`);
+    }
+
+    if (focusTarget.method) {
+        const hasFocusedMethod = dynamicLeftBranch.some(
+            (entry) => String((entry as { name?: unknown })?.name ?? '').trim() === focusTarget.method
+        );
+        if (!hasFocusedMethod) {
+            closureViolations.push(`${label} class ${focusTarget.owner} is missing focus method ${focusTarget.method}`);
+        }
+    }
+
+    return closureViolations;
+}
+
+function hasScaleMixingBranch(branch: unknown[]) {
+    if (branch.length < 2) {
+        return false;
+    }
+
+    let helperCount = 0;
+    let orchestrationCount = 0;
+    for (const entry of branch) {
+        const name = typeof (entry as { name?: unknown })?.name === 'string' ? String((entry as { name?: unknown }).name) : '';
+        const responsibility =
+            typeof (entry as { responsibility?: unknown })?.responsibility === 'string'
+                ? String((entry as { responsibility?: unknown }).responsibility)
+                : '';
+        if (isHelperMethodName(name)) {
+            helperCount += 1;
+        }
+        if (ORCHESTRATION_METHOD_PATTERN.test(name) || ORCHESTRATION_RESPONSIBILITY_PATTERN.test(responsibility)) {
+            orchestrationCount += 1;
+        }
+    }
+
+    return helperCount > 0 && orchestrationCount > 0;
+}
+
+function hasScaleMixingOperations(operations: TriadOperationIR[]) {
+    if (operations.length < 3) {
+        return false;
+    }
+
+    const helperCount = operations.filter((operation) => isHelperMethodName(operation.name)).length;
+    const orchestrationCount = operations.filter((operation) => isOrchestrationOperation(operation)).length;
+    return helperCount > 0 && orchestrationCount > 0;
+}
+
+function isOrchestrationOperation(operation: Pick<TriadOperationIR, 'name' | 'responsibility'>) {
+    return (
+        ORCHESTRATION_METHOD_PATTERN.test(String(operation.name ?? '').trim()) ||
+        ORCHESTRATION_RESPONSIBILITY_PATTERN.test(String(operation.responsibility ?? '').trim())
+    );
+}
+
+function isHelperMethodName(name: string) {
+    return HELPER_METHOD_PATTERN.test(String(name ?? '').trim());
+}
+
+function isMeaningfulRightBranchContract(contract: string, genericContractIgnoreList: string[]) {
+    const normalized = normalizeContractKey(contract);
+    if (!normalized || NONE_TOKENS.has(normalized) || GHOST_DEMAND_PATTERN.test(String(contract ?? '').trim())) {
+        return false;
+    }
+
+    return !resolveGenericContractIgnoreSet(genericContractIgnoreList).has(normalized);
+}
+
+function resolveGenericContractIgnoreSet(values: string[]) {
+    return new Set(
+        (Array.isArray(values) ? values : [])
+            .map((value) => normalizeContractKey(value))
+            .filter((value) => value && !NONE_TOKENS.has(value))
+    );
+}
+
+function normalizeContractKey(contract: unknown) {
+    if (typeof contract !== 'string') {
+        return '';
+    }
+
+    return contract
+        .trim()
+        .replace(/\[[^\]]+\]/g, '')
+        .replace(/\([^()]*\)/g, '')
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+}
+
+function formatVertexLabel(nodeId: string, sourcePath?: string) {
+    return sourcePath?.trim() ? `${nodeId}@${sourcePath.trim()}` : nodeId;
+}
+
+function buildTriadViolationDetail(title: string, values: string[]) {
+    return values.length === 0 ? `${title}: none` : `${title}: ${values.slice(0, 6).join(', ')}`;
 }
 
 function safeRatio(part: number, total: number) {

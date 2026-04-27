@@ -1,5 +1,10 @@
 import { normalizePath, WorkspacePaths } from './workspace';
 
+export interface TriadizationFocusSeed {
+    triadizationFocus: string;
+    recommendedOperation: string;
+}
+
 /**
  * @RightBranch
  */
@@ -14,16 +19,22 @@ export function createDraftProtocolTemplate(projectRoot: string, mapFile: string
             principle: 'reuse_first_minimal_change'
         },
         macroSplit: {
+            triadizationFocus: '',
+            recommendedOperation: '',
             anchorNodeId: '',
             vertexGoal: '',
             leftBranch: [],
             rightBranch: []
         },
         mesoSplit: {
+            triadizationFocus: '',
+            recommendedOperation: '',
             classes: [],
             pipelines: []
         },
         microSplit: {
+            triadizationFocus: '',
+            recommendedOperation: '',
             classes: []
         },
         actions: []
@@ -33,8 +44,9 @@ export function createDraftProtocolTemplate(projectRoot: string, mapFile: string
 /**
  * @RightBranch
  */
-export function createMacroSplitSeed(userDemand: string) {
+export function createMacroSplitSeed(userDemand: string, focus?: Partial<TriadizationFocusSeed>) {
     return {
+        ...createTriadizationFocusSeed(focus),
         anchorNodeId: '',
         vertexGoal: userDemand,
         leftBranch: [],
@@ -45,8 +57,9 @@ export function createMacroSplitSeed(userDemand: string) {
 /**
  * @RightBranch
  */
-export function createMesoSplitSeed() {
+export function createMesoSplitSeed(focus?: Partial<TriadizationFocusSeed>) {
     return {
+        ...createTriadizationFocusSeed(focus),
         classes: [],
         pipelines: []
     };
@@ -55,8 +68,9 @@ export function createMesoSplitSeed() {
 /**
  * @RightBranch
  */
-export function createMicroSplitSeed() {
+export function createMicroSplitSeed(focus?: Partial<TriadizationFocusSeed>) {
     return {
+        ...createTriadizationFocusSeed(focus),
         classes: []
     };
 }
@@ -69,6 +83,7 @@ export function getProtocolOutputContractLines() {
         '只返回严格 JSON；禁止输出 markdown、解释、前后缀说明。',
         '最终 JSON 必须同时包含 `macroSplit`、`mesoSplit`、`microSplit`、`actions`。',
         '`allowedOps` 只能是 `reuse` / `modify` / `create_child`。',
+        '`macroSplit`、`mesoSplit`、`microSplit` 应显式保留当前 triadization focus 与 recommendedOperation，三者不得漂移。',
         '`macroSplit` 负责寻找挂载点，并拆出左分支=子功能、右分支=编排 / 配置。',
         '`mesoSplit` 负责把子功能继续拆成类与数据管道。',
         '`microSplit` 负责把类继续拆成属性 / 状态与方法 / 动作，并明确 demand / answer。',
@@ -82,11 +97,12 @@ export function getProtocolOutputContractLines() {
  */
 export function getImplementationExecutionWorkflowLines() {
     return [
-        '1. 先执行 Macro-Split：寻找挂载点，并把功能拆成左分支=子功能、右分支=编排 / 配置。',
-        '2. 再执行 Meso-Split：把子功能继续拆成类（Class）、数据管道（Pipeline）与职责边界。',
-        '3. 最后执行 Micro-Split：把类拆成属性 / 状态（静态右分支）与方法 / 动作（动态左分支）。',
-        '4. 把三轮结果折叠进最终 `draft-protocol.json`，再进入 visualizer 审核。',
-        '5. 协议确认之后，才允许继续具体实现。'
+        '1. 先锁定当前 triadization focus；后续所有拆分都必须围绕同一个目标节点与同一个 recommendedOperation。',
+        '2. 再执行 Macro-Split：寻找挂载点，并把功能拆成左分支=子功能、右分支=编排 / 配置。',
+        '3. 再执行 Meso-Split：把子功能继续拆成类（Class）、数据管道（Pipeline）与职责边界。',
+        '4. 最后执行 Micro-Split：把类拆成属性 / 状态（静态右分支）与方法 / 动作（动态左分支）。',
+        '5. 把三轮结果折叠进最终 `draft-protocol.json`，再进入 visualizer 审核。',
+        '6. 协议确认之后，才允许继续具体实现。'
     ];
 }
 
@@ -115,6 +131,7 @@ export function getMasterPromptStageRouterLines() {
  */
 export function getMasterPromptProtocolPhaseLines() {
     return [
+        '先锁定并引用当前 triadization focus；没有确认焦点时，不要擅自漂移到其他节点。',
         '先做 Macro-Split：挂载点 + 左分支子功能 + 右分支编排 / 配置。',
         '再做 Meso-Split：类与数据管道。',
         '最后做 Micro-Split：属性 / 状态 + 方法 / 动作。',
@@ -240,7 +257,7 @@ export function buildMacroPromptShape(paths: WorkspacePaths, userDemand: string)
         JSON.stringify(userDemand.trim()),
         '',
         '[Output JSON Shape]',
-        '{"anchorNodeId":"","vertexGoal":"","leftBranch":[],"rightBranch":[]}'
+        '{"triadizationFocus":"","recommendedOperation":"","anchorNodeId":"","vertexGoal":"","leftBranch":[],"rightBranch":[]}'
     ].join('\n');
 }
 
@@ -258,7 +275,7 @@ export function buildMesoPromptShape(paths: WorkspacePaths, userDemand: string) 
         JSON.stringify(userDemand.trim()),
         '',
         '[Output JSON Shape]',
-        '{"classes":[{"className":"","category":"","responsibility":"","upstreams":[],"downstreams":[]}],"pipelines":[{"pipelineId":"","purpose":"","steps":[]}]}'
+        '{"triadizationFocus":"","recommendedOperation":"","classes":[{"className":"","category":"","responsibility":"","upstreams":[],"downstreams":[]}],"pipelines":[{"pipelineId":"","purpose":"","steps":[]}]}'
     ].join('\n');
 }
 
@@ -276,6 +293,13 @@ export function buildMicroPromptShape(paths: WorkspacePaths, userDemand: string)
         JSON.stringify(userDemand.trim()),
         '',
         '[Output JSON Shape]',
-        '{"classes":[{"className":"","staticRightBranch":[{"name":"","type":"","role":""}],"dynamicLeftBranch":[{"name":"","demand":[],"answer":[],"responsibility":""}]}]}'
+        '{"triadizationFocus":"","recommendedOperation":"","classes":[{"className":"","staticRightBranch":[{"name":"","type":"","role":""}],"dynamicLeftBranch":[{"name":"","demand":[],"answer":[],"responsibility":""}]}]}'
     ].join('\n');
+}
+
+function createTriadizationFocusSeed(focus?: Partial<TriadizationFocusSeed>): TriadizationFocusSeed {
+    return {
+        triadizationFocus: typeof focus?.triadizationFocus === 'string' ? focus.triadizationFocus.trim() : '',
+        recommendedOperation: typeof focus?.recommendedOperation === 'string' ? focus.recommendedOperation.trim() : ''
+    };
 }

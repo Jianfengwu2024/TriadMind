@@ -6,6 +6,7 @@ import {
     ParsedDemand,
     ParsedNodeRef,
     ProtocolValidationContext,
+    TriadizationFocusReference,
     TriadCategory,
     TriadNodeDefinition,
     UpgradeProtocol
@@ -127,6 +128,7 @@ export function readJsonFile<T>(filePath: string): T {
 export function assertProtocolShape(protocol: UpgradeProtocol, context: ProtocolValidationContext = {}) {
     const parsed = getUpgradeProtocolSchema().parse(protocol) as UpgradeProtocol;
     validateConfidenceRules(parsed, context);
+    validateTriadizationFocusRules(parsed, context);
     validateTopologyRules(parsed, context.existingNodes ?? []);
     return parsed;
 }
@@ -146,6 +148,53 @@ function validateConfidenceRules(protocol: UpgradeProtocol, context: ProtocolVal
             );
         }
     });
+}
+
+function validateTriadizationFocusRules(protocol: UpgradeProtocol, context: ProtocolValidationContext) {
+    const splitStages = [
+        ['macroSplit', protocol.macroSplit],
+        ['mesoSplit', protocol.mesoSplit],
+        ['microSplit', protocol.microSplit]
+    ] as const;
+    const presentStages = splitStages.filter((entry) => Boolean(entry[1]));
+
+    if (presentStages.length === 0) {
+        return;
+    }
+
+    if (presentStages.length !== splitStages.length) {
+        throw new Error('协议必须同时包含 macroSplit、mesoSplit、microSplit，才能验证 triadization focus 是否稳定。');
+    }
+
+    const canonicalStageName = presentStages[0][0];
+    const canonicalReference = presentStages[0][1] as TriadizationFocusReference;
+    const normalizedCanonical = normalizeTriadizationFocusReference(canonicalReference);
+
+    presentStages.slice(1).forEach(([stageName, reference]) => {
+        const normalizedReference = normalizeTriadizationFocusReference(reference as TriadizationFocusReference);
+        if (
+            normalizedReference.triadizationFocus !== normalizedCanonical.triadizationFocus ||
+            normalizedReference.recommendedOperation !== normalizedCanonical.recommendedOperation
+        ) {
+            throw new Error(
+                `${stageName} 的 triadization focus 漂移：期望与 ${canonicalStageName} 保持一致（${canonicalReference.triadizationFocus} -> ${canonicalReference.recommendedOperation}），实际为 ${normalizedReference.triadizationFocus} -> ${normalizedReference.recommendedOperation}`
+            );
+        }
+    });
+
+    if (!context.expectedTriadizationFocus) {
+        return;
+    }
+
+    const expected = normalizeTriadizationFocusReference(context.expectedTriadizationFocus);
+    if (
+        normalizedCanonical.triadizationFocus !== expected.triadizationFocus ||
+        normalizedCanonical.recommendedOperation !== expected.recommendedOperation
+    ) {
+        throw new Error(
+            `draft-protocol 的 triadization focus 与当前提案不一致：期望 ${context.expectedTriadizationFocus.triadizationFocus} -> ${context.expectedTriadizationFocus.recommendedOperation}，实际为 ${canonicalReference.triadizationFocus} -> ${canonicalReference.recommendedOperation}`
+        );
+    }
 }
 
 function validateTopologyRules(protocol: UpgradeProtocol, existingNodes: TriadNodeDefinition[]) {
@@ -200,4 +249,11 @@ function ensureUniqueActionTarget(actionTargetIds: Set<string>, nodeId: string, 
 
 function normalizeText(value: string) {
     return value.trim().replace(/\s+/g, ' ');
+}
+
+function normalizeTriadizationFocusReference(reference: TriadizationFocusReference) {
+    return {
+        triadizationFocus: reference.triadizationFocus.trim(),
+        recommendedOperation: reference.recommendedOperation.trim().toLowerCase()
+    };
 }

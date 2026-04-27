@@ -22,6 +22,14 @@ import {
 import { calculateBlastRadius, detectCycles, detectTopologicalDrift, generateRenormalizeProtocol } from './analyzer';
 import { LanguageAdapter } from './languageAdapter';
 import {
+    TriadizationConfirmationSource,
+    TriadizationReport,
+    hasConfirmedTriadization,
+    readTriadizationConfirmation,
+    writeTriadizationArtifacts,
+    writeTriadizationConfirmation
+} from './triadization';
+import {
     createDraftTemplate,
     ensureTriadSpec,
     getWorkspacePaths,
@@ -76,6 +84,12 @@ interface DreamRunCliOptions {
     json?: boolean;
 }
 
+interface ExecuteApplyOptions {
+    source: TriadizationConfirmationSource;
+    autoConfirmTriadization?: boolean;
+    triadizationReport?: TriadizationReport;
+}
+
 program.name('triadmind').description('TriadMind：顶点三元法驱动的项目拓扑规划与骨架生成工具').version('1.2.0');
 
 program
@@ -96,6 +110,7 @@ program
             reportBootstrapInitResult(paths, bootstrapResult);
         }
         syncProjectTopology(paths, true);
+        writeTriadizationArtifacts(paths);
         const runtimeResult = await writeRuntimeTopologyArtifacts(paths, {}, true);
         const viewMapResult = writeViewMapArtifactsBestEffort(paths);
         assertNoTopologicalDegradation(paths, previousMap, 'init');
@@ -276,6 +291,7 @@ program
         const paths = getWorkspacePaths(process.cwd());
         ensureTriadSpec(paths);
         syncProjectTopology(paths, Boolean(options.force), normalizeScanModeOption(options.scanMode));
+        writeTriadizationArtifacts(paths);
         const runtimeResult = await writeRuntimeTopologyArtifacts(paths, {}, true);
         const viewMapResult = writeViewMapArtifactsBestEffort(paths);
         reportRuntimeArtifactStatus(paths, runtimeResult);
@@ -844,6 +860,36 @@ program
     });
 
 program
+    .command('triadize')
+    .description('Analyze current topology and emit triadization diagnosis / task artifacts')
+    .option('--json', 'Emit machine-readable triadization report JSON')
+    .option('--confirm', 'Record the current primary triadization proposal as confirmed')
+    .action(async (options: { json?: boolean; confirm?: boolean }) => {
+        const paths = getWorkspacePaths(process.cwd());
+        ensureTriadSpec(paths);
+
+        if (!fs.existsSync(paths.mapFile)) {
+            syncProjectTopology(paths);
+        }
+
+        const report = writeTriadizationArtifacts(paths);
+        reportTriadizationStatus(paths, report);
+
+        if (options.confirm) {
+            const confirmed = await ensureTriadizationConfirmation(paths, report, 'triadize', false);
+            if (!confirmed) {
+                console.log(chalk.red('🛑 已取消三元化确认，未记录 confirmation。'));
+                process.exitCode = 1;
+                return;
+            }
+        }
+
+        if (options.json) {
+            console.log(JSON.stringify(report, null, 2));
+        }
+    });
+
+program
     .command('plan')
     .description('读取 `draft-protocol.json`，生成 `visualizer.html`，并在确认后落地骨架代码')
     .option('--apply', '跳过交互确认，直接执行 apply')
@@ -863,9 +909,13 @@ program
             syncProjectTopology(paths);
         }
 
+        const triadizationReport = writeTriadizationArtifacts(paths);
+        reportTriadizationStatus(paths, triadizationReport);
+
         if (!fs.existsSync(paths.draftFile)) {
             createDraftTemplate(paths);
             console.log(chalk.yellow(`📝 未找到 draft-protocol.json，已生成模板：${paths.draftFile}`));
+            console.log(chalk.yellow(`➡️ 请先参考 ${paths.triadizationReportFile} / ${paths.triadizationTaskFile}，与 AI 助手确认本轮三元化焦点后再生成协议。`));
             console.log(chalk.yellow(`➡️ 请先用 ${paths.promptFile} 让 AI 生成协议，然后重试。`));
             return;
         }
@@ -899,7 +949,7 @@ program
                 {
                     type: 'confirm',
                     name: 'confirm',
-                    message: '确认当前拓扑挂载点正确，并开始生成 / 更新骨架代码吗？',
+                    message: buildTriadizationConfirmationMessage(triadizationReport),
                     default: false
                 }
             ]);
@@ -912,7 +962,11 @@ program
             return;
         }
 
-        executeApply(paths.projectRoot);
+        await executeApply(paths.projectRoot, {
+            source: 'plan',
+            autoConfirmTriadization: Boolean(options.apply),
+            triadizationReport
+        });
     });
 
 program
@@ -944,7 +998,7 @@ program
     .option('--view <architecture|leaf>', 'Set initial visualizer view when --apply generates review graph')
     .option('--show-isolated', 'Show isolated capability nodes in architecture view')
     .option('--full-contract-edges', 'Disable visualizer contract-edge capping')
-    .action((demandParts: string[], options: { demand?: string; apply?: boolean } & DashboardCliOptions) => {
+    .action(async (demandParts: string[], options: { demand?: string; apply?: boolean } & DashboardCliOptions) => {
         const paths = getWorkspacePaths(process.cwd());
         const rawDemand = resolveDemand(demandParts, options.demand, paths);
         const demand = normalizeInvokeDemand(rawDemand);
@@ -963,10 +1017,12 @@ program
 
         prepareWorkspace(paths, demand);
         installAlwaysOnRules(paths);
+        const triadizationReport = writeTriadizationArtifacts(paths);
 
         console.log(chalk.green(`✅ 静默入口已准备：${paths.implementationPromptFile}`));
         console.log(chalk.green(`✅ 协议任务文件：${paths.protocolTaskFile}`));
         console.log(chalk.green(`✅ 协议落盘位置：${paths.draftFile}`));
+        reportTriadizationStatus(paths, triadizationReport);
 
         if (!options.apply) {
             console.log(chalk.yellow('➡️ AI 助手应读取 implementation-prompt.md，静默完成 Macro/Meso/Micro/Protocol。'));
@@ -988,13 +1044,17 @@ program
 
         generateDashboard(paths.mapFile, paths.draftFile, paths.visualizerFile, toDashboardOptions(options));
         console.log(chalk.green(`✅ 静默审核图已生成：${paths.visualizerFile}`));
-        executeApply(paths.projectRoot);
+        await executeApply(paths.projectRoot, {
+            source: 'invoke',
+            autoConfirmTriadization: true,
+            triadizationReport
+        });
     });
 
 program
     .command('apply')
     .description('直接执行 `draft-protocol.json`，生成 / 更新骨架并刷新 `triad-map.json`')
-    .action(() => {
+    .action(async () => {
         const paths = getWorkspacePaths(process.cwd());
 
         if (!fs.existsSync(paths.draftFile)) {
@@ -1003,7 +1063,9 @@ program
             return;
         }
 
-        executeApply(paths.projectRoot);
+        await executeApply(paths.projectRoot, {
+            source: 'apply'
+        });
     });
 
 program
@@ -1219,12 +1281,25 @@ function printPassPrompt(stage: 'macro' | 'meso' | 'micro', demandParts: string[
     console.log(chalk.yellow(`➡️ 完成后继续下一轮，最终汇总到 ${paths.draftFile}`));
 }
 
-function executeApply(projectRoot: string) {
+async function executeApply(projectRoot: string, options: ExecuteApplyOptions) {
     const paths = getWorkspacePaths(projectRoot);
 
     try {
         if (!fs.existsSync(paths.mapFile)) {
             syncProjectTopology(paths);
+        }
+
+        const triadizationReport = options.triadizationReport ?? writeTriadizationArtifacts(paths);
+        reportTriadizationStatus(paths, triadizationReport);
+        const confirmed = await ensureTriadizationConfirmation(
+            paths,
+            triadizationReport,
+            options.source,
+            Boolean(options.autoConfirmTriadization)
+        );
+        if (!confirmed) {
+            console.log(chalk.red('🛑 三元化演进方案尚未确认，已取消 apply。'));
+            return;
         }
 
         const previousMap = readCurrentTriadMap(paths);
@@ -1414,6 +1489,34 @@ function reportViewMapStatus(
     console.log(chalk.green(`✅ View map diagnostics written: ${paths.viewMapDiagnosticsFile}`));
 }
 
+function reportTriadizationStatus(paths: ReturnType<typeof getWorkspacePaths>, report: TriadizationReport) {
+    if (!report.primaryProposal) {
+        console.log(chalk.yellow('[TriadMind] 当前未发现明确的三元化提案。'));
+        console.log(chalk.green(`✅ Triadization report written: ${paths.triadizationReportFile}`));
+        console.log(chalk.green(`✅ Triadization task written: ${paths.triadizationTaskFile}`));
+        return;
+    }
+
+    const proposal = report.primaryProposal;
+    console.log(
+        chalk.cyan(
+            `[TriadMind] triadization focus: ${proposal.targetNodeId} -> ${proposal.recommendedOperation} (${proposal.diagnosis.join(', ')})`
+        )
+    );
+    console.log(chalk.gray(`   - rationale: ${proposal.rationale}`));
+    if (proposal.blastRadius.impactedNodeCount > 0) {
+        console.log(
+            chalk.gray(
+                `   - blast radius: ${proposal.blastRadius.impactedNodeCount} downstream node(s) (${proposal.blastRadius.impactedNodeIds
+                    .slice(0, 8)
+                    .join(', ')})`
+            )
+        );
+    }
+    console.log(chalk.green(`✅ Triadization report written: ${paths.triadizationReportFile}`));
+    console.log(chalk.green(`✅ Triadization task written: ${paths.triadizationTaskFile}`));
+}
+
 function reportBootstrapInitResult(paths: ReturnType<typeof getWorkspacePaths>, result: BootstrapScaffoldInitResult) {
     const created = result.files.filter((item) => item.action === 'created').length;
     const updated = result.files.filter((item) => item.action === 'updated').length;
@@ -1433,6 +1536,50 @@ function reportBootstrapInitResult(paths: ReturnType<typeof getWorkspacePaths>, 
         console.log(chalk.gray(`   ${marker} ${item.key}: ${item.path}`));
     });
     console.log(chalk.green(`[TriadMind] session verify output target: ${paths.bootstrapVerifyFile}`));
+}
+
+function buildTriadizationConfirmationMessage(report: TriadizationReport) {
+    const proposal = report.primaryProposal;
+    if (!proposal) {
+        return '未检测到明确的三元化提案，仍继续当前协议落地吗？';
+    }
+
+    return `确认本轮先对 ${proposal.targetNodeId} 执行 ${proposal.recommendedOperation}（${proposal.diagnosis.join(', ')}），再继续协议 / 骨架演进吗？`;
+}
+
+async function ensureTriadizationConfirmation(
+    paths: ReturnType<typeof getWorkspacePaths>,
+    report: TriadizationReport,
+    source: TriadizationConfirmationSource,
+    autoConfirm = false
+) {
+    if (!report.primaryProposal) {
+        return true;
+    }
+
+    if (hasConfirmedTriadization(paths, report)) {
+        return true;
+    }
+
+    let confirmed = autoConfirm;
+    if (!confirmed) {
+        const answer = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirm',
+                message: buildTriadizationConfirmationMessage(report),
+                default: false
+            }
+        ]);
+        confirmed = answer.confirm;
+    }
+
+    if (!confirmed) {
+        return false;
+    }
+
+    writeTriadizationConfirmation(paths, report, source);
+    return true;
 }
 
 function runAutoDreamAfterCommand(paths: ReturnType<typeof getWorkspacePaths>, trigger: string) {
@@ -1775,11 +1922,60 @@ function validateDraftProtocol(paths: ReturnType<typeof getWorkspacePaths>) {
 
     const existingNodes = readTriadMap(paths.mapFile);
     const config = loadTriadConfig(paths);
-    return assertProtocolShape(protocol, {
+    const expectedTriadizationFocus = resolveExpectedTriadizationFocus(paths);
+    const parsedProtocol = assertProtocolShape(protocol, {
         existingNodes,
         minConfidence: config.protocol.minConfidence,
-        requireConfidence: config.protocol.requireConfidence
+        requireConfidence: config.protocol.requireConfidence,
+        expectedTriadizationFocus
     });
+    assertTriadizationFocusGate(paths);
+    return parsedProtocol;
+}
+
+function assertTriadizationFocusGate(paths: ReturnType<typeof getWorkspacePaths>) {
+    const report = runTopologyVerify(paths);
+    const failedChecks = report.checks.filter(
+        (check) =>
+            (check.key === 'protocol_focus_alignment' || check.key === 'triad_focus_closure') &&
+            check.status === 'fail'
+    );
+
+    if (failedChecks.length === 0) {
+        return;
+    }
+
+    const detail = failedChecks.map((check) => `${check.key}: ${check.detail}`).join('; ');
+    throw new Error(
+        `Triadization focus gate failed: ${detail}. Please realign draft-protocol.json and micro-split.json around the same triadization focus before plan/apply.`
+    );
+}
+
+function resolveExpectedTriadizationFocus(paths: ReturnType<typeof getWorkspacePaths>) {
+    if (fs.existsSync(paths.triadizationReportFile)) {
+        try {
+            const report = readJsonFile<TriadizationReport>(paths.triadizationReportFile);
+            const proposal = report?.primaryProposal;
+            if (proposal && typeof proposal.targetNodeId === 'string' && typeof proposal.recommendedOperation === 'string') {
+                return {
+                    triadizationFocus: proposal.targetNodeId,
+                    recommendedOperation: proposal.recommendedOperation
+                };
+            }
+        } catch {
+            // ignore malformed report and fall through to confirmation
+        }
+    }
+
+    const confirmation = readTriadizationConfirmation(paths);
+    if (!confirmation) {
+        return undefined;
+    }
+
+    return {
+        triadizationFocus: confirmation.targetNodeId,
+        recommendedOperation: confirmation.recommendedOperation
+    };
 }
 
 function prepareWorkspace(paths: ReturnType<typeof getWorkspacePaths>, demand: string) {

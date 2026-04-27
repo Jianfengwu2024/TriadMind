@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export type TriadCategory = string;
 export type TriadOp = 'reuse' | 'modify' | 'create_child';
+export type TriadizationRecommendedOperation = 'aggregate' | 'split' | 'renormalize';
 
 export interface TriadFission {
     problem: string;
@@ -16,7 +17,12 @@ export interface TriadNodeDefinition {
     fission: TriadFission;
 }
 
-export interface MacroSplit {
+export interface TriadizationFocusReference {
+    triadizationFocus: string;
+    recommendedOperation: TriadizationRecommendedOperation;
+}
+
+export interface MacroSplit extends TriadizationFocusReference {
     anchorNodeId: string;
     vertexGoal: string;
     leftBranch: string[];
@@ -54,6 +60,15 @@ export interface MicroClassBlueprint {
     className: string;
     staticRightBranch: MicroPropertyBlueprint[];
     dynamicLeftBranch: MicroMethodBlueprint[];
+}
+
+export interface MesoSplit extends TriadizationFocusReference {
+    classes: MesoClassBlueprint[];
+    pipelines: MesoPipeline[];
+}
+
+export interface MicroSplit extends TriadizationFocusReference {
+    classes: MicroClassBlueprint[];
 }
 
 export interface ReuseAction {
@@ -95,13 +110,8 @@ export interface UpgradeProtocol {
         principle?: string;
     };
     macroSplit?: MacroSplit;
-    mesoSplit?: {
-        classes: MesoClassBlueprint[];
-        pipelines: MesoPipeline[];
-    };
-    microSplit?: {
-        classes: MicroClassBlueprint[];
-    };
+    mesoSplit?: MesoSplit;
+    microSplit?: MicroSplit;
     actions: TriadAction[];
     resultTopology?: TriadNodeDefinition[];
 }
@@ -123,6 +133,7 @@ export interface ProtocolValidationContext {
     existingNodes?: TriadNodeDefinition[];
     minConfidence?: number;
     requireConfidence?: boolean;
+    expectedTriadizationFocus?: TriadizationFocusReference;
 }
 
 export const PREFIX_CATEGORY_MAP: Record<string, TriadCategory> = {
@@ -132,6 +143,7 @@ export const PREFIX_CATEGORY_MAP: Record<string, TriadCategory> = {
 const nonEmptyStringSchema = z.string().trim().min(1);
 const triadCategorySchema = nonEmptyStringSchema;
 const triadOpSchema = z.enum(['reuse', 'modify', 'create_child']);
+const triadizationRecommendedOperationSchema = z.enum(['aggregate', 'split', 'renormalize']);
 
 export const triadFissionSchema = z.object({
     problem: nonEmptyStringSchema,
@@ -146,7 +158,12 @@ export const triadNodeDefinitionSchema = z.object({
     fission: triadFissionSchema
 });
 
-export const macroSplitSchema = z.object({
+export const triadizationFocusReferenceSchema = z.object({
+    triadizationFocus: nonEmptyStringSchema,
+    recommendedOperation: triadizationRecommendedOperationSchema
+});
+
+export const macroSplitSchema = triadizationFocusReferenceSchema.extend({
     anchorNodeId: z.string().trim(),
     vertexGoal: z.string().trim(),
     leftBranch: z.array(nonEmptyStringSchema),
@@ -231,14 +248,14 @@ export const upgradeProtocolSchema = z.object({
         })
         .optional(),
     macroSplit: macroSplitSchema.optional(),
-    mesoSplit: z
-        .object({
+    mesoSplit: triadizationFocusReferenceSchema
+        .extend({
             classes: z.array(mesoClassBlueprintSchema),
             pipelines: z.array(mesoPipelineSchema)
         })
         .optional(),
-    microSplit: z
-        .object({
+    microSplit: triadizationFocusReferenceSchema
+        .extend({
             classes: z.array(microClassBlueprintSchema)
         })
         .optional(),

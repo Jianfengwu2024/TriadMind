@@ -52,6 +52,9 @@ export interface WorkspacePaths {
     microSplitFile: string;
     approvedProtocolFile: string;
     visualizerFile: string;
+    triadizationReportFile: string;
+    triadizationTaskFile: string;
+    triadizationConfirmationFile: string;
     triadSpecFile: string;
     promptFile: string;
     protocolTaskFile: string;
@@ -140,6 +143,9 @@ export function getWorkspacePaths(projectRoot: string): WorkspacePaths {
         microSplitFile: path.join(triadDir, 'micro-split.json'),
         approvedProtocolFile: path.join(triadDir, 'last-approved-protocol.json'),
         visualizerFile: path.join(triadDir, 'visualizer.html'),
+        triadizationReportFile: path.join(triadDir, 'triadization-report.json'),
+        triadizationTaskFile: path.join(triadDir, 'triadization-task.md'),
+        triadizationConfirmationFile: path.join(triadDir, 'triadization-confirmation.json'),
         triadSpecFile: path.join(triadDir, 'triad.md'),
         promptFile: path.join(triadDir, 'upgrade-prompt.md'),
         protocolTaskFile: path.join(triadDir, 'protocol-task.md'),

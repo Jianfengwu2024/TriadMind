@@ -3,6 +3,7 @@ import * as path from 'path';
 import { ensureTriadConfig } from './config';
 import { ensureGovernPolicyFile } from './governPolicy';
 import { analyzeWorkspaceStage } from './stage';
+import { readTriadizationConfirmation, TriadizationReport, writeTriadizationArtifacts } from './triadization';
 import { getWorkspacePaths, ImplementationHandoffInput, normalizePath, WorkspacePaths } from './workspace';
 import {
     buildMacroPromptShape,
@@ -19,10 +20,18 @@ import {
     getMasterPromptImplementationPhaseLines,
     getMasterPromptProtocolPhaseLines,
     getMasterPromptStageRouterLines,
-    getProtocolOutputContractLines
+    getProtocolOutputContractLines,
+    TriadizationFocusSeed
 } from './workflowRightBranch';
 
 export { getWorkspacePaths, type WorkspacePaths, type ImplementationHandoffInput } from './workspace';
+
+type PromptTriadizationFocusContext = TriadizationFocusSeed & {
+    proposalId: string;
+    diagnosis: string[];
+    confirmed: boolean;
+    confirmationSource?: string;
+};
 
 /**
  * @LeftBranch
@@ -69,7 +78,11 @@ export function writePromptPacket(paths: WorkspacePaths, userDemand: string) {
     const shouldResetArtifacts = previousDemand.length > 0 && previousDemand !== normalizedDemand;
 
     createDraftTemplate(paths, userDemand, shouldResetArtifacts);
-    ensureMultiPassTemplates(paths, userDemand, { resetArtifacts: shouldResetArtifacts });
+    const triadizationReport = writeTriadizationArtifacts(paths);
+    ensureMultiPassTemplates(paths, userDemand, {
+        resetArtifacts: shouldResetArtifacts,
+        triadizationFocus: getTriadizationFocusSeed(triadizationReport)
+    });
 
     const protocolPrompt = buildProtocolPrompt(paths, userDemand);
     const implementationPrompt = buildImplementationPrompt(paths, userDemand);
@@ -88,18 +101,22 @@ export function writePromptPacket(paths: WorkspacePaths, userDemand: string) {
  * @LeftBranch
  */
 export function resetPipelineArtifacts(paths: WorkspacePaths, userDemand: string) {
-    fs.writeFileSync(paths.macroSplitFile, JSON.stringify(createMacroSplitSeed(userDemand), null, 2), 'utf-8');
-    fs.writeFileSync(paths.mesoSplitFile, JSON.stringify(createMesoSplitSeed(), null, 2), 'utf-8');
-    fs.writeFileSync(paths.microSplitFile, JSON.stringify(createMicroSplitSeed(), null, 2), 'utf-8');
+    resetPipelineArtifactsWithFocus(
+        paths,
+        userDemand,
+        getTriadizationFocusSeedFromContext(resolveTriadizationFocusContext(paths))
+    );
 }
 
 /**
  * @LeftBranch
  */
 export function ensurePipelineArtifactSeeds(paths: WorkspacePaths, userDemand: string) {
-    writeJsonSeedIfMissing(paths.macroSplitFile, createMacroSplitSeed(userDemand));
-    writeJsonSeedIfMissing(paths.mesoSplitFile, createMesoSplitSeed());
-    writeJsonSeedIfMissing(paths.microSplitFile, createMicroSplitSeed());
+    ensurePipelineArtifactSeedsWithFocus(
+        paths,
+        userDemand,
+        getTriadizationFocusSeedFromContext(resolveTriadizationFocusContext(paths))
+    );
 }
 
 /**
@@ -109,6 +126,9 @@ export function buildProtocolPrompt(paths: WorkspacePaths, userDemand: string) {
     const triadSpec = fs.readFileSync(paths.triadSpecFile, 'utf-8').trim();
     const configJson = safeRead(paths.configFile);
     const mapJson = fs.readFileSync(paths.mapFile, 'utf-8').trim();
+    const triadizationReportJson = safeRead(paths.triadizationReportFile);
+    const triadizationFocus = resolveTriadizationFocusContext(paths, triadizationReportJson);
+    const stage = analyzePromptStage(paths, userDemand, triadizationReportJson);
     const macroJson = safeRead(paths.macroSplitFile);
     const mesoJson = safeRead(paths.mesoSplitFile);
     const microJson = safeRead(paths.microSplitFile);
@@ -133,6 +153,19 @@ export function buildProtocolPrompt(paths: WorkspacePaths, userDemand: string) {
         mapJson,
         '```',
         '',
+        '[Context: Triadization Report JSON]',
+        '```json',
+        triadizationReportJson || '{}',
+        '```',
+        '',
+        '[Context: Triadization Focus]',
+        ...buildTriadizationFocusSummaryLines(triadizationFocus),
+        '',
+        '[Context: Triadization Focus JSON]',
+        '```json',
+        buildTriadizationFocusJson(triadizationFocus),
+        '```',
+        '',
         '[Context: Macro Split JSON]',
         '```json',
         macroJson || '{}',
@@ -151,6 +184,12 @@ export function buildProtocolPrompt(paths: WorkspacePaths, userDemand: string) {
         '[User Demand]',
         JSON.stringify(userDemand.trim()),
         '',
+        '[Triadization Focus Rules]',
+        ...buildTriadizationFocusRuleLines(triadizationFocus),
+        '',
+        '[Triadization Focus Gate]',
+        ...buildTriadizationFocusGateLines(stage),
+        '',
         '[Output Contract]',
         ...getProtocolOutputContractLines()
     ].join('\n');
@@ -163,6 +202,10 @@ export function buildImplementationPrompt(paths: WorkspacePaths, userDemand: str
     const triadSpec = fs.readFileSync(paths.triadSpecFile, 'utf-8').trim();
     const configJson = safeRead(paths.configFile);
     const mapJson = fs.readFileSync(paths.mapFile, 'utf-8').trim();
+    const triadizationReportJson = safeRead(paths.triadizationReportFile);
+    const triadizationFocus = resolveTriadizationFocusContext(paths, triadizationReportJson);
+    const stage = analyzePromptStage(paths, userDemand, triadizationReportJson);
+    const triadizationTask = safeRead(paths.triadizationTaskFile);
 
     return [
         '[System]',
@@ -189,13 +232,33 @@ export function buildImplementationPrompt(paths: WorkspacePaths, userDemand: str
         mapJson,
         '```',
         '',
+        '[Triadization Report JSON]',
+        '```json',
+        triadizationReportJson || '{}',
+        '```',
+        '',
+        '[Triadization Task]',
+        triadizationTask || '当前尚未生成 triadization-task.md',
+        '',
+        '[Triadization Focus]',
+        ...buildTriadizationFocusSummaryLines(triadizationFocus),
+        '',
         '[User Demand]',
         JSON.stringify(userDemand.trim()),
         '',
         '[Execution Workflow]',
         ...getImplementationExecutionWorkflowLines(),
         '',
+        '[Triadization Focus Rules]',
+        ...buildTriadizationFocusRuleLines(triadizationFocus),
+        '',
+        '[Triadization Focus Gate]',
+        ...buildTriadizationFocusGateLines(stage),
+        '',
         '[Output Rules]',
+        '先指出当前建议三元化的节点，以及推荐动作是 aggregate / split / renormalize 中的哪一种。',
+        '先确认这个建议，再进入 Macro / Meso / Micro 三轮拆分。',
+        'Macro / Meso / Micro 三轮结果必须显式保留同一个 `triadizationFocus` 与 `recommendedOperation`，不能静默切换。',
         '先给出 Macro / Meso / Micro 三轮拆分结果。',
         '再给出 `draft-protocol.json` 的严格 JSON 内容。',
         '再给出简洁实现计划。',
@@ -210,6 +273,10 @@ export function buildImplementationPrompt(paths: WorkspacePaths, userDemand: str
 export function buildPipelinePrompt(paths: WorkspacePaths, userDemand: string) {
     const triadSpec = fs.readFileSync(paths.triadSpecFile, 'utf-8').trim();
     const mapJson = fs.readFileSync(paths.mapFile, 'utf-8').trim();
+    const triadizationReportJson = safeRead(paths.triadizationReportFile);
+    const triadizationFocus = resolveTriadizationFocusContext(paths, triadizationReportJson);
+    const stage = analyzePromptStage(paths, userDemand, triadizationReportJson);
+    const triadizationTask = safeRead(paths.triadizationTaskFile);
 
     return [
         '[System]',
@@ -227,24 +294,49 @@ export function buildPipelinePrompt(paths: WorkspacePaths, userDemand: string) {
         mapJson,
         '```',
         '',
+        '[Triadization Report JSON]',
+        '```json',
+        triadizationReportJson || '{}',
+        '```',
+        '',
+        '[Triadization Task]',
+        triadizationTask || '当前尚未生成 triadization-task.md',
+        '',
+        '[Triadization Focus]',
+        ...buildTriadizationFocusSummaryLines(triadizationFocus),
+        '',
         '[User Demand]',
         JSON.stringify(userDemand.trim()),
         '',
+        '[Pass 0: Triadization Diagnosis]',
+        '先指出当前建议三元化的节点，以及推荐动作是 aggregate / split / renormalize 中的哪一种。',
+        '先确认该建议，再进入 Macro-Split。',
+        '',
         '[Pass 1: Macro-Split]',
         `把需求切成：挂载点、左分支（子功能）、右分支（编排 / 配置）。结果写入 ${normalizePath(paths.macroSplitFile)}。`,
+        '输出必须显式填写 `triadizationFocus` 与 `recommendedOperation`，并与当前 focus 保持一致。',
         '',
         '[Pass 2: Meso-Split]',
         `基于 Macro 结果，把子功能切成类与数据管道。结果写入 ${normalizePath(paths.mesoSplitFile)}。`,
+        '输出必须继续沿用同一个 `triadizationFocus` 与 `recommendedOperation`，不得漂移。',
         '',
         '[Pass 3: Micro-Split]',
         `基于 Meso 结果，把类切成属性 / 状态和方法 / 动作，并明确 demand / answer。结果写入 ${normalizePath(paths.microSplitFile)}。`,
+        '输出必须继续沿用同一个 `triadizationFocus` 与 `recommendedOperation`，并把类级左右分支对齐到该 focus。',
         '',
         '[Final Protocol]',
         `把三轮结果折叠进 ${normalizePath(paths.draftFile)}，并提供可 apply 的 \`actions\`。`,
         '',
+        '[Triadization Focus Rules]',
+        ...buildTriadizationFocusRuleLines(triadizationFocus),
+        '',
+        '[Triadization Focus Gate]',
+        ...buildTriadizationFocusGateLines(stage),
+        '',
         '[Rules]',
         '每一轮都必须继承上一轮，不能跳步。',
         '如果上层拆分不稳定，就不能进入下层。',
+        '如果发现需要切换到其他节点或其他动作，必须先停止当前推演并返回 triadization 确认。',
         '最终协议必须包含 `macroSplit`、`mesoSplit`、`microSplit`、`actions`。'
     ].join('\n');
 }
@@ -293,18 +385,22 @@ export function buildMasterPrompt(paths: WorkspacePaths) {
     const macroSplit = safeRead(paths.macroSplitFile);
     const mesoSplit = safeRead(paths.mesoSplitFile);
     const microSplit = safeRead(paths.microSplitFile);
+    const triadizationReport = safeRead(paths.triadizationReportFile);
+    const triadizationTask = safeRead(paths.triadizationTaskFile);
     const pipelinePrompt = safeRead(paths.pipelinePromptFile);
     const approvedProtocol = safeRead(paths.approvedProtocolFile);
     const handoffPrompt = safeRead(paths.handoffPromptFile);
     const applyFilesManifest = safeRead(paths.lastApplyFilesFile);
     const changedFiles = readChangedFiles(paths);
+    const triadizationFocus = resolveTriadizationFocusContext(paths, triadizationReport);
     const stage = analyzeWorkspaceStage({
         latestDemand,
         draftProtocol,
         macroSplit,
         mesoSplit,
         microSplit,
-        approvedProtocol
+        approvedProtocol,
+        triadizationReport
     });
 
     const changedFilesSection =
@@ -340,6 +436,23 @@ export function buildMasterPrompt(paths: WorkspacePaths) {
         '',
         '[Latest User Demand]',
         latestDemand ? JSON.stringify(latestDemand.trim()) : '""',
+        '',
+        '[Triadization Report JSON]',
+        '```json',
+        triadizationReport || '{}',
+        '```',
+        '',
+        '[Triadization Task]',
+        triadizationTask || '当前尚未生成 triadization-task.md',
+        '',
+        '[Triadization Focus]',
+        ...buildTriadizationFocusSummaryLines(triadizationFocus),
+        '',
+        '[Triadization Focus Rules]',
+        ...buildTriadizationFocusRuleLines(triadizationFocus),
+        '',
+        '[Triadization Focus Gate]',
+        ...buildTriadizationFocusGateLines(stage),
         '',
         '[Triad Map JSON]',
         '```json',
@@ -463,12 +576,14 @@ function buildTriadSpec(projectRoot: string) {
 export function ensureMultiPassTemplates(
     paths: WorkspacePaths,
     userDemand: string,
-    options: { resetArtifacts?: boolean } = {}
+    options: { resetArtifacts?: boolean; triadizationFocus?: TriadizationFocusSeed } = {}
 ) {
+    const triadizationFocus =
+        options.triadizationFocus ?? getTriadizationFocusSeedFromContext(resolveTriadizationFocusContext(paths));
     if (options.resetArtifacts) {
-        resetPipelineArtifacts(paths, userDemand);
+        resetPipelineArtifactsWithFocus(paths, userDemand, triadizationFocus);
     } else {
-        ensurePipelineArtifactSeeds(paths, userDemand);
+        ensurePipelineArtifactSeedsWithFocus(paths, userDemand, triadizationFocus);
     }
 
     fs.writeFileSync(paths.macroPromptFile, buildMacroPrompt(paths, userDemand), 'utf-8');
@@ -480,21 +595,98 @@ export function ensureMultiPassTemplates(
  * @LeftBranch
  */
 export function buildMacroPrompt(paths: WorkspacePaths, userDemand: string) {
-    return buildMacroPromptShape(paths, userDemand);
+    const triadizationFocus = resolveTriadizationFocusContext(paths);
+    return [
+        buildMacroPromptShape(paths, userDemand),
+        '',
+        '[Triadization Focus]',
+        ...buildTriadizationFocusSummaryLines(triadizationFocus),
+        '',
+        '[Focus Rules]',
+        ...buildTriadizationFocusRuleLines(triadizationFocus),
+        '',
+        '[Required Output Notes]',
+        ...buildTriadizationFocusOutputLines(
+            triadizationFocus,
+            'Macro-Split 必须围绕同一个挂载点候选来展开，不要把 focus 偷偷换成别的节点。'
+        )
+    ].join('\n');
 }
 
 /**
  * @LeftBranch
  */
 export function buildMesoPrompt(paths: WorkspacePaths, userDemand: string) {
-    return buildMesoPromptShape(paths, userDemand);
+    const triadizationFocus = resolveTriadizationFocusContext(paths);
+    return [
+        buildMesoPromptShape(paths, userDemand),
+        '',
+        '[Triadization Focus]',
+        ...buildTriadizationFocusSummaryLines(triadizationFocus),
+        '',
+        '[Focus Rules]',
+        ...buildTriadizationFocusRuleLines(triadizationFocus),
+        '',
+        '[Required Output Notes]',
+        ...buildTriadizationFocusOutputLines(
+            triadizationFocus,
+            'Meso-Split 中的类与数据管道必须解释为同一 triadization focus 服务，而不是横向扩题。'
+        )
+    ].join('\n');
 }
 
 /**
  * @LeftBranch
  */
 export function buildMicroPrompt(paths: WorkspacePaths, userDemand: string) {
-    return buildMicroPromptShape(paths, userDemand);
+    const triadizationFocus = resolveTriadizationFocusContext(paths);
+    return [
+        buildMicroPromptShape(paths, userDemand),
+        '',
+        '[Triadization Focus]',
+        ...buildTriadizationFocusSummaryLines(triadizationFocus),
+        '',
+        '[Focus Rules]',
+        ...buildTriadizationFocusRuleLines(triadizationFocus),
+        '',
+        '[Required Output Notes]',
+        ...buildTriadizationFocusOutputLines(
+            triadizationFocus,
+            'Micro-Split 中的静态右支与动态左支必须共同完成同一 triadization focus，不能拆成无关职责。'
+        )
+    ].join('\n');
+}
+
+function resetPipelineArtifactsWithFocus(
+    paths: WorkspacePaths,
+    userDemand: string,
+    triadizationFocus?: TriadizationFocusSeed
+) {
+    fs.writeFileSync(
+        paths.macroSplitFile,
+        JSON.stringify(createMacroSplitSeed(userDemand, triadizationFocus), null, 2),
+        'utf-8'
+    );
+    fs.writeFileSync(
+        paths.mesoSplitFile,
+        JSON.stringify(createMesoSplitSeed(triadizationFocus), null, 2),
+        'utf-8'
+    );
+    fs.writeFileSync(
+        paths.microSplitFile,
+        JSON.stringify(createMicroSplitSeed(triadizationFocus), null, 2),
+        'utf-8'
+    );
+}
+
+function ensurePipelineArtifactSeedsWithFocus(
+    paths: WorkspacePaths,
+    userDemand: string,
+    triadizationFocus?: TriadizationFocusSeed
+) {
+    writeJsonSeedIfMissing(paths.macroSplitFile, createMacroSplitSeed(userDemand, triadizationFocus));
+    writeJsonSeedIfMissing(paths.mesoSplitFile, createMesoSplitSeed(triadizationFocus));
+    writeJsonSeedIfMissing(paths.microSplitFile, createMicroSplitSeed(triadizationFocus));
 }
 
 function readChangedFiles(paths: WorkspacePaths) {
@@ -512,8 +704,185 @@ function readChangedFiles(paths: WorkspacePaths) {
     }
 }
 
+function analyzePromptStage(
+    paths: WorkspacePaths,
+    userDemand: string,
+    triadizationReportJson = safeRead(paths.triadizationReportFile)
+) {
+    return analyzeWorkspaceStage({
+        latestDemand: userDemand.trim(),
+        draftProtocol: safeRead(paths.draftFile),
+        macroSplit: safeRead(paths.macroSplitFile),
+        mesoSplit: safeRead(paths.mesoSplitFile),
+        microSplit: safeRead(paths.microSplitFile),
+        approvedProtocol: safeRead(paths.approvedProtocolFile),
+        triadizationReport: triadizationReportJson
+    });
+}
+
 function safeRead(filePath: string) {
     return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8').trim() : '';
+}
+
+function safeParseJson<T>(content: string): T | undefined {
+    if (!content.trim()) {
+        return undefined;
+    }
+
+    try {
+        return JSON.parse(content) as T;
+    } catch {
+        return undefined;
+    }
+}
+
+function getTriadizationFocusSeed(report?: TriadizationReport): TriadizationFocusSeed | undefined {
+    const proposal = report?.primaryProposal;
+    if (!proposal) {
+        return undefined;
+    }
+
+    return {
+        triadizationFocus: proposal.targetNodeId,
+        recommendedOperation: proposal.recommendedOperation
+    };
+}
+
+function getTriadizationFocusSeedFromContext(
+    context?: PromptTriadizationFocusContext
+): TriadizationFocusSeed | undefined {
+    if (!context) {
+        return undefined;
+    }
+
+    return {
+        triadizationFocus: context.triadizationFocus,
+        recommendedOperation: context.recommendedOperation
+    };
+}
+
+function resolveTriadizationFocusContext(
+    paths: WorkspacePaths,
+    triadizationReportJson = safeRead(paths.triadizationReportFile)
+) {
+    const report = safeParseJson<TriadizationReport>(triadizationReportJson);
+    const proposal = report?.primaryProposal;
+    if (!proposal || typeof proposal.targetNodeId !== 'string' || typeof proposal.recommendedOperation !== 'string') {
+        return undefined;
+    }
+
+    const confirmation = readTriadizationConfirmation(paths);
+    const confirmed = confirmation?.proposalId === proposal.proposalId;
+
+    return {
+        proposalId: proposal.proposalId,
+        triadizationFocus: proposal.targetNodeId,
+        recommendedOperation: proposal.recommendedOperation,
+        diagnosis: Array.isArray(proposal.diagnosis)
+            ? proposal.diagnosis.map((item) => String(item).trim()).filter(Boolean)
+            : [],
+        confirmed,
+        confirmationSource: confirmed ? confirmation?.source : undefined
+    } satisfies PromptTriadizationFocusContext;
+}
+
+function buildTriadizationFocusSummaryLines(context?: PromptTriadizationFocusContext) {
+    if (!context) {
+        return ['状态：未检测到 triadization focus。', '请先运行 triadmind triadize，并确认当前顶点三元化焦点。'];
+    }
+
+    return [
+        context.confirmed
+            ? `状态：已确认（来源：${context.confirmationSource ?? 'unknown'}）`
+            : '状态：主提案已生成，但尚未确认。',
+        `焦点：${context.triadizationFocus} -> ${context.recommendedOperation}`,
+        `诊断：${context.diagnosis.join(', ') || 'none'}`
+    ];
+}
+
+function buildTriadizationFocusJson(context?: PromptTriadizationFocusContext) {
+    if (!context) {
+        return JSON.stringify(
+            {
+                triadizationFocus: '',
+                recommendedOperation: '',
+                confirmed: false,
+                diagnosis: []
+            },
+            null,
+            2
+        );
+    }
+
+    return JSON.stringify(
+        {
+            triadizationFocus: context.triadizationFocus,
+            recommendedOperation: context.recommendedOperation,
+            confirmed: context.confirmed,
+            diagnosis: context.diagnosis
+        },
+        null,
+        2
+    );
+}
+
+function buildTriadizationFocusRuleLines(context?: PromptTriadizationFocusContext) {
+    if (!context) {
+        return [
+            '没有明确 triadization focus 时，不要擅自生成新的 Macro / Meso / Micro / Protocol 结果。',
+            '先回到 triadization 对话，确认当前节点与 recommendedOperation。'
+        ];
+    }
+
+    const exactFocus = `\`${context.triadizationFocus}\` -> \`${context.recommendedOperation}\``;
+    const lines = [
+        `后续 Macro / Meso / Micro / Protocol 必须显式引用当前 focus ${exactFocus}。`,
+        `不得把焦点切换到其他节点，不得把动作从 \`${context.recommendedOperation}\` 静默改成别的操作。`,
+        '如果发现必须切换节点或动作，先停止当前推演，返回 triadization 对话重新确认。'
+    ];
+
+    if (context.confirmed) {
+        lines.push('由于该 focus 已确认，后续三轮拆分应把它当作本轮唯一有效演进主线。');
+    } else {
+        lines.push('由于该 focus 尚未确认，后续拆分只能作为围绕该主提案的候选方案，不能当作已批准事实。');
+    }
+
+    return lines;
+}
+
+function buildTriadizationFocusGateLines(stage: ReturnType<typeof analyzeWorkspaceStage>) {
+    const lines = [`status: ${stage.triadizationFocusGateStatus}`];
+
+    if (stage.triadizationFocusGateKind) {
+        lines.push(`failureKind: ${stage.triadizationFocusGateKind}`);
+    }
+    if (stage.triadizationFocusGateSummary) {
+        lines.push(`summary: ${stage.triadizationFocusGateSummary}`);
+    }
+    if (stage.triadizationFocusGateRepairTarget) {
+        lines.push(`repairTarget: ${stage.triadizationFocusGateRepairTarget}`);
+    }
+
+    stage.triadizationFocusGateDetails.slice(0, 4).forEach((detail, index) => {
+        lines.push(`detail${index + 1}: ${detail}`);
+    });
+
+    return lines;
+}
+
+function buildTriadizationFocusOutputLines(
+    context: PromptTriadizationFocusContext | undefined,
+    stageSpecificRule: string
+) {
+    const lines = ['输出 JSON 必须显式包含 `triadizationFocus` 与 `recommendedOperation`。', stageSpecificRule];
+    if (!context) {
+        lines.push('如果当前没有 focus，就保持这两个字段为空字符串，并先回到 triadization 诊断阶段。');
+        return lines;
+    }
+
+    lines.push(`其中 \`triadizationFocus\` 必须等于 \`${context.triadizationFocus}\`。`);
+    lines.push(`其中 \`recommendedOperation\` 必须等于 \`${context.recommendedOperation}\`。`);
+    return lines;
 }
 
 function writeJsonSeedIfMissing(filePath: string, seed: unknown) {
