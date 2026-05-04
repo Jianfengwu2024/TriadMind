@@ -948,6 +948,10 @@ program
             }
         }
 
+        if (options.open === false && !options.apply) {
+            return;
+        }
+
         let shouldApply = Boolean(options.apply);
         if (!shouldApply) {
             const answer = await inquirer.prompt([

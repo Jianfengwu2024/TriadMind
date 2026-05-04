@@ -301,6 +301,48 @@ test('plan rejects draft protocol when micro-split drifts away from the draft pr
     assert.match(result.stdout, /protocol_focus_alignment/i);
 });
 
+test('plan --no-open generates visualizer and exits without interactive confirmation', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-plan-no-open-'));
+    const paths = getWorkspacePaths(root);
+    ensureTriadSpec(paths, true);
+    fs.mkdirSync(paths.triadDir, { recursive: true });
+
+    const map = [
+        {
+            nodeId: 'Workflow.execute',
+            category: 'core',
+            sourcePath: 'src/workflow.ts',
+            fission: {
+                problem: 'Workflow orchestration',
+                demand: ['RunCommand'],
+                answer: ['WorkflowResult']
+            }
+        },
+        {
+            nodeId: 'Consumer1.handle',
+            category: 'core',
+            sourcePath: 'src/consumer_1.ts',
+            fission: {
+                problem: 'Consumer 1',
+                demand: ['WorkflowResult'],
+                answer: ['Consumer1Result']
+            }
+        }
+    ];
+
+    fs.writeFileSync(paths.mapFile, JSON.stringify(map, null, 2), 'utf-8');
+    const report = writeTriadizationArtifacts(paths);
+    writeTriadizationConfirmation(paths, report, 'triadize');
+    fs.writeFileSync(paths.draftFile, JSON.stringify(createDraftProtocol(), null, 2), 'utf-8');
+    fs.writeFileSync(paths.microSplitFile, JSON.stringify(createMicroSplit(), null, 2), 'utf-8');
+
+    const result = runCli(root, ['plan', '--no-open', '--view', 'architecture']);
+    assert.equal(result.status, 0, `plan --no-open should succeed: ${result.stderr || result.stdout}`);
+    assert.match(result.stdout, /演化视图已生成/i);
+    assert.doesNotMatch(result.stdout, /已取消 apply/i);
+    assert.equal(fs.existsSync(paths.visualizerFile), true);
+});
+
 test('apply rejects draft protocol when focused method does not close around the draft protocol focus', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'triadmind-apply-focus-gate-'));
     const paths = getWorkspacePaths(root);
