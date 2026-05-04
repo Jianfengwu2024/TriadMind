@@ -824,7 +824,12 @@ program
         }
 
         const paths = getWorkspacePaths(process.cwd());
+        const config = loadTriadConfig(paths);
         const renormalizeProtocolFile = path.join(paths.triadDir, 'renormalize-protocol.json');
+        const analyzerOptions = {
+            ignoreGenericContracts: config.parser.ignoreGenericContracts,
+            genericContractIgnoreList: config.parser.genericContractIgnoreList
+        };
 
         ensureTriadSpec(paths);
         if (!fs.existsSync(paths.mapFile)) {
@@ -832,7 +837,7 @@ program
         }
 
         const map = readCurrentTriadMap(paths);
-        const cycles = detectCycles(map);
+        const cycles = detectCycles(map, analyzerOptions);
 
         if (cycles.length === 0) {
             console.log(chalk.green('✅ No cyclic dependencies found; renormalization is not required.'));
@@ -842,7 +847,7 @@ program
             return;
         }
 
-        const protocol = generateRenormalizeProtocol(map, cycles);
+        const protocol = generateRenormalizeProtocol(map, cycles, analyzerOptions);
         fs.writeFileSync(renormalizeProtocolFile, JSON.stringify(protocol, null, 2), 'utf-8');
 
         console.log(chalk.yellow(`⚠️ Detected ${cycles.length} cyclic component(s).`));

@@ -364,3 +364,47 @@ test('triadize command emits report and task artifacts', () => {
     assert.equal(fs.existsSync(path.join(root, '.triadmind', 'triadization-report.json')), true);
     assert.equal(fs.existsSync(path.join(root, '.triadmind', 'triadization-task.md')), true);
 });
+
+test('renormalize command respects project generic contract ignore config', () => {
+    const root = createTriadizeFixture([
+        {
+            nodeId: 'Alpha.execute',
+            category: 'core',
+            sourcePath: 'src/alpha.py',
+            fission: {
+                problem: 'Alpha stage',
+                demand: ['Context (ctx)', 'dict[str, DataPacket] (inputs)'],
+                answer: ['dict[str, DataPacket]']
+            }
+        },
+        {
+            nodeId: 'Beta.execute',
+            category: 'core',
+            sourcePath: 'src/beta.py',
+            fission: {
+                problem: 'Beta stage',
+                demand: ['Context (ctx)', 'dict[str, DataPacket] (inputs)'],
+                answer: ['dict[str, DataPacket]']
+            }
+        }
+    ]);
+
+    fs.writeFileSync(
+        path.join(root, '.triadmind', 'config.json'),
+        JSON.stringify(
+            {
+                parser: {
+                    genericContractIgnoreList: ['context', 'dict[str,datapacket]']
+                }
+            },
+            null,
+            2
+        ),
+        'utf-8'
+    );
+
+    const result = runCli(root, ['renormalize']);
+    assert.equal(result.status, 0, `renormalize failed: ${result.stderr || result.stdout}`);
+    assert.match(result.stdout, /No cyclic dependencies found/i);
+    assert.equal(fs.existsSync(path.join(root, '.triadmind', 'renormalize-protocol.json')), false);
+});
